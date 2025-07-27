@@ -10,6 +10,11 @@ export interface GridPaintCanvasMethods {
   setColor: () => void;
   setBorderWidth: (width: number) => void;
   saveIMG: () => void;
+  setActiveLayer: (layerId: number | null) => void;
+  toggleLayerVisibility: (layerId: number) => void;
+  createNewLayer: () => boolean;
+  deleteLayer: (layerId: number) => void;
+  getLayerState: () => { layers: Layer[], activeLayerId: number | null };
 }
 
 interface GridPoint {
@@ -59,6 +64,101 @@ class RasterPoint {
     }
   }
   
+  renderBlobBorderOnly(ctx: CanvasRenderingContext2D, gridSize: number, color: string, borderWidth: number) {
+    const centerX = this.x * gridSize + gridSize / 2;
+    const centerY = this.y * gridSize + gridSize / 2;
+    const elementSize = gridSize / 2;
+    const magicNr = 0.553; // Bezier magic number for quarter circles
+    
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = borderWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    
+    const isCenter = this.neighbors[1][1];
+    
+    if (isCenter) {
+      // This point is active - render 4 quadrants based on exact neighbor positions
+      
+      // DOWN RIGHT quadrant (0 degrees)
+      ctx.save();
+      if (this.neighbors[2][1] || this.neighbors[2][2] || this.neighbors[1][2]) {
+        this.drawElement0BorderOnly(ctx, elementSize, borderWidth);
+      } else {
+        this.drawElement1BorderOnly(ctx, elementSize, magicNr, borderWidth);
+      }
+      ctx.restore();
+      
+      // DOWN LEFT quadrant (90 degrees)
+      ctx.save();
+      ctx.rotate(Math.PI / 2);
+      if (this.neighbors[0][1] || this.neighbors[0][2] || this.neighbors[1][2]) {
+        this.drawElement0BorderOnly(ctx, elementSize, borderWidth);
+      } else {
+        this.drawElement1BorderOnly(ctx, elementSize, magicNr, borderWidth);
+      }
+      ctx.restore();
+      
+      // UP LEFT quadrant (180 degrees)
+      ctx.save();
+      ctx.rotate(Math.PI);
+      if (this.neighbors[0][1] || this.neighbors[0][0] || this.neighbors[1][0]) {
+        this.drawElement0BorderOnly(ctx, elementSize, borderWidth);
+      } else {
+        this.drawElement1BorderOnly(ctx, elementSize, magicNr, borderWidth);
+      }
+      ctx.restore();
+      
+      // UP RIGHT quadrant (270 degrees)
+      ctx.save();
+      ctx.rotate(3 * Math.PI / 2);
+      if (this.neighbors[1][0] || this.neighbors[2][0] || this.neighbors[2][1]) {
+        this.drawElement0BorderOnly(ctx, elementSize, borderWidth);
+      } else {
+        this.drawElement1BorderOnly(ctx, elementSize, magicNr, borderWidth);
+      }
+      ctx.restore();
+      
+    } else {
+      // This point is inactive - check for diagonal bridges
+      
+      // DOWN RIGHT bridge
+      if (this.neighbors[2][1] && this.neighbors[1][2]) {
+        ctx.save();
+        this.drawElement2BorderOnly(ctx, elementSize, magicNr, borderWidth);
+        ctx.restore();
+      }
+      
+      // DOWN LEFT bridge
+      if (this.neighbors[1][2] && this.neighbors[0][1]) {
+        ctx.save();
+        ctx.rotate(Math.PI / 2);
+        this.drawElement2BorderOnly(ctx, elementSize, magicNr, borderWidth);
+        ctx.restore();
+      }
+      
+      // UP LEFT bridge
+      if (this.neighbors[0][1] && this.neighbors[1][0]) {
+        ctx.save();
+        ctx.rotate(Math.PI);
+        this.drawElement2BorderOnly(ctx, elementSize, magicNr, borderWidth);
+        ctx.restore();
+      }
+      
+      // UP RIGHT bridge
+      if (this.neighbors[1][0] && this.neighbors[2][1]) {
+        ctx.save();
+        ctx.rotate(3 * Math.PI / 2);
+        this.drawElement2BorderOnly(ctx, elementSize, magicNr, borderWidth);
+        ctx.restore();
+      }
+    }
+    
+    ctx.restore();
+  }
+
   renderBlob(ctx: CanvasRenderingContext2D, gridSize: number, color: string, borderWidth: number) {
     const centerX = this.x * gridSize + gridSize / 2;
     const centerY = this.y * gridSize + gridSize / 2;
@@ -160,9 +260,11 @@ class RasterPoint {
     ctx.fillRect(0, 0, elementSize, elementSize);
     
     // Stroke the rectangle border for laser cutting
-    ctx.beginPath();
-    ctx.rect(0, 0, elementSize, elementSize);
-    ctx.stroke();
+    if (borderWidth > 0) {
+      ctx.beginPath();
+      ctx.rect(0, 0, elementSize, elementSize);
+      ctx.stroke();
+    }
   }
   
   drawElement1(ctx: CanvasRenderingContext2D, elementSize: number, magicNr: number, borderWidth: number) {
@@ -182,7 +284,9 @@ class RasterPoint {
     
     // Fill and stroke for both visual and laser cutting
     ctx.fill();
-    ctx.stroke();
+    if (borderWidth > 0) {
+      ctx.stroke();
+    }
   }
   
   drawElement2(ctx: CanvasRenderingContext2D, elementSize: number, magicNr: number, borderWidth: number) {
@@ -202,6 +306,49 @@ class RasterPoint {
     
     // Fill and stroke for both visual and laser cutting
     ctx.fill();
+    if (borderWidth > 0) {
+      ctx.stroke();
+    }
+  }
+
+  drawElement0BorderOnly(ctx: CanvasRenderingContext2D, elementSize: number, borderWidth: number) {
+    // Stroke the rectangle border only
+    ctx.beginPath();
+    ctx.rect(0, 0, elementSize, elementSize);
+    ctx.stroke();
+  }
+  
+  drawElement1BorderOnly(ctx: CanvasRenderingContext2D, elementSize: number, magicNr: number, borderWidth: number) {
+    // Create the curved quarter path - border only
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(elementSize, 0);
+    ctx.bezierCurveTo(
+      elementSize,
+      elementSize * magicNr,
+      elementSize * magicNr,
+      elementSize,
+      0,
+      elementSize
+    );
+    ctx.closePath();
+    ctx.stroke();
+  }
+  
+  drawElement2BorderOnly(ctx: CanvasRenderingContext2D, elementSize: number, magicNr: number, borderWidth: number) {
+    // Create the diagonal bridge path - border only
+    ctx.beginPath();
+    ctx.moveTo(elementSize, 0);
+    ctx.bezierCurveTo(
+      elementSize,
+      elementSize * magicNr,
+      elementSize * magicNr,
+      elementSize,
+      0,
+      elementSize
+    );
+    ctx.lineTo(elementSize, elementSize);
+    ctx.closePath();
     ctx.stroke();
   }
 }
@@ -216,7 +363,7 @@ export const GridPaintCanvas = forwardRef<GridPaintCanvasMethods, GridPaintCanva
       layers: [
         { id: 1, points: new Set<string>(), visible: true }
       ] as Layer[],
-      activeLayerId: 1,
+      activeLayerId: 1 as number | null,
       rasterPoints: new Map<string, RasterPoint>(),
       isDragging: false
     });
@@ -282,29 +429,59 @@ export const GridPaintCanvas = forwardRef<GridPaintCanvasMethods, GridPaintCanva
       // Render layers from bottom to top (6 -> 1)
       const sortedLayers = [...layers].sort((a, b) => b.id - a.id);
       
+      // First pass: render all layers with their gray colors (fill only)
       sortedLayers.forEach(layer => {
         if (!layer.visible) return;
         
-        // Determine layer color (grayscale tinting)
-        let color = '#808080'; // Default gray
-        if (layer.id === activeLayerId) {
-          color = '#000000'; // Active layer is black
-        } else {
-          // Grayscale tint based on layer depth
-          const intensity = Math.max(50, 200 - (layer.id - 1) * 25);
-          color = `rgb(${intensity}, ${intensity}, ${intensity})`;
-        }
+        // All layers use grayscale tinting based on depth
+        const intensity = Math.max(100, 220 - (layer.id - 1) * 20);
+        const color = `rgb(${intensity}, ${intensity}, ${intensity})`;
         
-        // Only render points that have neighbors (are part of blob shapes)
+        // We need to check all raster points for this layer to render bridges properly
         rasterPoints.forEach(point => {
-          const key = `${point.x},${point.y}`;
+          // Create a temporary layer state with only this layer's points
+          const tempLayers = [{ 
+            id: layer.id, 
+            points: layer.points, 
+            visible: true 
+          }];
+          
+          point.updateNeighbors(tempLayers, stateRef.current.gridSize);
+          
+          // Check if this point should render anything for this layer
+          const pointKey = `${point.x},${point.y}`;
+          const isActive = layer.points.has(pointKey);
           const hasActiveNeighbors = point.neighbors.some(row => row.some(cell => cell));
           
-          if (hasActiveNeighbors) {
-            point.renderBlob(ctx, stateRef.current.gridSize, color, stateRef.current.borderWidth);
+          if (isActive || hasActiveNeighbors) {
+            point.renderBlob(ctx, stateRef.current.gridSize, color, 0); // No border for fill pass
           }
         });
       });
+      
+      // Second pass: render active layer borders on top
+      if (activeLayerId !== null) {
+        const activeLayer = layers.find(l => l.id === activeLayerId);
+        if (activeLayer && activeLayer.visible) {
+          rasterPoints.forEach(point => {
+            const tempLayers = [{ 
+              id: activeLayer.id, 
+              points: activeLayer.points, 
+              visible: true 
+            }];
+            
+            point.updateNeighbors(tempLayers, stateRef.current.gridSize);
+            
+            const pointKey = `${point.x},${point.y}`;
+            const isActive = activeLayer.points.has(pointKey);
+            const hasActiveNeighbors = point.neighbors.some(row => row.some(cell => cell));
+            
+            if (isActive || hasActiveNeighbors) {
+              point.renderBlobBorderOnly(ctx, stateRef.current.gridSize, '#000000', stateRef.current.borderWidth + 1);
+            }
+          });
+        }
+      }
     }, [updateNeighbors]);
 
     const getGridCoordinates = useCallback((clientX: number, clientY: number) => {
@@ -326,6 +503,10 @@ export const GridPaintCanvas = forwardRef<GridPaintCanvasMethods, GridPaintCanva
       if (!coords) return;
       
       const { activeLayerId, layers, currentTool } = stateRef.current;
+      
+      // Only allow painting if there's an active layer
+      if (activeLayerId === null) return;
+      
       const activeLayer = layers.find(l => l.id === activeLayerId);
       if (!activeLayer) return;
       
@@ -424,7 +605,59 @@ export const GridPaintCanvas = forwardRef<GridPaintCanvasMethods, GridPaintCanva
         link.download = 'gridpaint.png';
         link.href = canvas.toDataURL();
         link.click();
-      }
+      },
+
+      setActiveLayer: (layerId: number | null) => {
+        stateRef.current.activeLayerId = layerId;
+        render();
+      },
+
+      toggleLayerVisibility: (layerId: number) => {
+        const layer = stateRef.current.layers.find(l => l.id === layerId);
+        if (layer) {
+          layer.visible = !layer.visible;
+          render();
+        }
+      },
+
+      createNewLayer: () => {
+        const { layers } = stateRef.current;
+        if (layers.length >= 6) return false;
+        
+        const newLayerId = Math.max(...layers.map(l => l.id)) + 1;
+        const newLayer: Layer = {
+          id: newLayerId,
+          points: new Set<string>(),
+          visible: true
+        };
+        
+        layers.push(newLayer);
+        stateRef.current.activeLayerId = newLayerId;
+        render();
+        return true;
+      },
+
+      deleteLayer: (layerId: number) => {
+        const { layers } = stateRef.current;
+        if (layers.length <= 1) return; // Keep at least one layer
+        
+        const layerIndex = layers.findIndex(l => l.id === layerId);
+        if (layerIndex === -1) return;
+        
+        layers.splice(layerIndex, 1);
+        
+        // Update active layer if the deleted layer was active
+        if (stateRef.current.activeLayerId === layerId) {
+          stateRef.current.activeLayerId = layers.length > 0 ? layers[0].id : null;
+        }
+        
+        render();
+      },
+
+      getLayerState: () => ({
+        layers: [...stateRef.current.layers],
+        activeLayerId: stateRef.current.activeLayerId
+      })
     }));
 
     return (
