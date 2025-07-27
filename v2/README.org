@@ -1,0 +1,36 @@
+#+title: vite-app-template installation guide
+
+* introduction
+
+this document provides instructions on how to install and set up the
+vite-app-template from its github repository. there are two versions available
+for installation: the main version and the redux version.
+
+* what's in it?
+
+a empty project on the following stack:
+- bun
+- vite
+- typescript
+- react
+- twin.macro
+- shadcn/ui
+
+* installation
+
+** main version
+
+#+begin_src shell
+npx degit jpjagt/vite-app-template#main my-vite-app
+#+end_src
+
+** redux version
+
+#+begin_src shell
+npx degit jpjagt/vite-app-template#redux my-vite-app-redux
+#+end_src
+
+* post-installation
+
+after installation, you may want to change the name of your project in
+=package.json=.
