@@ -1,11 +1,7 @@
 import { Button } from "@/components/ui/button"
-import { Plus, Eye, EyeOff } from "lucide-react"
-
-interface Layer {
-  id: number
-  points: Set<string>
-  visible: boolean
-}
+import { Eye, EyeOff, Grid3X3, Square } from "lucide-react"
+import { useEffect } from "react"
+import type { Layer } from "@/stores/drawingStores"
 
 interface LayerControlsProps {
   layers: Layer[]
@@ -13,6 +9,8 @@ interface LayerControlsProps {
   onLayerSelect: (layerId: number | null) => void
   onLayerVisibilityToggle: (layerId: number) => void
   onCreateLayer: () => void
+  onLayerRenderStyleToggle: (layerId: number) => void
+  onCreateOrActivateLayer: (layerId: number) => void
   maxLayers?: number
 }
 
@@ -22,6 +20,8 @@ export const LayerControls = ({
   onLayerSelect,
   onLayerVisibilityToggle,
   onCreateLayer,
+  onLayerRenderStyleToggle,
+  onCreateOrActivateLayer,
   maxLayers = 6,
 }: LayerControlsProps) => {
   const handleLayerClick = (layerId: number) => {
@@ -29,9 +29,28 @@ export const LayerControls = ({
     if (activeLayerId === layerId) {
       onLayerSelect(null)
     } else {
-      onLayerSelect(layerId)
+      onCreateOrActivateLayer(layerId)
     }
   }
+
+  // Keyboard shortcuts for layer switching
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      const key = e.key
+      if (key >= "1" && key <= "6") {
+        e.preventDefault()
+        const layerId = parseInt(key)
+        if (activeLayerId === layerId) {
+          onLayerSelect(null) // Deactivate if already active
+        } else {
+          onCreateOrActivateLayer(layerId)
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyPress)
+    return () => window.removeEventListener("keydown", handleKeyPress)
+  }, [activeLayerId, onLayerSelect, onCreateOrActivateLayer])
 
   return (
     <div className='fixed top-5 left-5 flex flex-col gap-2'>
@@ -48,43 +67,47 @@ export const LayerControls = ({
               <Button
                 size='icon'
                 variant={isActive ? "default" : "ghost"}
-                onClick={() => exists && handleLayerClick(layerId)}
-                disabled={!exists}
+                onClick={() => handleLayerClick(layerId)}
                 className='size-5'
               >
                 {layerId}
               </Button>
 
-              {/* Visibility toggle below each layer button */}
+              {/* Controls below each layer button */}
               {exists && (
-                <Button
-                  size='icon'
-                  variant='ghost'
-                  onClick={() => onLayerVisibilityToggle(layerId)}
-                  className='size-5 text-muted-foreground'
-                >
-                  {layer?.visible ? (
-                    <Eye className='w-3 h-3' />
-                  ) : (
-                    <EyeOff className='w-3 h-3' />
-                  )}
-                </Button>
+                <div className='flex flex-col gap-1'>
+                  {/* Visibility toggle */}
+                  <Button
+                    size='icon'
+                    variant='ghost'
+                    onClick={() => onLayerVisibilityToggle(layerId)}
+                    className='size-5 text-muted-foreground'
+                  >
+                    {layer?.isVisible ? (
+                      <Eye className='w-3 h-3' />
+                    ) : (
+                      <EyeOff className='w-3 h-3' />
+                    )}
+                  </Button>
+
+                  {/* Render style toggle */}
+                  <Button
+                    size='icon'
+                    variant='ghost'
+                    onClick={() => onLayerRenderStyleToggle(layerId)}
+                    className='size-5 text-muted-foreground'
+                  >
+                    {layer?.renderStyle === "tiles" ? (
+                      <Grid3X3 className='w-3 h-3' />
+                    ) : (
+                      <Square className='w-3 h-3' />
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
           )
         })}
-
-        {/* Add new layer button */}
-        {layers.length < maxLayers && (
-          <Button
-            size='icon'
-            variant='ghost'
-            onClick={onCreateLayer}
-            className='w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white'
-          >
-            <Plus className='w-4 h-4' />
-          </Button>
-        )}
       </div>
 
       {/* Active layer indicator */}
