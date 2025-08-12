@@ -11,6 +11,7 @@ import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
 import type { Tool } from "./ToolSelection"
 import { showActiveLayerOutline } from "@/stores/ui"
 import useDrawingState from "@/hooks/useDrawingState"
+import { exportDrawingAsJSON, exportAllLayersAsSVG } from "@/lib/export/exportUtils"
 import {
   type Layer,
   $canvasView,
@@ -305,10 +306,12 @@ class RasterPoint {
     elementSize: number,
     borderWidth: number,
   ) {
-    ctx.fillRect(0, 0, elementSize, elementSize)
+    // Round to pixel boundaries and add small overlap to prevent gaps
+    const pixelSize = Math.ceil(elementSize) + 0.5
+    ctx.fillRect(-0.25, -0.25, pixelSize, pixelSize)
     if (borderWidth > 0) {
       ctx.beginPath()
-      ctx.rect(0, 0, elementSize, elementSize)
+      ctx.rect(-0.25, -0.25, pixelSize, pixelSize)
       ctx.stroke()
     }
   }
@@ -368,8 +371,10 @@ class RasterPoint {
     elementSize: number,
     borderWidth: number,
   ) {
+    // Round to pixel boundaries and add small overlap to prevent gaps
+    const pixelSize = Math.ceil(elementSize) + 0.5
     ctx.beginPath()
-    ctx.rect(0, 0, elementSize, elementSize)
+    ctx.rect(-0.25, -0.25, pixelSize, pixelSize)
     ctx.stroke()
   }
 
@@ -505,6 +510,9 @@ export const GridPaintCanvas = forwardRef<
 
     const ctx = canvas.getContext("2d")
     if (!ctx) return
+
+    // Disable anti-aliasing for crisp pixel rendering
+    ctx.imageSmoothingEnabled = false
 
     const displayWidth = window.innerWidth
     const displayHeight = window.innerHeight
@@ -903,10 +911,24 @@ export const GridPaintCanvas = forwardRef<
       const canvas = canvasRef.current
       if (!canvas) return
 
-      const link = document.createElement("a")
-      link.download = "gridpaint.png"
-      link.href = canvas.toDataURL()
-      link.click()
+      // Export PNG
+      const pngLink = document.createElement("a")
+      pngLink.download = `${drawingMeta.name || 'gridpaint'}.png`
+      pngLink.href = canvas.toDataURL()
+      pngLink.click()
+
+      // Export JSON data
+      const currentDocument = {
+        ...drawingMeta,
+        ...canvasView,
+        layers: layersState.layers,
+      }
+      exportDrawingAsJSON(currentDocument)
+
+      // Export SVG files for each layer
+      setTimeout(() => {
+        exportAllLayersAsSVG(layersState.layers, canvasView.gridSize, canvasView.borderWidth, drawingMeta.name)
+      }, 200)
     },
 
     setActiveLayer: (layerId: number | null) => {

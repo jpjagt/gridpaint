@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:lucide.dev)",
+      "Bash(mkdir:*)",
+      "WebFetch(domain:api.lucide.dev)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl:*)",
+      "Bash(pnpm add:*)"
+    ],
+    "deny": []
+  }
+}

@@ -150,7 +150,7 @@ export default function Home() {
               {/* Title and metadata */}
               <div className='p-3 border-t border-gray-100'>
                 <a
-                  href={`#/drawings/${drawing.id}`}
+                  href={`#/grids/${drawing.id}`}
                   className='block font-medium text-gray-900 hover:underline transition-colors mb-1'
                 >
                   {drawing.name}
