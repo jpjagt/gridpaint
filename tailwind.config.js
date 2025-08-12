@@ -51,6 +51,23 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        canvas: {
+          background: "hsl(var(--canvas-background))",
+          grid: "hsl(var(--canvas-grid-line))",
+          layer: {
+            1: "hsl(var(--canvas-layer-1))",
+            2: "hsl(var(--canvas-layer-2))",
+            3: "hsl(var(--canvas-layer-3))",
+            4: "hsl(var(--canvas-layer-4))",
+            5: "hsl(var(--canvas-layer-5))",
+            6: "hsl(var(--canvas-layer-6))",
+            border: "hsl(var(--canvas-layer-border))",
+          },
+          outline: {
+            active: "hsl(var(--canvas-outline-active))",
+            bridge: "hsl(var(--canvas-outline-bridge))",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

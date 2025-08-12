@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Eye, EyeOff, Grid3X3, Square } from "lucide-react"
 import { useEffect } from "react"
 import type { Layer } from "@/stores/drawingStores"
+import { ModeToggle } from "@/components/ModeToggle"
 
 interface LayerControlsProps {
   layers: Layer[]
@@ -112,15 +113,20 @@ export const LayerControls = ({
 
       {/* Active layer indicator */}
       {activeLayerId && (
-        <div className='text-xs text-white/70 font-mono text-center'>
+        <div className='text-xs text-muted-foreground font-mono text-center'>
           Layer {activeLayerId}
         </div>
       )}
       {activeLayerId === null && (
-        <div className='text-xs text-white/50 font-mono text-center'>
+        <div className='text-xs text-muted-foreground/70 font-mono text-center'>
           View Only
         </div>
       )}
+
+      {/* Theme toggle */}
+      <div className='mt-2 flex justify-center'>
+        <ModeToggle />
+      </div>
     </div>
   )
 }

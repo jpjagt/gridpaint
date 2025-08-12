@@ -9,9 +9,20 @@ import {
 import { useStore } from "@nanostores/react"
 import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
 import type { Tool } from "./ToolSelection"
+import { magicNr } from "@/lib/constants"
+
+const getCanvasColor = (varName: string): string => {
+  const hslValue = getComputedStyle(document.documentElement)
+    .getPropertyValue(varName)
+    .trim()
+  return hslValue ? `hsl(${hslValue})` : "#000000"
+}
 import { showActiveLayerOutline } from "@/stores/ui"
 import useDrawingState from "@/hooks/useDrawingState"
-import { exportDrawingAsJSON, exportAllLayersAsSVG } from "@/lib/export/exportUtils"
+import {
+  exportDrawingAsJSON,
+  exportAllLayersAsSVG,
+} from "@/lib/export/exportUtils"
 import {
   type Layer,
   $canvasView,
@@ -93,7 +104,6 @@ class RasterPoint {
     const centerX = this.x * gridSize + gridSize / 2
     const centerY = this.y * gridSize + gridSize / 2
     const elementSize = gridSize / 2 + borderWidth
-    const magicNr = 0.553
 
     ctx.save()
     ctx.translate(centerX, centerY)
@@ -201,7 +211,6 @@ class RasterPoint {
     const centerX = this.x * gridSize + gridSize / 2
     const centerY = this.y * gridSize + gridSize / 2
     const elementSize = gridSize / 2 + borderWidth
-    const magicNr = 0.553
 
     ctx.save()
     ctx.translate(centerX, centerY)
@@ -517,8 +526,8 @@ export const GridPaintCanvas = forwardRef<
     const displayWidth = window.innerWidth
     const displayHeight = window.innerHeight
 
-    // Clear canvas
-    ctx.fillStyle = "#ffffff"
+    // Clear canvas with semantic background color
+    ctx.fillStyle = getCanvasColor("--canvas-background")
     ctx.fillRect(0, 0, displayWidth, displayHeight)
 
     // Apply zoom and pan transforms
@@ -580,9 +589,8 @@ export const GridPaintCanvas = forwardRef<
     sortedLayers.forEach((layer) => {
       if (!layer.isVisible) return
 
-      // All layers use grayscale tinting based on depth
-      const intensity = Math.max(100, 220 - (layer.id - 1) * 20)
-      const color = `rgb(${intensity}, ${intensity}, ${intensity})`
+      // Use layer-specific semantic colors (layer 1 = lightest, layer 6 = darkest)
+      const color = getCanvasColor(`--canvas-layer-${layer.id}`)
 
       // Only render points that are in our pointsToRender set
       pointsToRender.forEach((pointKey) => {
@@ -611,16 +619,11 @@ export const GridPaintCanvas = forwardRef<
         if (isActive || hasActiveNeighbors) {
           if (layer.renderStyle === "tiles") {
             // Render with tiled borders in black
-            point.renderBlob(
-              ctx,
-              gridSize,
-              color,
-              canvasView.borderWidth,
-            )
+            point.renderBlob(ctx, gridSize, color, canvasView.borderWidth)
             point.renderBlobBorderOnly(
               ctx,
               gridSize,
-              "#000000",
+              getCanvasColor("--canvas-layer-border"),
               canvasView.borderWidth,
             )
           } else {
@@ -657,7 +660,12 @@ export const GridPaintCanvas = forwardRef<
           )
 
           if (isActive || hasActiveNeighbors) {
-            point.renderBlobOutline(ctx, gridSize, "#000000", 2)
+            point.renderBlobOutline(
+              ctx,
+              gridSize,
+              getCanvasColor("--canvas-outline-active"),
+              2,
+            )
           }
         })
       }
@@ -913,7 +921,7 @@ export const GridPaintCanvas = forwardRef<
 
       // Export PNG
       const pngLink = document.createElement("a")
-      pngLink.download = `${drawingMeta.name || 'gridpaint'}.png`
+      pngLink.download = `${drawingMeta.name || "gridpaint"}.png`
       pngLink.href = canvas.toDataURL()
       pngLink.click()
 
@@ -927,7 +935,12 @@ export const GridPaintCanvas = forwardRef<
 
       // Export SVG files for each layer
       setTimeout(() => {
-        exportAllLayersAsSVG(layersState.layers, canvasView.gridSize, canvasView.borderWidth, drawingMeta.name)
+        exportAllLayersAsSVG(
+          layersState.layers,
+          canvasView.gridSize,
+          canvasView.borderWidth,
+          drawingMeta.name,
+        )
       }, 200)
     },
 

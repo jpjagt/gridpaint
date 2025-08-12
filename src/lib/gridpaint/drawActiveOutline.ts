@@ -1,9 +1,18 @@
+import { magicNr } from "@/lib/constants"
+
 const DEBUG_OUTLINE = false
 
 interface RasterPoint {
   x: number
   y: number
   neighbors: boolean[][]
+}
+
+const getCanvasColor = (varName: string): string => {
+  const hslValue = getComputedStyle(document.documentElement)
+    .getPropertyValue(varName)
+    .trim()
+  return hslValue ? `hsl(${hslValue})` : "#000000"
 }
 
 export function drawActiveLayerOutline(
@@ -13,12 +22,17 @@ export function drawActiveLayerOutline(
   color: string,
   borderWidth: number,
 ) {
+  // Use semantic colors, fallback to passed color for export compatibility
+  const outlineColor =
+    color === getCanvasColor("--canvas-outline-active")
+      ? getCanvasColor("--canvas-outline-active")
+      : color
+  const bridgeColor = getCanvasColor("--canvas-outline-bridge")
   // Only render outline segments for the actual perimeter of the shape
   // This means we only draw edges that face empty space (no neighbors)
   const centerX = point.x * gridSize + gridSize / 2
   const centerY = point.y * gridSize + gridSize / 2
   const elementSize = gridSize / 2
-  const magicNr = 0.553
 
   ctx.save()
   ctx.translate(centerX, centerY)
@@ -68,21 +82,26 @@ export function drawActiveLayerOutline(
 
     // Check for bridges in adjacent empty pixels that would make our edges redundant
     // For right edge: check if bottom-right empty pixel has a bridge
-    const hasAdjacentBottomRightBridge = !point.neighbors[2][2] && point.neighbors[2][1] && point.neighbors[1][2]
-    // For bottom edge: check if bottom-right empty pixel has a bridge  
-    const hasAdjacentBottomRightBridgeForBottom = !point.neighbors[2][2] && point.neighbors[2][1] && point.neighbors[1][2]
+    const hasAdjacentBottomRightBridge =
+      !point.neighbors[2][2] && point.neighbors[2][1] && point.neighbors[1][2]
+    // For bottom edge: check if bottom-right empty pixel has a bridge
+    const hasAdjacentBottomRightBridgeForBottom =
+      !point.neighbors[2][2] && point.neighbors[2][1] && point.neighbors[1][2]
     // For top edge: check if top-right empty pixel has a bridge
-    const hasAdjacentTopRightBridge = !point.neighbors[2][0] && point.neighbors[2][1] && point.neighbors[1][0]
+    const hasAdjacentTopRightBridge =
+      !point.neighbors[2][0] && point.neighbors[2][1] && point.neighbors[1][0]
     // For left edge: check if top-left empty pixel has a bridge
-    const hasAdjacentTopLeftBridge = !point.neighbors[0][0] && point.neighbors[0][1] && point.neighbors[1][0]
+    const hasAdjacentTopLeftBridge =
+      !point.neighbors[0][0] && point.neighbors[0][1] && point.neighbors[1][0]
     // For left edge: check if bottom-left empty pixel has a bridge
-    const hasAdjacentBottomLeftBridge = !point.neighbors[0][2] && point.neighbors[0][1] && point.neighbors[1][2]
+    const hasAdjacentBottomLeftBridge =
+      !point.neighbors[0][2] && point.neighbors[0][1] && point.neighbors[1][2]
 
     // For active points, only draw the curves/edges that face empty space
 
     // Corner curves
     if (shouldDrawBottomRightCorner) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : outlineColor
       ctx.setLineDash(DEBUG_OUTLINE ? [] : [])
       ctx.beginPath()
       ctx.moveTo(elementSize, 0)
@@ -98,7 +117,7 @@ export function drawActiveLayerOutline(
     }
 
     if (shouldDrawBottomLeftCorner) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : outlineColor
       ctx.setLineDash(DEBUG_OUTLINE ? [] : [])
       ctx.beginPath()
       ctx.moveTo(0, elementSize)
@@ -114,7 +133,7 @@ export function drawActiveLayerOutline(
     }
 
     if (shouldDrawTopLeftCorner) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : outlineColor
       ctx.setLineDash(DEBUG_OUTLINE ? [] : [])
       ctx.beginPath()
       ctx.moveTo(-elementSize, 0)
@@ -130,7 +149,7 @@ export function drawActiveLayerOutline(
     }
 
     if (shouldDrawTopRightCorner) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff0000" : outlineColor
       ctx.setLineDash(DEBUG_OUTLINE ? [] : [])
       ctx.beginPath()
       ctx.moveTo(0, -elementSize)
@@ -148,7 +167,7 @@ export function drawActiveLayerOutline(
     // Straight edges
     // Right edge
     if (!hasRightNeighbor) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#0000ff" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#0000ff" : outlineColor
 
       if (hasTopConnections) {
         // Top is connected, draw from top
@@ -171,7 +190,7 @@ export function drawActiveLayerOutline(
 
     // Bottom edge
     if (!hasBottomNeighbor) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#00ff00" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#00ff00" : outlineColor
       ctx.setLineDash(DEBUG_OUTLINE ? [5, 5] : [])
 
       if (hasBottomLeftConnections && !hasAdjacentBottomLeftBridge) {
@@ -192,7 +211,7 @@ export function drawActiveLayerOutline(
 
     // Left edge
     if (!hasLeftNeighbor) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#ffff00" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#ffff00" : outlineColor
 
       if (hasLeftTopConnections && !hasAdjacentTopLeftBridge) {
         // Top is connected, but suppress if there's a bridge in top-left empty pixel
@@ -214,7 +233,7 @@ export function drawActiveLayerOutline(
 
     // Top edge
     if (!hasTopNeighbor) {
-      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff00ff" : "#000000"
+      ctx.strokeStyle = DEBUG_OUTLINE ? "#ff00ff" : outlineColor
       ctx.setLineDash(DEBUG_OUTLINE ? [] : [])
 
       if (hasTopLeftConnections && !hasAdjacentTopLeftBridge) {
@@ -234,7 +253,7 @@ export function drawActiveLayerOutline(
     }
   } else {
     // Bridge curves
-    ctx.strokeStyle = DEBUG_OUTLINE ? "#00ffff" : "#000000"
+    ctx.strokeStyle = DEBUG_OUTLINE ? "#00ffff" : bridgeColor
     ctx.setLineDash(DEBUG_OUTLINE ? [] : [])
     ctx.lineWidth = DEBUG_OUTLINE ? borderWidth + 2 : borderWidth
 
