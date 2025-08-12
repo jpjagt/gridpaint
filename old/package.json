@@ -1,8 +1,0 @@
-{
-	"dependencies": {
-		"@nanostores/react": "^1.0.0",
-		"nanostores": "^1.0.1",
-		"react-router-dom": "^7.7.1",
-		"unique-names-generator": "^4.7.1"
-	}
-}
