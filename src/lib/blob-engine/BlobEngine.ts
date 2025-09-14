@@ -239,7 +239,7 @@ export class BlobEngine {
         analysis,
       )
 
-      logPointInfo(point, neighborhood, analysis, pointPrimitives)
+      // logPointInfo(point, neighborhood, analysis, pointPrimitives)
 
       primitives.push(...pointPrimitives)
 

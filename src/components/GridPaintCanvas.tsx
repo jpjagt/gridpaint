@@ -9,6 +9,8 @@ import {
 } from "react"
 import { useStore } from "@nanostores/react"
 import type { Tool } from "./ToolSelection"
+import { useSelection } from "@/hooks/useSelection"
+import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
@@ -96,6 +98,10 @@ export const GridPaintCanvas = forwardRef<
     x: number
     y: number
   } | null>(null)
+
+  // Selection hooks
+  const selection = useSelection()
+  const { renderSelectionRectangle } = useSelectionRenderer()
 
   const [didInitialize, setDidInitialize] = useState(false)
 
@@ -202,6 +208,23 @@ export const GridPaintCanvas = forwardRef<
     calculateExpandedViewport,
   ]) // No pan/zoom dependencies!
 
+  const getGridCoordinates = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current
+      if (!canvas) return null
+
+      const rect = canvas.getBoundingClientRect()
+      const x = (clientX - rect.left - canvasView.panOffset.x) / canvasView.zoom
+      const y = (clientY - rect.top - canvasView.panOffset.y) / canvasView.zoom
+
+      const gridX = Math.floor(x / canvasView.gridSize)
+      const gridY = Math.floor(y / canvasView.gridSize)
+
+      return { x: gridX, y: gridY }
+    },
+    [canvasView],
+  )
+
   // Main render function - now just handles transforms and rendering
   const render = useCallback(() => {
     if (!renderer || !isReady || !cachedGeometry) return
@@ -260,6 +283,16 @@ export const GridPaintCanvas = forwardRef<
       }
     }
 
+    // Render selection rectangle if active
+    if (currentTool === "select" && selection.hasSelection && renderer) {
+      renderSelectionRectangle(
+        renderer,
+        selection.selectionStart!,
+        selection.selectionEnd!,
+        canvasView
+      )
+    }
+
     const renderTime = performance.now() - startTime
     if (renderTime > 16) {
       // Log slow frames
@@ -272,6 +305,11 @@ export const GridPaintCanvas = forwardRef<
     canvasView,
     layersState,
     $showActiveLayerOutline,
+    currentTool,
+    selection.hasSelection,
+    selection.selectionStart,
+    selection.selectionEnd,
+    renderSelectionRectangle,
   ]) // Much simpler dependencies!
 
   // Calculate current visible viewport for outline rendering
@@ -378,24 +416,6 @@ export const GridPaintCanvas = forwardRef<
     })
   }, [layersState.layers, blobEngine])
 
-  // Coordinate conversion utilities
-  const getGridCoordinates = useCallback(
-    (clientX: number, clientY: number) => {
-      const canvas = canvasRef.current
-      if (!canvas) return null
-
-      const rect = canvas.getBoundingClientRect()
-      const x = (clientX - rect.left - canvasView.panOffset.x) / canvasView.zoom
-      const y = (clientY - rect.top - canvasView.panOffset.y) / canvasView.zoom
-
-      const gridX = Math.floor(x / canvasView.gridSize)
-      const gridY = Math.floor(y / canvasView.gridSize)
-
-      return { x: gridX, y: gridY }
-    },
-    [canvasView],
-  )
-
   const paintAtPosition = useCallback(
     (
       clientX: number,
@@ -472,6 +492,8 @@ export const GridPaintCanvas = forwardRef<
 
       if (currentTool === "pan") {
         setPanStart({ x: e.clientX, y: e.clientY })
+      } else if (currentTool === "select") {
+        selection.startSelection(e.clientX, e.clientY, getGridCoordinates)
       } else {
         const newCoords = paintAtPosition(e.clientX, e.clientY, e.altKey)
         setLastPaintCoords(newCoords || null)
@@ -490,6 +512,8 @@ export const GridPaintCanvas = forwardRef<
             y: currentCanvasView.panOffset.y + deltaY,
           })
           setPanStart({ x: e.clientX, y: e.clientY })
+        } else if (currentTool === "select") {
+          selection.updateSelection(e.clientX, e.clientY, getGridCoordinates)
         } else {
           const newCoords = paintAtPosition(
             e.clientX,
@@ -506,6 +530,7 @@ export const GridPaintCanvas = forwardRef<
       setIsDragging(false)
       setLastPaintCoords(null)
     }
+
 
     canvas.addEventListener("mousedown", handleMouseDown)
     canvas.addEventListener("mousemove", handleMouseMove)
@@ -525,6 +550,9 @@ export const GridPaintCanvas = forwardRef<
     panStart,
     lastPaintCoords,
     canvasView,
+    selection.startSelection,
+    selection.updateSelection,
+    getGridCoordinates,
   ])
 
   // Wheel event handler for zoom/pan (same as original)
@@ -571,6 +599,59 @@ export const GridPaintCanvas = forwardRef<
       canvas.removeEventListener("wheel", handleWheel)
     }
   }, [canvasView])
+
+  // Keyboard shortcuts for copy/paste
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target !== document.body) return // Only work when no input is focused
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+        if (currentTool === "select" && selection.hasSelection) {
+          e.preventDefault()
+          selection.copySelection()
+        }
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "v") {
+        if (currentTool === "select") {
+          e.preventDefault()
+          // Get current mouse position for paste location
+          const canvas = canvasRef.current
+          if (canvas) {
+            const rect = canvas.getBoundingClientRect()
+            const centerX = rect.left + rect.width / 2
+            const centerY = rect.top + rect.height / 2
+            selection.pasteSelection(centerX, centerY, getGridCoordinates)
+          }
+        }
+      }
+
+      if (e.key === "Escape") {
+        if (currentTool === "select" && selection.hasSelection) {
+          e.preventDefault()
+          selection.clearSelection()
+        }
+      }
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (currentTool === "select" && selection.hasSelection) {
+          e.preventDefault()
+          selection.deleteSelection(e.shiftKey)
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [
+    currentTool,
+    selection.hasSelection,
+    selection.copySelection,
+    selection.pasteSelection,
+    selection.clearSelection,
+    selection.deleteSelection,
+    getGridCoordinates,
+  ])
 
   // Imperative handle (same interface as original)
   useImperativeHandle(ref, () => ({
@@ -829,6 +910,8 @@ export const GridPaintCanvas = forwardRef<
         return "cursor-crosshair"
       case "pan":
         return "cursor-grab"
+      case "select":
+        return "cursor-pointer"
       default:
         return "cursor-crosshair"
     }

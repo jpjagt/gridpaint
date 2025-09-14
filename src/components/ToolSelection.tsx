@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
-import { Brush, Eraser, Hand } from "lucide-react"
+import { Brush, Eraser, Hand, MousePointer } from "lucide-react"
 
-export type Tool = "draw" | "erase" | "pan"
+export type Tool = "draw" | "erase" | "pan" | "select"
 
 interface ToolSelectionProps {
   currentTool: Tool
@@ -13,6 +13,7 @@ export const ToolSelection = ({ currentTool, onToolSelect }: ToolSelectionProps)
     { id: "draw" as const, icon: Brush, label: "Draw" },
     { id: "erase" as const, icon: Eraser, label: "Erase" },
     { id: "pan" as const, icon: Hand, label: "Pan" },
+    { id: "select" as const, icon: MousePointer, label: "Select" },
   ]
 
   return (
