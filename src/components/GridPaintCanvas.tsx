@@ -59,6 +59,7 @@ export interface GridPaintCanvasMethods {
   reset: () => void
   setGridSize: (operation: "+" | "-") => void
   setBorderWidth: (width: number) => void
+  setMmPerUnit: (mmPerUnit: number) => void
   saveIMG: () => void
   setActiveLayer: (layerId: number | null) => void
   toggleLayerVisibility: (layerId: number) => void
@@ -681,6 +682,12 @@ export const GridPaintCanvas = forwardRef<
       render()
     },
 
+    setMmPerUnit: (mmPerUnit: number) => {
+      const clampedMmPerUnit = Math.max(0.1, Math.min(100, mmPerUnit))
+      $canvasView.setKey("mmPerUnit", clampedMmPerUnit)
+      // No need to clear caches or re-render as this only affects export
+    },
+
     saveIMG: () => {
       const canvas = canvasRef.current
       if (!canvas) return
@@ -706,6 +713,7 @@ export const GridPaintCanvas = forwardRef<
           canvasView.gridSize,
           canvasView.borderWidth,
           drawingMeta.name,
+          canvasView.mmPerUnit,
         )
       }, 200)
     },

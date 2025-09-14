@@ -14,6 +14,7 @@ export interface CanvasViewState {
   borderWidth: number
   panOffset: { x: number; y: number }
   zoom: number
+  mmPerUnit: number // How many millimeters each grid unit represents
 }
 
 export interface LayersState {
@@ -44,6 +45,7 @@ export const $canvasView = map<CanvasViewState>({
   borderWidth: 0.5,
   panOffset: { x: 0, y: 0 },
   zoom: 1,
+  mmPerUnit: 1.0, // Default: 1mm per grid unit
 })
 
 export const $layersState = map<LayersState>({
@@ -82,6 +84,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         borderWidth: stored.borderWidth,
         panOffset: stored.panOffset,
         zoom: stored.zoom,
+        mmPerUnit: stored.mmPerUnit || 1.0, // Default for legacy drawings
       })
 
       $layersState.set({
@@ -105,6 +108,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         borderWidth: 0.5,
         panOffset: { x: 0, y: 0 },
         zoom: 1,
+        mmPerUnit: 1.0, // Default: 1mm per grid unit
       })
 
       $layersState.set({
@@ -216,5 +220,6 @@ export function resetDrawing(): void {
     borderWidth: 0.5,
     panOffset: { x: 0, y: 0 },
     zoom: 1,
+    mmPerUnit: 1.0, // Default: 1mm per grid unit
   })
 }

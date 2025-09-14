@@ -20,12 +20,17 @@ interface GridPaintControlsProps {
   onDownload: () => void
   onGridSizeChange: (operation: "+" | "-") => void
   onBorderWidthChange: (width: number) => void
+  onMmPerUnitChange: (mmPerUnit: number) => void
   /** Current drawing title */
   name: string
   /** Callback when title is edited */
   onNameChange: (name: string) => void
   /** Navigate back to home/gallery */
   onHome: () => void
+  /** Current mm per unit value */
+  mmPerUnit: number
+  /** Callback when measuring bars should be shown */
+  onShowMeasuringBars: (show: boolean) => void
 }
 
 export const GridPaintControls = ({
@@ -33,9 +38,12 @@ export const GridPaintControls = ({
   onDownload,
   onGridSizeChange,
   onBorderWidthChange,
+  onMmPerUnitChange,
   name,
   onNameChange,
   onHome,
+  mmPerUnit,
+  onShowMeasuringBars,
 }: GridPaintControlsProps) => {
   const $showActiveLayerOutline = useStore(showActiveLayerOutline)
   const [borderWidth, setBorderWidth] = useState(2)
@@ -112,6 +120,23 @@ export const GridPaintControls = ({
         >
           <Minus className='w-4 h-4' />
         </Button>
+
+        {/* Physical size control */}
+        <div className='bg-white/10 backdrop-blur-sm rounded-md px-2 py-1 flex items-center gap-1'>
+          <input
+            type='number'
+            value={mmPerUnit}
+            onChange={(e) => onMmPerUnitChange(parseFloat(e.target.value) || 1.0)}
+            onFocus={() => onShowMeasuringBars(true)}
+            onBlur={() => onShowMeasuringBars(false)}
+            className='w-12 bg-transparent text-xs text-white placeholder-white/50 border-none outline-none'
+            min='0.1'
+            max='100'
+            step='0.1'
+            title='mm per grid unit'
+          />
+          <span className='text-xs text-white/70'>mm</span>
+        </div>
       </div>
     </>
   )

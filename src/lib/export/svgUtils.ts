@@ -136,6 +136,7 @@ export function generateSingleLayerSvg(
   borderWidth: number = 2,
   style: SvgRenderOptions = DEFAULT_SVG_STYLE,
   addMargin: boolean = false,
+  mmPerUnit: number = 1.0,
 ): string {
   const layer = pointsToGridLayer(points, 1)
 
@@ -183,8 +184,15 @@ export function generateSingleLayerSvg(
 
   const content = generateLayerSvgContent(layer, gridSize, borderWidth, style)
 
+  // Calculate physical dimensions in mm
+  const physicalWidth = viewW * mmPerUnit
+  const physicalHeight = viewH * mmPerUnit
+
   const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewX} ${viewY} ${viewW} ${viewH}">
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="${physicalWidth}mm"
+     height="${physicalHeight}mm"
+     viewBox="${viewX} ${viewY} ${viewW} ${viewH}">
 ${content}
 </svg>`
 
@@ -209,6 +217,7 @@ export function generateMultiLayerSvg(
   borderWidth: number,
   style: SvgRenderOptions = DEFAULT_SVG_STYLE,
   addMargin: boolean = false,
+  mmPerUnit: number = 1.0,
 ): string {
   const visibleLayers = layers.filter(
     (layer) => layer.isVisible && layer.points.size > 0,
@@ -276,8 +285,15 @@ export function generateMultiLayerSvg(
     .filter(Boolean)
     .join("\n")
 
+  // Calculate physical dimensions in mm
+  const physicalWidth = viewW * mmPerUnit
+  const physicalHeight = viewH * mmPerUnit
+
   const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewX} ${viewY} ${viewW} ${viewH}">
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="${physicalWidth}mm"
+     height="${physicalHeight}mm"
+     viewBox="${viewX} ${viewY} ${viewW} ${viewH}">
 ${layerContents}
 </svg>`
 
@@ -313,6 +329,7 @@ export function generateLayerSvgsForExport(
   gridSize: number,
   borderWidth: number,
   style: SvgRenderOptions = DEFAULT_SVG_STYLE,
+  mmPerUnit: number = 1.0,
 ): { layerId: number; svg: string; filename: string }[] {
   const visibleLayers = layers.filter(
     (layer) => layer.isVisible && layer.points.size > 0,
@@ -325,6 +342,8 @@ export function generateLayerSvgsForExport(
       gridSize,
       borderWidth,
       style,
+      false, // addMargin
+      mmPerUnit,
     )
 
     return {

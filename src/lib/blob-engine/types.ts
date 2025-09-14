@@ -26,6 +26,7 @@ export interface GridDocument {
   layers: GridLayer[]
   gridSize: number
   borderWidth: number
+  mmPerUnit: number // How many millimeters each grid unit represents
 }
 
 // === Blob Geometry Primitives ===

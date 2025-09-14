@@ -48,6 +48,8 @@ export interface DrawingDocument extends DrawingMetadata {
   panOffset: { x: number; y: number }
   /** Current zoom factor */
   zoom: number
+  /** How many millimeters each grid unit represents */
+  mmPerUnit: number
   /** All layers in this drawing */
   layers: Layer[]
 }

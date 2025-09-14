@@ -14,9 +14,12 @@ import {
 import { GridPaintControls } from "@/components/GridPaintControls"
 import { LayerControls } from "@/components/LayerControls"
 import { ToolSelection, type Tool } from "@/components/ToolSelection"
+import { MeasuringBars } from "@/components/MeasuringBars"
 import type { Layer } from "@/stores/drawingStores"
 import { drawingStore } from "@/lib/storage/store"
 import { generateSingleLayerSvg, generateLayerSvgContent, convertLayersToGridLayers } from "@/lib/export/svgUtils"
+import { useStore } from "@nanostores/react"
+import { $canvasView } from "@/stores/drawingStores"
 
 // Editor page for a given drawing ID
 function EditorPage() {
@@ -27,6 +30,8 @@ function EditorPage() {
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null)
   const [currentTool, setCurrentTool] = useState<Tool>("draw")
   const [drawingName, setDrawingName] = useState<string>("")
+  const [showMeasuringBars, setShowMeasuringBars] = useState<boolean>(false)
+  const canvasView = useStore($canvasView)
 
   // Sync layer state
   useEffect(() => {
@@ -49,6 +54,8 @@ function EditorPage() {
     canvasRef.current?.setGridSize(op)
   const handleBorderWidthChange = (w: number) =>
     canvasRef.current?.setBorderWidth(w)
+  const handleMmPerUnitChange = (mmPerUnit: number) =>
+    canvasRef.current?.setMmPerUnit(mmPerUnit)
   const handleToolSelect = (t: Tool) => setCurrentTool(t)
   const handleLayerSelect = (id: number | null) =>
     canvasRef.current?.setActiveLayer(id)
@@ -81,17 +88,21 @@ function EditorPage() {
         onDownload={handleDownload}
         onGridSizeChange={handleGridSizeChange}
         onBorderWidthChange={handleBorderWidthChange}
+        onMmPerUnitChange={handleMmPerUnitChange}
         name={drawingName}
         onNameChange={(n) => {
           setDrawingName(n)
           canvasRef.current?.setName(n)
         }}
         onHome={() => navigate("/")}
+        mmPerUnit={canvasView.mmPerUnit}
+        onShowMeasuringBars={setShowMeasuringBars}
       />
       <ToolSelection
         currentTool={currentTool}
         onToolSelect={handleToolSelect}
       />
+      <MeasuringBars show={showMeasuringBars} />
     </div>
   )
 }

@@ -405,6 +405,7 @@ export function exportLayerAsSVG(
   gridSize: number,
   borderWidth: number,
   name: string,
+  mmPerUnit: number = 1.0,
 ): void {
   if (layer.points.size === 0) {
     console.warn(`Layer ${layer.id} has no points to export`)
@@ -415,7 +416,8 @@ export function exportLayerAsSVG(
     [layer],
     gridSize,
     borderWidth,
-    DEFAULT_SVG_STYLE
+    DEFAULT_SVG_STYLE,
+    mmPerUnit,
   )
 
   if (layerSvgs.length === 0) {
@@ -444,12 +446,14 @@ export function exportAllLayersAsSVG(
   gridSize: number,
   borderWidth: number,
   name: string,
+  mmPerUnit: number = 1.0,
 ): void {
   const layerSvgs = generateLayerSvgsForExport(
     layers,
     gridSize,
     borderWidth,
-    DEFAULT_SVG_STYLE
+    DEFAULT_SVG_STYLE,
+    mmPerUnit,
   )
 
   if (layerSvgs.length === 0) {
