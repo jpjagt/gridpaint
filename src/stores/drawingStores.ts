@@ -41,7 +41,7 @@ export const $drawingMeta = map<DrawingMetaState>({
 
 export const $canvasView = map<CanvasViewState>({
   gridSize: 75,
-  borderWidth: 2,
+  borderWidth: 0.5,
   panOffset: { x: 0, y: 0 },
   zoom: 1,
 })
@@ -102,7 +102,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
 
       $canvasView.set({
         gridSize: 75,
-        borderWidth: 2,
+        borderWidth: 0.5,
         panOffset: { x: 0, y: 0 },
         zoom: 1,
       })
@@ -213,7 +213,7 @@ export function resetDrawing(): void {
 
   $canvasView.set({
     gridSize: 20,
-    borderWidth: 3,
+    borderWidth: 0.5,
     panOffset: { x: 0, y: 0 },
     zoom: 1,
   })

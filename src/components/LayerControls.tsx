@@ -38,7 +38,10 @@ export const LayerControls = ({
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       const key = e.key
-      if (key >= "1" && key <= "6") {
+      // Check if the key is a number between 1 and 6 but no modifier keys are pressed
+      const isNumberKey =
+        /^[1-6]$/.test(key) && !e.ctrlKey && !e.metaKey && !e.altKey
+      if (isNumberKey) {
         e.preventDefault()
         const layerId = parseInt(key)
         if (activeLayerId === layerId) {

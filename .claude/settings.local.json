@@ -6,7 +6,10 @@
       "WebFetch(domain:api.lucide.dev)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(curl:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(mv:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

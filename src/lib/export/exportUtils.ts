@@ -6,6 +6,7 @@
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
 import type { Layer } from "@/stores/drawingStores"
 import { magicNr } from "@/lib/constants"
+import { generateLayerSvgsForExport, DEFAULT_SVG_STYLE } from "./svgUtils"
 
 /**
  * Convert Set<string> points to Array<string> for JSON serialization
@@ -397,7 +398,7 @@ function componentToSVGPath(
 }
 
 /**
- * Export a single layer as SVG
+ * Export a single layer as SVG using centralized utilities
  */
 export function exportLayerAsSVG(
   layer: Layer,
@@ -405,43 +406,26 @@ export function exportLayerAsSVG(
   borderWidth: number,
   name: string,
 ): void {
-  const components = findConnectedComponents(layer.points)
-
-  if (components.length === 0) {
+  if (layer.points.size === 0) {
     console.warn(`Layer ${layer.id} has no points to export`)
     return
   }
 
-  // Calculate bounds for all components
-  const allPoints = Array.from(layer.points).map((p) => {
-    const [x, y] = p.split(",").map(Number)
-    return { x, y }
-  })
+  const layerSvgs = generateLayerSvgsForExport(
+    [layer],
+    gridSize,
+    borderWidth,
+    DEFAULT_SVG_STYLE
+  )
 
-  const minX = Math.min(...allPoints.map((p) => p.x))
-  const maxX = Math.max(...allPoints.map((p) => p.x))
-  const minY = Math.min(...allPoints.map((p) => p.y))
-  const maxY = Math.max(...allPoints.map((p) => p.y))
+  if (layerSvgs.length === 0) {
+    console.warn(`Layer ${layer.id} produced no SVG content`)
+    return
+  }
 
-  const svgWidth = (maxX - minX + 1) * gridSize + gridSize * 2
-  const svgHeight = (maxY - minY + 1) * gridSize + gridSize * 2
-  const offsetX = -minX * gridSize + gridSize
-  const offsetY = -minY * gridSize + gridSize
+  const { svg } = layerSvgs[0]
 
-  // Generate SVG content
-  const paths = components
-    .map((component) => componentToSVGPath(component, gridSize, borderWidth))
-    .filter((path) => path.length > 0)
-
-  const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}"
-     xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(${offsetX}, ${offsetY})">
-    <path d="${paths.join(" ")}" fill="#666666" fill-rule="nonzero"/>
-  </g>
-</svg>`
-
-  const blob = new Blob([svgContent], { type: "image/svg+xml" })
+  const blob = new Blob([svg], { type: "image/svg+xml" })
   const url = URL.createObjectURL(blob)
 
   const link = document.createElement("a")
@@ -453,7 +437,7 @@ export function exportLayerAsSVG(
 }
 
 /**
- * Export all visible layers as SVG files
+ * Export all visible layers as SVG files using centralized utilities
  */
 export function exportAllLayersAsSVG(
   layers: Layer[],
@@ -461,19 +445,30 @@ export function exportAllLayersAsSVG(
   borderWidth: number,
   name: string,
 ): void {
-  const visibleLayers = layers.filter(
-    (layer) => layer.isVisible && layer.points.size > 0,
+  const layerSvgs = generateLayerSvgsForExport(
+    layers,
+    gridSize,
+    borderWidth,
+    DEFAULT_SVG_STYLE
   )
 
-  if (visibleLayers.length === 0) {
+  if (layerSvgs.length === 0) {
     console.warn("No visible layers with points to export")
     return
   }
 
   // Export each layer separately with a small delay to prevent browser issues
-  visibleLayers.forEach((layer, index) => {
+  layerSvgs.forEach(({ svg, layerId }, index) => {
     setTimeout(() => {
-      exportLayerAsSVG(layer, gridSize, borderWidth, name)
+      const blob = new Blob([svg], { type: "image/svg+xml" })
+      const url = URL.createObjectURL(blob)
+
+      const link = document.createElement("a")
+      link.download = `${name || "gridpaint"}-layer-${layerId}.svg`
+      link.href = url
+      link.click()
+
+      URL.revokeObjectURL(url)
     }, index * 100)
   })
 }
