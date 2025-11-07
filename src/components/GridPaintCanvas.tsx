@@ -149,36 +149,36 @@ export const GridPaintCanvas = forwardRef<
     [],
   )
 
-  // Calculate expanded viewport for buffering (larger than visible area)
-  const calculateExpandedViewport = useCallback((): SpatialRegion => {
+  // Helper: expand a viewport by N grid cells
+  const expandViewport = useCallback(
+    (vp: SpatialRegion, pad: number): SpatialRegion => ({
+      minX: vp.minX - pad,
+      minY: vp.minY - pad,
+      maxX: vp.maxX + pad,
+      maxY: vp.maxY + pad,
+    }),
+    [],
+  )
+
+  const calculateCurrentViewport = useCallback((): SpatialRegion => {
     const displayWidth = window.innerWidth
     const displayHeight = window.innerHeight
-    const { gridSize } = canvasView
+    const { zoom, panOffset, gridSize } = canvasView
 
-    // Use a larger buffer that doesn't depend on current pan/zoom
-    // This creates a viewport that's ~3x the screen size in each direction
-    const bufferMultiplier = 3
-    const bufferWidth = displayWidth * bufferMultiplier
-    const bufferHeight = displayHeight * bufferMultiplier
-
-    // Calculate buffer bounds assuming worst case (minimum zoom)
-    const minZoom = 0.1
-    const maxGridWidth = Math.ceil(bufferWidth / (gridSize * minZoom))
-    const maxGridHeight = Math.ceil(bufferHeight / (gridSize * minZoom))
-
-    // Center the buffer around origin (we can adjust this later if needed)
-    const centerX = 0
-    const centerY = 0
-    const halfWidth = Math.ceil(maxGridWidth / 2)
-    const halfHeight = Math.ceil(maxGridHeight / 2)
+    const viewportMinX = Math.floor(-panOffset.x / (gridSize * zoom)) - 2
+    const viewportMaxX =
+      Math.ceil((displayWidth - panOffset.x) / (gridSize * zoom)) + 2
+    const viewportMinY = Math.floor(-panOffset.y / (gridSize * zoom)) - 2
+    const viewportMaxY =
+      Math.ceil((displayHeight - panOffset.y) / (gridSize * zoom)) + 2
 
     return {
-      minX: centerX - halfWidth,
-      minY: centerY - halfHeight,
-      maxX: centerX + halfWidth,
-      maxY: centerY + halfHeight,
+      minX: viewportMinX,
+      minY: viewportMinY,
+      maxX: viewportMaxX,
+      maxY: viewportMaxY,
     }
-  }, [canvasView.gridSize]) // Only depends on grid size, not pan/zoom
+  }, [canvasView])
 
   // Cache geometry generation - only regenerate when layers or settings change
   const cachedGeometry = useMemo(() => {
@@ -189,8 +189,9 @@ export const GridPaintCanvas = forwardRef<
     // Convert layers to blob format
     const blobLayers = convertLayersToBlobFormat(layersState.layers)
 
-    // Calculate expanded viewport for buffering
-    const expandedViewport = calculateExpandedViewport()
+    // Use current visible viewport with a small buffer
+    const currentViewport = calculateCurrentViewport()
+    const expandedViewport = expandViewport(currentViewport, 2)
 
     // Generate geometry using blob engine with expanded viewport
     return blobEngine.generateGeometry(
@@ -206,8 +207,11 @@ export const GridPaintCanvas = forwardRef<
     layersState.layers,
     canvasView.gridSize,
     canvasView.borderWidth,
-    calculateExpandedViewport,
-  ]) // No pan/zoom dependencies!
+    canvasView.zoom,
+    canvasView.panOffset,
+    calculateCurrentViewport,
+    expandViewport,
+  ])
 
   const getGridCoordinates = useCallback(
     (clientX: number, clientY: number) => {
@@ -290,7 +294,7 @@ export const GridPaintCanvas = forwardRef<
         renderer,
         selection.selectionStart!,
         selection.selectionEnd!,
-        canvasView
+        canvasView,
       )
     }
 
@@ -313,26 +317,60 @@ export const GridPaintCanvas = forwardRef<
     renderSelectionRectangle,
   ]) // Much simpler dependencies!
 
-  // Calculate current visible viewport for outline rendering
-  const calculateCurrentViewport = useCallback((): SpatialRegion => {
-    const displayWidth = window.innerWidth
-    const displayHeight = window.innerHeight
-    const { zoom, panOffset, gridSize } = canvasView
+  // Center canvas to fit all visible content
+  const centerCanvasToContent = useCallback(() => {
+    // Calculate bounds from all visible layers (fresh read)
+    const state = $layersState.get()
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity
+    let hasPoints = false
 
-    const viewportMinX = Math.floor(-panOffset.x / (gridSize * zoom)) - 2
-    const viewportMaxX =
-      Math.ceil((displayWidth - panOffset.x) / (gridSize * zoom)) + 2
-    const viewportMinY = Math.floor(-panOffset.y / (gridSize * zoom)) - 2
-    const viewportMaxY =
-      Math.ceil((displayHeight - panOffset.y) / (gridSize * zoom)) + 2
+    state.layers.forEach((layer) => {
+      if (!layer.isVisible) return
+      for (const pointKey of layer.points) {
+        const [x, y] = pointKey.split(",").map(Number)
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+        hasPoints = true
+      }
+    })
 
-    return {
-      minX: viewportMinX,
-      minY: viewportMinY,
-      maxX: viewportMaxX,
-      maxY: viewportMaxY,
+    if (hasPoints) {
+      const { gridSize } = $canvasView.get()
+
+      // Calculate content bounds in pixels (add padding for margin)
+      const contentWidth = (maxX - minX + 1) * gridSize + gridSize * 2
+      const contentHeight = (maxY - minY + 1) * gridSize + gridSize * 2
+
+      // Viewport size
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+
+      // Zoom to fit with cap
+      const zoomX = viewportWidth / contentWidth
+      const zoomY = viewportHeight / contentHeight
+      const targetZoom = Math.min(zoomX, zoomY, 2.0)
+
+      // Center of content in pixels
+      const centerX = ((minX + maxX) / 2) * gridSize
+      const centerY = ((minY + maxY) / 2) * gridSize
+
+      const viewportCenterX = viewportWidth / 2
+      const viewportCenterY = viewportHeight / 2
+
+      $canvasView.setKey("zoom", targetZoom)
+      $canvasView.setKey("panOffset", {
+        x: viewportCenterX - centerX * targetZoom,
+        y: viewportCenterY - centerY * targetZoom,
+      })
+
+      render()
     }
-  }, [canvasView])
+  }, [render])
 
   // Compatibility function for active layer outline (temporary)
   const renderActiveLayerOutlineCompat = useCallback(
@@ -410,7 +448,7 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [canvasView, layersState, render, isReady])
 
-  // Invalidate cache when layers change
+  // Invalidate caches when layers change (covers non-paint edits like paste/selection)
   useEffect(() => {
     layersState.layers.forEach((layer) => {
       blobEngine.invalidateLayer(layer.id)
@@ -477,7 +515,29 @@ export const GridPaintCanvas = forwardRef<
         }
       })
 
+      // Apply update
       updateLayerPoints(activeLayerId, newPoints)
+
+      // Targeted cache invalidation for the edited region (+1-cell padding for neighbors)
+      if (pointsToModify.size > 0) {
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity
+        for (const key of pointsToModify) {
+          const [x, y] = key.split(",").map(Number)
+          if (x < minX) minX = x
+          if (y < minY) minY = y
+          if (x > maxX) maxX = x
+          if (y > maxY) maxY = y
+        }
+        blobEngine.invalidateLayer(activeLayerId, {
+          minX: minX - 1,
+          minY: minY - 1,
+          maxX: maxX + 1,
+          maxY: maxY + 1,
+        })
+      }
       return coords
     },
     [getGridCoordinates, currentTool],
@@ -531,7 +591,6 @@ export const GridPaintCanvas = forwardRef<
       setIsDragging(false)
       setLastPaintCoords(null)
     }
-
 
     canvas.addEventListener("mousedown", handleMouseDown)
     canvas.addEventListener("mousemove", handleMouseMove)
@@ -627,6 +686,17 @@ export const GridPaintCanvas = forwardRef<
         }
       }
 
+      // Center view to fit all content
+      if (
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        (e.key === "c" || e.key === "C")
+      ) {
+        e.preventDefault()
+        centerCanvasToContent()
+      }
+
       if (e.key === "Escape") {
         if (currentTool === "select" && selection.hasSelection) {
           e.preventDefault()
@@ -652,6 +722,7 @@ export const GridPaintCanvas = forwardRef<
     selection.clearSelection,
     selection.deleteSelection,
     getGridCoordinates,
+    centerCanvasToContent,
   ])
 
   // Imperative handle (same interface as original)
@@ -767,58 +838,7 @@ export const GridPaintCanvas = forwardRef<
     },
 
     centerCanvas: () => {
-      // Calculate bounds from all visible layers
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity
-      let hasPoints = false
-
-      layersState.layers.forEach((layer) => {
-        if (!layer.isVisible) return
-
-        Array.from(layer.points).forEach((pointKey) => {
-          const [x, y] = pointKey.split(",").map(Number)
-          minX = Math.min(minX, x)
-          minY = Math.min(minY, y)
-          maxX = Math.max(maxX, x)
-          maxY = Math.max(maxY, y)
-          hasPoints = true
-        })
-      })
-
-      if (hasPoints) {
-        const { gridSize } = canvasView
-
-        // Calculate content bounds in pixels (add padding for margin)
-        const contentWidth = (maxX - minX + 1) * gridSize + gridSize * 2
-        const contentHeight = (maxY - minY + 1) * gridSize + gridSize * 2
-
-        // Calculate viewport size
-        const viewportWidth = window.innerWidth
-        const viewportHeight = window.innerHeight
-
-        // Calculate zoom to fit content with margin
-        const zoomX = viewportWidth / contentWidth
-        const zoomY = viewportHeight / contentHeight
-        const targetZoom = Math.min(zoomX, zoomY, 2.0) // Cap at 2x zoom
-
-        // Calculate center point in pixels
-        const centerX = ((minX + maxX) / 2) * gridSize
-        const centerY = ((minY + maxY) / 2) * gridSize
-
-        // Set zoom and pan
-        const viewportCenterX = viewportWidth / 2
-        const viewportCenterY = viewportHeight / 2
-
-        $canvasView.setKey("zoom", targetZoom)
-        $canvasView.setKey("panOffset", {
-          x: viewportCenterX - centerX * targetZoom,
-          y: viewportCenterY - centerY * targetZoom,
-        })
-
-        render()
-      }
+      centerCanvasToContent()
     },
 
     zoomIn: () => {

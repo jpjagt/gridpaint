@@ -10,106 +10,151 @@ export const MeasuringBars = ({ show }: MeasuringBarsProps) => {
 
   if (!show) return null
 
-  // Calculate the visible viewport bounds in grid coordinates
+  // Calculate grid lines for metric measurements
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
 
-  // Calculate how many grid units fit in the current viewport
-  const viewportGridWidth = viewportWidth / (canvasView.gridSize * canvasView.zoom)
-  const viewportGridHeight = viewportHeight / (canvasView.gridSize * canvasView.zoom)
+  // Calculate the current viewport bounds in grid coordinates
+  const viewportLeft = -canvasView.panOffset.x / (canvasView.gridSize * canvasView.zoom)
+  const viewportTop = -canvasView.panOffset.y / (canvasView.gridSize * canvasView.zoom)
+  const viewportRight = viewportLeft + viewportWidth / (canvasView.gridSize * canvasView.zoom)
+  const viewportBottom = viewportTop + viewportHeight / (canvasView.gridSize * canvasView.zoom)
 
-  // Physical dimensions of the viewport in mm
-  const physicalWidth = viewportGridWidth * canvasView.mmPerUnit
-  const physicalHeight = viewportGridHeight * canvasView.mmPerUnit
+  // Calculate metric spacing
+  const mmPerGridUnit = canvasView.mmPerUnit
+  const gridUnitsPerCm = 10 / mmPerGridUnit  // 10mm = 1cm
+  const gridUnitsPerHalfCm = 5 / mmPerGridUnit  // 5mm = 0.5cm
 
-  // Create ruler marks every 10mm or every 50mm depending on scale
-  const getMarks = (physicalSize: number, gridSize: number) => {
-    const marks = []
-    const mmPerGridUnit = canvasView.mmPerUnit
+  // Calculate screen pixel spacing
+  const pixelsPerCm = gridUnitsPerCm * canvasView.gridSize * canvasView.zoom
+  const pixelsPerHalfCm = gridUnitsPerHalfCm * canvasView.gridSize * canvasView.zoom
 
-    // Choose appropriate spacing
-    let spacing = 10 // 10mm marks
-    if (physicalSize / spacing > 20) {
-      spacing = 50 // 50mm marks if too crowded
-    }
-    if (physicalSize / spacing > 20) {
-      spacing = 100 // 100mm marks if still too crowded
-    }
+  // Generate vertical lines (every 5mm and 10mm)
+  const verticalLines = []
 
-    const gridSpacing = spacing / mmPerGridUnit
-    const pixelSpacing = gridSpacing * canvasView.gridSize * canvasView.zoom
+  // Find the starting cm position
+  const startCm = Math.floor(viewportLeft * mmPerGridUnit / 10) // Start cm position
+  const endCm = Math.ceil(viewportRight * mmPerGridUnit / 10) // End cm position
 
-    for (let i = 0; i * spacing < physicalSize; i++) {
-      marks.push({
-        position: i * pixelSpacing,
-        label: `${i * spacing}mm`,
-        isMajor: i % 5 === 0, // Every 5th mark is major
+  for (let cm = startCm; cm <= endCm; cm++) {
+    const gridPos = (cm * 10) / mmPerGridUnit // Grid position for this cm
+    const screenX = (gridPos - viewportLeft) * canvasView.gridSize * canvasView.zoom
+
+    if (screenX >= -10 && screenX <= viewportWidth + 10) {
+      // Full cm line (solid)
+      verticalLines.push({
+        x: screenX,
+        type: 'cm',
+        label: `${cm}cm`
       })
-    }
 
-    return marks
+      // Half cm line (dotted) - only if there's enough space
+      if (pixelsPerHalfCm > 10) {
+        const halfCmGridPos = gridPos + gridUnitsPerHalfCm
+        const halfCmScreenX = (halfCmGridPos - viewportLeft) * canvasView.gridSize * canvasView.zoom
+
+        if (halfCmScreenX >= -10 && halfCmScreenX <= viewportWidth + 10) {
+          verticalLines.push({
+            x: halfCmScreenX,
+            type: 'halfCm',
+            label: `${cm}.5cm`
+          })
+        }
+      }
+    }
   }
 
-  const horizontalMarks = getMarks(physicalWidth, canvasView.gridSize)
-  const verticalMarks = getMarks(physicalHeight, canvasView.gridSize)
+  // Generate horizontal lines (every 5mm and 10mm)
+  const horizontalLines = []
+
+  const startCmY = Math.floor(viewportTop * mmPerGridUnit / 10)
+  const endCmY = Math.ceil(viewportBottom * mmPerGridUnit / 10)
+
+  for (let cm = startCmY; cm <= endCmY; cm++) {
+    const gridPos = (cm * 10) / mmPerGridUnit
+    const screenY = (gridPos - viewportTop) * canvasView.gridSize * canvasView.zoom
+
+    if (screenY >= -10 && screenY <= viewportHeight + 10) {
+      // Full cm line (solid)
+      horizontalLines.push({
+        y: screenY,
+        type: 'cm',
+        label: `${cm}cm`
+      })
+
+      // Half cm line (dotted)
+      if (pixelsPerHalfCm > 10) {
+        const halfCmGridPos = gridPos + gridUnitsPerHalfCm
+        const halfCmScreenY = (halfCmGridPos - viewportTop) * canvasView.gridSize * canvasView.zoom
+
+        if (halfCmScreenY >= -10 && halfCmScreenY <= viewportHeight + 10) {
+          horizontalLines.push({
+            y: halfCmScreenY,
+            type: 'halfCm',
+            label: `${cm}.5cm`
+          })
+        }
+      }
+    }
+  }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50">
-      {/* Horizontal ruler (top) */}
-      <div className="absolute top-0 left-0 right-0 h-8 bg-black/50 backdrop-blur-sm border-b border-white/20">
-        <div className="relative w-full h-full">
-          {horizontalMarks.map((mark, i) => (
+    <div className="pointer-events-none fixed inset-0 z-40">
+      {/* Vertical lines */}
+      {verticalLines.map((line, i) => (
+        <div key={`v-${i}`}>
+          {/* Line */}
+          <div
+            className={
+              line.type === 'cm'
+                ? "absolute top-0 bottom-0 w-px bg-red-500/70"
+                : "absolute top-0 bottom-0 w-px border-l border-dashed border-red-400/60"
+            }
+            style={{
+              left: `${line.x}px`,
+            }}
+          />
+          {/* Label for cm lines */}
+          {line.type === 'cm' && pixelsPerCm > 30 && (
             <div
-              key={i}
-              className="absolute top-0 flex flex-col items-center"
-              style={{ left: `${mark.position}px` }}
+              className="absolute top-2 text-xs text-red-500 font-mono bg-black/50 px-1 rounded"
+              style={{ left: `${line.x + 2}px` }}
             >
-              <div
-                className={`w-px ${mark.isMajor ? 'h-4 bg-white' : 'h-2 bg-white/70'}`}
-              />
-              {mark.isMajor && (
-                <span className="text-xs text-white font-mono mt-1">
-                  {mark.label}
-                </span>
-              )}
+              {line.label}
             </div>
-          ))}
-          <div className="absolute top-1 right-2 text-xs text-white/70 font-mono">
-            Width: {physicalWidth.toFixed(1)}mm
-          </div>
+          )}
         </div>
-      </div>
+      ))}
 
-      {/* Vertical ruler (left) */}
-      <div className="absolute top-0 left-0 bottom-0 w-16 bg-black/50 backdrop-blur-sm border-r border-white/20">
-        <div className="relative w-full h-full">
-          {verticalMarks.map((mark, i) => (
+      {/* Horizontal lines */}
+      {horizontalLines.map((line, i) => (
+        <div key={`h-${i}`}>
+          {/* Line */}
+          <div
+            className={
+              line.type === 'cm'
+                ? "absolute left-0 right-0 h-px bg-red-500/70"
+                : "absolute left-0 right-0 h-px border-t border-dashed border-red-400/60"
+            }
+            style={{
+              top: `${line.y}px`,
+            }}
+          />
+          {/* Label for cm lines */}
+          {line.type === 'cm' && pixelsPerCm > 30 && (
             <div
-              key={i}
-              className="absolute left-0 flex items-center"
-              style={{ top: `${mark.position}px` }}
+              className="absolute left-2 text-xs text-red-500 font-mono bg-black/50 px-1 rounded"
+              style={{ top: `${line.y + 2}px` }}
             >
-              <div
-                className={`h-px ${mark.isMajor ? 'w-4 bg-white' : 'w-2 bg-white/70'}`}
-              />
-              {mark.isMajor && (
-                <span className="text-xs text-white font-mono ml-1 transform -rotate-90 origin-left whitespace-nowrap">
-                  {mark.label}
-                </span>
-              )}
+              {line.label}
             </div>
-          ))}
-          <div className="absolute bottom-2 left-1 text-xs text-white/70 font-mono transform -rotate-90 origin-left whitespace-nowrap">
-            Height: {physicalHeight.toFixed(1)}mm
-          </div>
+          )}
         </div>
-      </div>
+      ))}
 
-      {/* Corner info */}
-      <div className="absolute top-0 left-0 w-16 h-8 bg-black/60 backdrop-blur-sm border-r border-b border-white/20 flex items-center justify-center">
-        <span className="text-xs text-white/70 font-mono">
-          {canvasView.mmPerUnit}mm/u
-        </span>
+      {/* Info overlay */}
+      <div className="absolute top-4 right-4 bg-black/70 text-white text-xs font-mono px-2 py-1 rounded">
+        {canvasView.mmPerUnit}mm/unit | Grid: {pixelsPerCm > 30 ? '1cm' : '0.5cm'} spacing
       </div>
     </div>
   )

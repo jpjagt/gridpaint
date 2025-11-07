@@ -16,8 +16,10 @@ import type {
 import { QUADRANT_NEIGHBOR_PATTERNS } from "./types"
 
 export class NeighborhoodAnalyzer {
-  private neighborCache = new Map<string, NeighborhoodMap>()
-  private analysisCache = new Map<string, NeighborAnalysis>()
+  // Scope caches by the specific Set instance for a layer's points to avoid
+  // expensive content hashing and cross-layer collisions.
+  private neighborCache = new WeakMap<Set<string>, Map<string, NeighborhoodMap>>()
+  private analysisCache = new WeakMap<Set<string>, Map<string, NeighborAnalysis>>()
 
   /**
    * Get the 3x3 neighborhood map for a point within a specific layer
@@ -26,11 +28,11 @@ export class NeighborhoodAnalyzer {
     point: GridPoint,
     layerPoints: Set<string>,
   ): NeighborhoodMap {
-    const cacheKey = this.generateNeighborhoodCacheKey(point, layerPoints)
+    const subCache = this.ensureNeighborSubcache(layerPoints)
+    const cacheKey = this.generateNeighborhoodCacheKey(point)
 
-    if (this.neighborCache.has(cacheKey)) {
-      return this.neighborCache.get(cacheKey)!
-    }
+    const hit = subCache.get(cacheKey)
+    if (hit) return hit
 
     const neighborhood: NeighborhoodMap = [
       [false, false, false],
@@ -51,7 +53,7 @@ export class NeighborhoodAnalyzer {
       }
     }
 
-    this.neighborCache.set(cacheKey, neighborhood)
+    subCache.set(cacheKey, neighborhood)
     return neighborhood
   }
 
@@ -63,11 +65,11 @@ export class NeighborhoodAnalyzer {
     layerPoints: Set<string>,
     centerPoint: GridPoint,
   ): NeighborAnalysis {
-    const cacheKey = `${this.serializeNeighborhood(neighborhood)}:${centerPoint.x},${centerPoint.y}`
+    const subCache = this.ensureAnalysisSubcache(layerPoints)
+    const cacheKey = `${centerPoint.x},${centerPoint.y}:${this.serializeNeighborhood(neighborhood)}`
 
-    if (this.analysisCache.has(cacheKey)) {
-      return this.analysisCache.get(cacheKey)!
-    }
+    const hit = subCache.get(cacheKey)
+    if (hit) return hit
 
     const analysis: NeighborAnalysis = {
       // 8-directional neighbors
@@ -105,7 +107,7 @@ export class NeighborhoodAnalyzer {
       adjacentBridges: this.computeAdjacentBridges(centerPoint, layerPoints),
     }
 
-    this.analysisCache.set(cacheKey, analysis)
+    subCache.set(cacheKey, analysis)
     return analysis
   }
 
@@ -250,22 +252,33 @@ export class NeighborhoodAnalyzer {
    * Clear caches (call when layer data changes significantly)
    */
   clearCache(): void {
-    this.neighborCache.clear()
-    this.analysisCache.clear()
+    this.neighborCache = new WeakMap()
+    this.analysisCache = new WeakMap()
   }
 
   /**
    * Generate cache key for neighborhood lookup
    */
-  private generateNeighborhoodCacheKey(
-    point: GridPoint,
-    layerPoints: Set<string>,
-  ): string {
-    // Create a hash of the layer points for caching
-    const sortedPoints = Array.from(layerPoints).sort()
-    const pointsHash = sortedPoints.slice(0, 10).join(",") // Limit for performance
+  private generateNeighborhoodCacheKey(point: GridPoint): string {
+    return `${point.x},${point.y}`
+  }
 
-    return `${point.x},${point.y}:${pointsHash.length}:${sortedPoints.length}`
+  private ensureNeighborSubcache(layerPoints: Set<string>): Map<string, NeighborhoodMap> {
+    let sub = this.neighborCache.get(layerPoints)
+    if (!sub) {
+      sub = new Map<string, NeighborhoodMap>()
+      this.neighborCache.set(layerPoints, sub)
+    }
+    return sub
+  }
+
+  private ensureAnalysisSubcache(layerPoints: Set<string>): Map<string, NeighborAnalysis> {
+    let sub = this.analysisCache.get(layerPoints)
+    if (!sub) {
+      sub = new Map<string, NeighborAnalysis>()
+      this.analysisCache.set(layerPoints, sub)
+    }
+    return sub
   }
 
   /**

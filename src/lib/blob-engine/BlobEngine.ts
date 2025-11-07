@@ -181,54 +181,88 @@ export class BlobEngine {
       return this.createEmptyLayerGeometry(gridSize, borderWidth)
     }
 
-    // Determine points that need processing
-    const pointsToProcess = viewport
-      ? this.getViewportPoints(layer, viewport)
-      : this.getAllLayerPoints(layer)
+    // If caching and viewport provided, do region-based fetch/compute
+    if (this.options.enableCaching && viewport) {
+      const { geometry: hitPrimitives, hitRegions, missRegions } =
+        this.cache.getCachedGeometry(viewport, [layer], gridSize, borderWidth)
 
+      const resultPrimitives: BlobPrimitive[] = [...hitPrimitives]
+
+      // Precompute candidate points within the overall viewport once
+      const viewportPoints = this.getViewportPoints(layer, viewport)
+
+      // Update layer version snapshot once for this round
+      this.cache.snapshotLayerVersions([layer])
+
+      // Compute primitives for each missed region and cache them
+      for (const regionKey of missRegions) {
+        const regionBounds = this.cache.getRegionBounds(regionKey)
+        const pointsToProcess = this.filterPointsInRegion(viewportPoints, regionBounds)
+
+        if (pointsToProcess.size === 0) {
+          // Cache empty to avoid rework later
+          this.cache.cacheRegionGeometry(regionKey, [], [layer])
+          continue
+        }
+
+        const regionPrimitives: BlobPrimitive[] = []
+        for (const pointKey of pointsToProcess) {
+          const [x, y] = pointKey.split(",").map(Number)
+          const point: GridPoint = { x, y }
+
+          const neighborhood = this.analyzer.getNeighborhoodMap(
+            point,
+            layer.points,
+          )
+          const analysis = this.analyzer.analyzeNeighborhood(
+            neighborhood,
+            layer.points,
+            point,
+          )
+          const isActivePoint = layer.points.has(pointKey)
+
+          const pointPrimitives = this.generatePointPrimitives(
+            point,
+            neighborhood,
+            isActivePoint,
+            gridSize,
+            borderWidth,
+            layer.id,
+            analysis,
+          )
+
+          regionPrimitives.push(...pointPrimitives)
+        }
+
+        // Cache region results and add to final list
+        this.cache.cacheRegionGeometry(regionKey, regionPrimitives, [layer])
+        resultPrimitives.push(...regionPrimitives)
+      }
+
+      return this.createGeometryFromPrimitives(
+        resultPrimitives,
+        gridSize,
+        borderWidth,
+      )
+    }
+
+    // Fallback: no viewport or caching disabled → compute full set
+    const pointsToProcess = this.getAllLayerPoints(layer)
     if (pointsToProcess.size === 0) {
       return this.createEmptyLayerGeometry(gridSize, borderWidth)
     }
 
-    // Try cache if enabled
-    if (this.options.enableCaching && viewport) {
-      const cacheResult = this.cache.getCachedGeometry(
-        viewport,
-        [layer],
-        gridSize,
-        borderWidth,
-      )
-      if (cacheResult.hit) {
-        return this.createGeometryFromPrimitives(
-          cacheResult.geometry,
-          gridSize,
-          borderWidth,
-        )
-      }
-    }
-
-    // Generate primitives for all points
     const primitives: BlobPrimitive[] = []
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity
-
     for (const pointKey of pointsToProcess) {
       const [x, y] = pointKey.split(",").map(Number)
       const point: GridPoint = { x, y }
-
-      // Get neighborhood and analyze it
       const neighborhood = this.analyzer.getNeighborhoodMap(point, layer.points)
       const analysis = this.analyzer.analyzeNeighborhood(
         neighborhood,
         layer.points,
         point,
       )
-
       const isActivePoint = layer.points.has(pointKey)
-
-      // Generate primitives for each quadrant
       const pointPrimitives = this.generatePointPrimitives(
         point,
         neighborhood,
@@ -238,40 +272,10 @@ export class BlobEngine {
         layer.id,
         analysis,
       )
-
-      // logPointInfo(point, neighborhood, analysis, pointPrimitives)
-
       primitives.push(...pointPrimitives)
-
-      // Update bounds
-      if (pointPrimitives.length > 0) {
-        minX = Math.min(minX, x)
-        minY = Math.min(minY, y)
-        maxX = Math.max(maxX, x)
-        maxY = Math.max(maxY, y)
-      }
     }
 
-    const geometry: BlobGeometry = {
-      primitives,
-      boundingBox:
-        primitives.length > 0
-          ? {
-              min: { x: minX, y: minY },
-              max: { x: maxX, y: maxY },
-            }
-          : { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } },
-      gridSize,
-      borderWidth,
-    }
-
-    // Cache the result if enabled
-    if (this.options.enableCaching && viewport) {
-      // TODO: Implement region-based caching
-      // For now, skip caching to avoid complexity
-    }
-
-    return geometry
+    return this.createGeometryFromPrimitives(primitives, gridSize, borderWidth)
   }
 
   /**
@@ -341,6 +345,32 @@ export class BlobEngine {
     }
 
     return viewportPoints
+  }
+
+  /**
+   * Get points within a specific region bounds
+   */
+  private getRegionPoints(layer: GridLayer, region: SpatialRegion): Set<string> {
+    return this.getViewportPoints(layer, region)
+  }
+
+  private filterPointsInRegion(
+    points: Set<string>,
+    region: SpatialRegion,
+  ): Set<string> {
+    const subset = new Set<string>()
+    for (const key of points) {
+      const [x, y] = key.split(',').map(Number)
+      if (
+        x >= region.minX &&
+        x <= region.maxX &&
+        y >= region.minY &&
+        y <= region.maxY
+      ) {
+        subset.add(key)
+      }
+    }
+    return subset
   }
 
   /**

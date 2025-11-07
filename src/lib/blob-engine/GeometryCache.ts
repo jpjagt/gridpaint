@@ -30,7 +30,8 @@ interface LayerVersion {
 }
 
 export class GeometryCache {
-  private readonly regionSize: number = 32  // Size of each cache region in grid units
+  // Smaller regions improve locality and reduce recompute on small edits
+  private readonly regionSize: number = 16  // Size of each cache region in grid units
   private readonly maxCacheSize: number = 1000  // Maximum number of cached regions
   private readonly maxAge: number = 300000  // 5 minutes in milliseconds
 
@@ -51,7 +52,7 @@ export class GeometryCache {
     layers: GridLayer[], 
     gridSize: number, 
     borderWidth: number
-  ): { hit: boolean, geometry: BlobPrimitive[], regions: string[] } {
+  ): { hit: boolean, geometry: BlobPrimitive[], hitRegions: string[], missRegions: string[] } {
     const regions = this.getRegionsForViewport(viewport)
     const cachedPrimitives: BlobPrimitive[] = []
     const hitRegions: string[] = []
@@ -75,7 +76,8 @@ export class GeometryCache {
     return {
       hit: missRegions.length === 0,
       geometry: cachedPrimitives,
-      regions: hitRegions
+      hitRegions,
+      missRegions,
     }
   }
 
@@ -88,9 +90,6 @@ export class GeometryCache {
     layers: GridLayer[]
   ): void {
     const now = Date.now()
-    
-    // Update layer versions
-    this.updateLayerVersions(layers)
     
     // Create cache entry
     const cacheEntry: CacheRegion = {
@@ -110,6 +109,13 @@ export class GeometryCache {
 
     // Evict old entries if cache is full
     this.evictIfNecessary()
+  }
+
+  /**
+   * Precompute/update layer versions once before caching multiple regions
+   */
+  snapshotLayerVersions(layers: GridLayer[]): void {
+    this.updateLayerVersions(layers)
   }
 
   /**
@@ -200,6 +206,13 @@ export class GeometryCache {
   }
 
   /**
+   * Public: get all region keys that overlap the viewport
+   */
+  regionsForViewport(viewport: SpatialRegion): string[] {
+    return this.getRegionsForViewport(viewport)
+  }
+
+  /**
    * Check if cached entry is still valid
    */
   private isCacheValid(cached: CacheRegion, layers: GridLayer[]): boolean {
@@ -226,13 +239,14 @@ export class GeometryCache {
    */
   private updateLayerVersions(layers: GridLayer[]): void {
     for (const layer of layers) {
-      const pointsHash = this.hashLayerPoints(layer)
       const existing = this.layerVersions.get(layer.id)
-      
-      if (!existing || existing.pointsHash !== pointsHash) {
+      // If we already track this layer, rely on explicit invalidation to bump version.
+      // Avoid expensive hashing on every cache write. Initialize if missing.
+      if (!existing) {
+        const pointsHash = this.hashLayerPoints(layer)
         this.layerVersions.set(layer.id, {
-          version: existing ? existing.version + 1 : 1,
-          pointsHash
+          version: 1,
+          pointsHash,
         })
       }
     }

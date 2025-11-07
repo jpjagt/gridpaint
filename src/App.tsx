@@ -15,6 +15,8 @@ import { GridPaintControls } from "@/components/GridPaintControls"
 import { LayerControls } from "@/components/LayerControls"
 import { ToolSelection, type Tool } from "@/components/ToolSelection"
 import { MeasuringBars } from "@/components/MeasuringBars"
+import { ImageImportOverlay } from "@/components/ImageImportOverlay"
+import { useImagePaste } from "@/hooks/useImagePaste"
 import type { Layer } from "@/stores/drawingStores"
 import { drawingStore } from "@/lib/storage/store"
 import { generateSingleLayerSvg, generateLayerSvgContent, convertLayersToGridLayers } from "@/lib/export/svgUtils"
@@ -32,6 +34,8 @@ function EditorPage() {
   const [drawingName, setDrawingName] = useState<string>("")
   const [showMeasuringBars, setShowMeasuringBars] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
+  // Enable paste-to-import
+  useImagePaste()
 
   // Sync layer state
   useEffect(() => {
@@ -74,6 +78,8 @@ function EditorPage() {
         currentTool={currentTool}
         drawingId={drawingId!}
       />
+      {/* Image import overlay renders above the canvas when active */}
+      <ImageImportOverlay />
       <LayerControls
         layers={layers}
         activeLayerId={activeLayerId}

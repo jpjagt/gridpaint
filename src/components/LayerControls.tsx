@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button"
 import { Eye, EyeOff, Grid3X3, Square } from "lucide-react"
 import { useEffect } from "react"
 import type { Layer } from "@/stores/drawingStores"
-import { ModeToggle } from "@/components/ModeToggle"
 
 interface LayerControlsProps {
   layers: Layer[]
@@ -125,11 +124,6 @@ export const LayerControls = ({
           View Only
         </div>
       )}
-
-      {/* Theme toggle */}
-      <div className='mt-2 flex justify-center'>
-        <ModeToggle />
-      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
+import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
 
 export interface Layer {
   id: number
@@ -45,7 +46,7 @@ export const $canvasView = map<CanvasViewState>({
   borderWidth: 0.5,
   panOffset: { x: 0, y: 0 },
   zoom: 1,
-  mmPerUnit: 1.0, // Default: 1mm per grid unit
+  mmPerUnit: DEFAULT_MM_PER_UNIT,
 })
 
 export const $layersState = map<LayersState>({
@@ -84,7 +85,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         borderWidth: stored.borderWidth,
         panOffset: stored.panOffset,
         zoom: stored.zoom,
-        mmPerUnit: stored.mmPerUnit || 1.0, // Default for legacy drawings
+        mmPerUnit: stored.mmPerUnit || DEFAULT_MM_PER_UNIT, // Default for legacy drawings
       })
 
       $layersState.set({
@@ -108,7 +109,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         borderWidth: 0.5,
         panOffset: { x: 0, y: 0 },
         zoom: 1,
-        mmPerUnit: 1.0, // Default: 1mm per grid unit
+        mmPerUnit: DEFAULT_MM_PER_UNIT,
       })
 
       $layersState.set({
@@ -220,6 +221,6 @@ export function resetDrawing(): void {
     borderWidth: 0.5,
     panOffset: { x: 0, y: 0 },
     zoom: 1,
-    mmPerUnit: 1.0, // Default: 1mm per grid unit
+    mmPerUnit: DEFAULT_MM_PER_UNIT,
   })
 }
