@@ -1,0 +1,8 @@
+{
+  "hosting": {
+    "public": "dist"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

@@ -2,12 +2,25 @@ import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
+import type { InteractionGroup, PointModifications } from "@/types/gridpaint"
 
 export interface Layer {
   id: number
-  points: Set<string>
   isVisible: boolean
   renderStyle: "default" | "tiles"
+  /** Interaction groups. All points live inside groups. */
+  groups: InteractionGroup[]
+  /** Per-point modifications keyed by "x,y". Only points with mods need entries. */
+  pointModifications?: Map<string, PointModifications>
+}
+
+/** Derive the union of all points across all groups in a layer */
+export function getLayerPoints(layer: Layer): Set<string> {
+  const all = new Set<string>()
+  for (const group of layer.groups) {
+    for (const p of group.points) all.add(p)
+  }
+  return all
 }
 
 export interface CanvasViewState {
@@ -58,9 +71,9 @@ export const $layersState = map<LayersState>({
 export function createDefaultLayer(id: number = 1): Layer {
   return {
     id,
-    points: new Set<string>(),
     isVisible: true,
     renderStyle: "default",
+    groups: [{ id: "default", points: new Set<string>() }],
   }
 }
 
@@ -201,12 +214,116 @@ export function createOrActivateLayer(layerId: number): void {
   }
 }
 
-export function updateLayerPoints(layerId: number, points: Set<string>): void {
+/**
+ * Update points for a specific group on a layer.
+ * If groupId is omitted, updates the first group (default).
+ */
+export function updateGroupPoints(
+  layerId: number,
+  points: Set<string>,
+  groupId?: string,
+): void {
   const current = $layersState.get()
-  const layers = current.layers.map((layer) =>
-    layer.id === layerId ? { ...layer, points: new Set(points) } : layer,
-  )
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== layerId) return layer
+    const targetGroupId = groupId ?? layer.groups[0]?.id ?? "default"
+    const groups = layer.groups.map((g) =>
+      g.id === targetGroupId ? { ...g, points: new Set(points) } : g,
+    )
+    return { ...layer, groups }
+  })
   $layersState.setKey("layers", layers)
+}
+
+/**
+ * Convenience: update points for the first/default group of a layer.
+ * Most drawing operations use this.
+ */
+export function updateLayerPoints(layerId: number, points: Set<string>): void {
+  updateGroupPoints(layerId, points)
+}
+
+/**
+ * Add a new interaction group to the active layer.
+ * Returns the new group's id, or null if no active layer.
+ */
+export function addGroupToActiveLayer(): string | null {
+  const current = $layersState.get()
+  if (current.activeLayerId === null) return null
+
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== current.activeLayerId) return layer
+    const newGroupId = `group-${layer.groups.length + 1}`
+    const newGroup: InteractionGroup = {
+      id: newGroupId,
+      points: new Set<string>(),
+    }
+    return { ...layer, groups: [...layer.groups, newGroup] }
+  })
+  $layersState.setKey("layers", layers)
+
+  const updatedLayer = layers.find((l) => l.id === current.activeLayerId)
+  return updatedLayer ? updatedLayer.groups[updatedLayer.groups.length - 1].id : null
+}
+
+/**
+ * Remove empty trailing groups from the active layer, keeping at least one group.
+ * Groups that are after the given keepUpToIndex are removed if empty.
+ * Returns the number of groups remaining.
+ */
+export function collapseEmptyTrailingGroups(keepUpToIndex: number): number {
+  const current = $layersState.get()
+  if (current.activeLayerId === null) return 0
+
+  let resultCount = 0
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== current.activeLayerId) return layer
+
+    // Find the last non-empty group index
+    let lastNonEmptyIdx = 0
+    for (let i = 0; i < layer.groups.length; i++) {
+      if (layer.groups[i].points.size > 0) {
+        lastNonEmptyIdx = i
+      }
+    }
+
+    // Keep groups up to max(lastNonEmptyIdx, keepUpToIndex), minimum 1 group
+    const keepCount = Math.max(lastNonEmptyIdx + 1, Math.min(keepUpToIndex + 1, layer.groups.length))
+    const trimmedGroups = layer.groups.slice(0, Math.max(1, keepCount))
+    resultCount = trimmedGroups.length
+    return { ...layer, groups: trimmedGroups }
+  })
+  $layersState.setKey("layers", layers)
+  return resultCount
+}
+
+/**
+ * Update point modifications for a specific point on a layer.
+ */
+export function updatePointModifications(
+  layerId: number,
+  pointKey: string,
+  mods: PointModifications | undefined,
+): void {
+  const current = $layersState.get()
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== layerId) return layer
+    const newMods = new Map(layer.pointModifications || [])
+    if (mods === undefined) {
+      newMods.delete(pointKey)
+    } else {
+      newMods.set(pointKey, mods)
+    }
+    return { ...layer, pointModifications: newMods.size > 0 ? newMods : undefined }
+  })
+  $layersState.setKey("layers", layers)
+}
+
+/**
+ * Clear all modifications (overrides, cutouts) for a specific point.
+ */
+export function clearPointModifications(layerId: number, pointKey: string): void {
+  updatePointModifications(layerId, pointKey, undefined)
 }
 
 export function resetDrawing(): void {

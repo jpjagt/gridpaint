@@ -1,0 +1,35 @@
+{
+  "id": "cf3a2697-e451-441e-baaa-60c3fccfec96",
+  "name": "test1 (imported)",
+  "createdAt": 1771607378142,
+  "updatedAt": 1771607437708,
+  "gridSize": 125,
+  "borderWidth": 0.5,
+  "panOffset": {
+    "x": 520,
+    "y": -88.9569091796875
+  },
+  "zoom": 1,
+  "mmPerUnit": 5,
+  "layers": [
+    {
+      "id": 1,
+      "isVisible": true,
+      "renderStyle": "default",
+      "groups": [
+        {
+          "id": "default",
+          "points": ["2,4", "1,5"]
+        },
+        {
+          "id": "group-2",
+          "points": ["1,3", "0,4", "1,5", "2,3"]
+        },
+        {
+          "id": "group-3",
+          "points": ["2,4", "3,5"]
+        }
+      ]
+    }
+  ]
+}

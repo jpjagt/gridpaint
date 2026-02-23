@@ -272,33 +272,33 @@ export class PrimitiveGenerator {
     if (quadrant === 0) {
       // SE
       if (east && south) return "none" // Interior corner
-      if (southeast) return "none" // Diagonal bridge resolves
-      if (!east && south) return "line-east" // Missing east
-      if (east && !south) return "line-south" // Missing south
+      if (!east && south) return "line-east" // East edge exposed
+      if (east && !south) return "line-south" // South edge exposed
+      if (southeast) return "none" // Only diagonal — bridge resolves
     }
 
     if (quadrant === 1) {
       // SW
       if (south && west) return "none" // Interior corner
-      if (southwest) return "none" // Diagonal bridge resolves
-      if (!south && west) return "line-south" // Missing south
-      if (south && !west) return "line-west" // Missing west
+      if (!south && west) return "line-south" // South edge exposed
+      if (south && !west) return "line-west" // West edge exposed
+      if (southwest) return "none" // Only diagonal — bridge resolves
     }
 
     if (quadrant === 2) {
       // NW
       if (west && north) return "none" // Interior corner
-      if (northwest) return "none" // Diagonal bridge resolves
-      if (!west && north) return "line-west" // Missing west
-      if (west && !north) return "line-north" // Missing north
+      if (!west && north) return "line-west" // West edge exposed
+      if (west && !north) return "line-north" // North edge exposed
+      if (northwest) return "none" // Only diagonal — bridge resolves
     }
 
     if (quadrant === 3) {
       // NE
       if (north && east) return "none" // Interior corner
-      if (northeast) return "none" // Diagonal bridge resolves
-      if (!north && east) return "line-north" // Missing north
-      if (north && !east) return "line-east" // Missing east
+      if (!north && east) return "line-north" // North edge exposed
+      if (north && !east) return "line-east" // East edge exposed
+      if (northeast) return "none" // Only diagonal — bridge resolves
     }
 
     return "none" // Fallback (shouldn't happen)

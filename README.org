@@ -1,36 +1,167 @@
-#+title: vite-app-template installation guide
+#+title: GridPaint
 
-* introduction
+* what is GridPaint?
 
-this document provides instructions on how to install and set up the
-vite-app-template from its github repository. there are two versions available
-for installation: the main version and the redux version.
+GridPaint is a multi-layer pixel art application that renders discrete grid
+points as connected blob shapes. Users paint on a grid, but instead of
+squares/circles, adjacent points merge into smooth organic shapes using Bezier
+curves.
 
-* what's in it?
-
-a empty project on the following stack:
-- bun
-- vite
-- typescript
-- react
-- twin.macro
-- shadcn/ui
+- multi-layer editing (up to 6 layers) with visual hierarchy
+- blob rendering engine that analyzes 3x3 neighborhoods to generate smooth connected shapes
+- interaction groups within a layer (independent blobification, merged via union)
+- per-quadrant shape overrides (convex, concave, full, empty)
+- circular cutouts with configurable anchor + radius
+- SVG export (outlines-only for laser cutting)
+- localStorage persistence with auto-save
 
 * installation
 
-** main version
-
 #+begin_src shell
-npx degit jpjagt/vite-app-template#main my-vite-app
+pnpm install
+pnpm dev
 #+end_src
 
-** redux version
+* controls
 
-#+begin_src shell
-npx degit jpjagt/vite-app-template#redux my-vite-app-redux
+** tools
+
+| key | tool     | description                                           |
+|-----+----------+-------------------------------------------------------|
+| =D= | draw     | paint points on the active group                      |
+| =E= | erase    | remove points (also clears overrides + cutouts)       |
+| =P= | pan      | drag to pan the canvas                                |
+| =S= | select   | rectangle select, copy/paste/delete                   |
+| =O= | cutout   | add circular cutouts to existing points               |
+| =V= | override | paint per-quadrant shape overrides                    |
+
+tools can also be selected by clicking the toolbar at the bottom center.
+
+** drawing
+
+| action           | effect                                             |
+|------------------+----------------------------------------------------|
+| click/drag       | paint with current tool                            |
+| alt + click/drag | invert draw/erase (temporary erase while drawing)  |
+
+** layers
+
+| key     | action                                                       |
+|---------+--------------------------------------------------------------|
+| =1= - =6= | switch to layer (creates if it doesn't exist)            |
+| =1= - =6= (already active) | deactivate layer (view-only mode)          |
+
+layer buttons are at the top left. each layer has visibility (eye icon) and
+render style (grid/blob) toggles below it.
+
+** interaction groups
+
+groups allow independent blob shapes within a single layer. each group's
+neighborhood analysis is computed separately, then merged via "most filled wins"
+union. shared internal edges between groups are eliminated in SVG export.
+
+| key | action                                                          |
+|-----+-----------------------------------------------------------------|
+| =]= | next group (creates new if current group is non-empty)          |
+| =[= | previous group (collapses empty trailing groups)                |
+
+- the layer button shows the group as a subindex (e.g. =1.2= for layer 1 group 2)
+  when multiple groups exist
+- the active layer outline only highlights the current group's points
+- =]= will not cycle past an empty group (draw something first)
+- =[= collapses empty trailing groups to keep state clean
+
+** cutout tool (=O=)
+
+when the cutout tool is active, an options panel appears above the toolbar:
+
+- *5 anchor positions*: center, SE, SW, NW, NE (position relative to the grid point)
+  - keyboard shortcuts: =Q= (center), =X= (SE), =Z= (SW), =A= (NW), =W= (NE)
+- *radius input*: in millimeters (converted to grid units using the drawing's mm/unit scale)
+- *click* on an existing point to add a cutout
+- *alt+click* on a point to clear all cutouts on that point
+- multiple cutouts per point are supported
+
+cutouts render as transparent holes on canvas (destination-out compositing)
+and as separate CCW-wound circular paths in SVG export.
+
+** override tool (=V=)
+
+when the override tool is active, an options panel shows 10 shape options:
+
+| shape        | keyboard | description                                   |
+|--------------+----------+-----------------------------------------------|
+| full         | =F=      | filled rectangle quadrant                     |
+| empty        | =R=      | nothing rendered in that quadrant              |
+| convex-SE    | =T=      | outward curve facing south-east               |
+| convex-SW    | =G=      | outward curve facing south-west               |
+| convex-NW    | =B=      | outward curve facing north-west               |
+| convex-NE    | =Y=      | outward curve facing north-east               |
+| concave-SE   | =H=      | inward (bridge) curve facing south-east       |
+| concave-SW   | =N=      | inward (bridge) curve facing south-west       |
+| concave-NW   | =U=      | inward (bridge) curve facing north-west       |
+| concave-NE   | =J=      | inward (bridge) curve facing north-east       |
+
+- *click* on a quadrant of any point to apply the selected shape
+- *alt+click* on a quadrant to clear that override (revert to auto-computed)
+- clicking an empty cell creates the point first, then applies the override
+- drag-painting is supported (hold mouse and drag across quadrants)
+- the cursor position determines which quadrant is targeted (each grid cell is
+  divided into 4 quadrants: SE, SW, NW, NE)
+- overrides respect the selected direction regardless of which quadrant they're
+  placed in
+
+** viewport
+
+| key/gesture                 | action                   |
+|-----------------------------+--------------------------|
+| =C=                        | center canvas to content |
+| ctrl + scroll / pinch      | zoom toward cursor       |
+| scroll / two-finger drag   | pan                      |
+| grid size =+= / =-= buttons | change grid size       |
+
+** copy / paste / selection
+
+| key              | action                                                      |
+|------------------+-------------------------------------------------------------|
+| cmd/ctrl + =C=   | copy selection (select tool)                                |
+| cmd/ctrl + =V=   | paste at canvas center (select tool)                        |
+| =Escape=         | clear selection                                             |
+| =Delete= / =Backspace= | delete selected points from current layer             |
+| shift + =Delete= / =Backspace= | delete selected points from all layers        |
+
+** other
+
+| control             | location      | description                                             |
+|---------------------+---------------+---------------------------------------------------------|
+| drawing name        | top right     | editable text input                                     |
+| home button         | top right     | navigate back to gallery                                |
+| download button     | top right     | export PNG + JSON + per-layer SVGs                      |
+| =?= button          | top right     | open keyboard shortcuts help modal                      |
+| dark/light mode     | top right     | toggle theme                                            |
+| mm/unit input       | bottom right  | physical scale (shows measuring bars on focus)          |
+
+* project structure
+
+#+begin_src
+src/
+  components/           # React components
+    ui/                 # shadcn/ui primitives
+  lib/
+    blob-engine/        # Core rendering: NeighborhoodAnalyzer, PrimitiveGenerator, BlobEngine, GroupMerger
+    storage/            # LocalStorage + Firestore persistence
+    export/             # SVG/PNG export utilities
+    gridpaint/          # Drawing utilities
+  stores/               # Nanostores: drawingStores.ts, ui.ts
+  types/                # TypeScript type definitions
+  hooks/                # Custom React hooks
 #+end_src
 
-* post-installation
+* development
 
-after installation, you may want to change the name of your project in
-=package.json=.
+#+begin_src shell
+pnpm install        # install dependencies
+pnpm dev            # start dev server with HMR
+pnpm build          # typecheck + production build
+pnpm lint           # run ESLint
+#+end_src

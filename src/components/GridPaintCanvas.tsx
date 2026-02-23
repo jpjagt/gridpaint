@@ -8,7 +8,14 @@ import {
   useCallback,
 } from "react"
 import { useStore } from "@nanostores/react"
-import type { Tool } from "./ToolSelection"
+import type { Tool } from "@/stores/ui"
+import {
+  $currentTool,
+  $activeGroupIndex,
+  $cutoutToolSettings,
+  $overrideToolSettings,
+  setActiveGroupIndex,
+} from "@/stores/ui"
 import { useSelection } from "@/hooks/useSelection"
 import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 
@@ -30,6 +37,7 @@ import {
 } from "@/lib/export/exportUtils"
 import {
   type Layer,
+  getLayerPoints,
   $canvasView,
   $layersState,
   $drawingMeta,
@@ -39,8 +47,13 @@ import {
   toggleLayerRenderStyle,
   createOrActivateLayer,
   updateLayerPoints,
+  updateGroupPoints,
+  updatePointModifications,
+  clearPointModifications,
+  addGroupToActiveLayer,
   resetDrawing,
 } from "@/stores/drawingStores"
+import type { CircularCutout, PointModifications } from "@/types/gridpaint"
 
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
@@ -51,7 +64,7 @@ const getCanvasColor = (varName: string): string => {
 }
 
 interface GridPaintCanvasProps {
-  currentTool: Tool
+  currentTool?: Tool // deprecated: now uses $currentTool store
   drawingId: string
 }
 
@@ -78,9 +91,14 @@ export interface GridPaintCanvasMethods {
 export const GridPaintCanvas = forwardRef<
   GridPaintCanvasMethods,
   GridPaintCanvasProps
->(({ currentTool, drawingId }, ref) => {
+>(({ drawingId }, ref) => {
+  const currentTool = useStore($currentTool)
+  const activeGroupIndex = useStore($activeGroupIndex)
+  const cutoutSettings = useStore($cutoutToolSettings)
+  const overrideSettings = useStore($overrideToolSettings)
   const $showActiveLayerOutline = useStore(showActiveLayerOutline)
   const canvasView = useStore($canvasView)
+  const { zoom: canvasZoom, panOffset: canvasPanOffset, gridSize: canvasGridSize } = canvasView
   const layersState = useStore($layersState)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -141,9 +159,14 @@ export const GridPaintCanvas = forwardRef<
     (layers: Layer[]): BlobGridLayer[] => {
       return layers.map((layer) => ({
         id: layer.id,
-        points: new Set(layer.points),
+        groups: layer.groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          points: new Set(g.points),
+        })),
         isVisible: layer.isVisible,
         renderStyle: layer.renderStyle,
+        pointModifications: layer.pointModifications,
       }))
     },
     [],
@@ -178,7 +201,7 @@ export const GridPaintCanvas = forwardRef<
       maxX: viewportMaxX,
       maxY: viewportMaxY,
     }
-  }, [canvasView])
+  }, [canvasView.zoom, canvasView.panOffset, canvasView.gridSize])
 
   // Cache geometry generation - only regenerate when layers or settings change
   const cachedGeometry = useMemo(() => {
@@ -230,6 +253,168 @@ export const GridPaintCanvas = forwardRef<
     [canvasView],
   )
 
+  /**
+   * Get sub-grid coordinates: which quadrant of which cell the cursor is in.
+   * Quadrant indices: 0=SE (+x,+y), 1=SW (-x,+y), 2=NW (-x,-y), 3=NE (+x,-y)
+   */
+  const getQuadrantCoordinates = useCallback(
+    (clientX: number, clientY: number): { gridX: number; gridY: number; quadrant: 0 | 1 | 2 | 3 } | null => {
+      const canvas = canvasRef.current
+      if (!canvas) return null
+
+      const rect = canvas.getBoundingClientRect()
+      const x = (clientX - rect.left - canvasView.panOffset.x) / canvasView.zoom
+      const y = (clientY - rect.top - canvasView.panOffset.y) / canvasView.zoom
+
+      const gridX = Math.floor(x / canvasView.gridSize)
+      const gridY = Math.floor(y / canvasView.gridSize)
+
+      // Position within the cell (0..1)
+      const cellX = (x / canvasView.gridSize) - gridX
+      const cellY = (y / canvasView.gridSize) - gridY
+
+      // Determine quadrant: right half = E, left half = W; bottom half = S, top half = N
+      // Quadrant mapping: 0=SE, 1=SW, 2=NW, 3=NE
+      let quadrant: 0 | 1 | 2 | 3
+      if (cellX >= 0.5) {
+        quadrant = cellY >= 0.5 ? 0 : 3 // right: SE or NE
+      } else {
+        quadrant = cellY >= 0.5 ? 1 : 2 // left: SW or NW
+      }
+
+      return { gridX, gridY, quadrant }
+    },
+    [canvasView],
+  )
+
+  /** Handle cutout tool click: add cutout to a point, or alt+click to clear all cutouts */
+  const handleCutoutClick = useCallback(
+    (clientX: number, clientY: number, isAltHeld: boolean) => {
+      const coords = getGridCoordinates(clientX, clientY)
+      if (!coords) return
+
+      const currentLayersState = $layersState.get()
+      const { activeLayerId, layers } = currentLayersState
+      if (activeLayerId === null) return
+
+      const activeLayer = layers.find((l) => l.id === activeLayerId)
+      if (!activeLayer) return
+
+      const pointKey = `${coords.x},${coords.y}`
+
+      // Only allow cutouts on existing points
+      const allPoints = getLayerPoints(activeLayer)
+      if (!allPoints.has(pointKey)) return
+
+      const existingMods = activeLayer.pointModifications?.get(pointKey)
+
+      if (isAltHeld) {
+        // Clear all cutouts on this point
+        if (existingMods?.cutouts) {
+          const newMods: PointModifications = { ...existingMods }
+          delete newMods.cutouts
+          const hasAnything = newMods.quadrantOverrides && Object.keys(newMods.quadrantOverrides).length > 0
+          updatePointModifications(activeLayerId, pointKey, hasAnything ? newMods : undefined)
+        }
+      } else {
+        // Add a cutout with current settings (store radiusMm as primary value;
+        // renderers convert to grid units at draw time using mmPerUnit)
+        const { anchor, radiusMm } = cutoutSettings
+
+        const newCutout: CircularCutout = {
+          anchor,
+          radiusMm,
+        }
+
+        const existingCutouts = existingMods?.cutouts || []
+        const newMods: PointModifications = {
+          ...existingMods,
+          cutouts: [...existingCutouts, newCutout],
+        }
+        updatePointModifications(activeLayerId, pointKey, newMods)
+      }
+
+      // Invalidate cache
+      blobEngine.invalidateLayer(activeLayerId, {
+        minX: coords.x - 1,
+        minY: coords.y - 1,
+        maxX: coords.x + 1,
+        maxY: coords.y + 1,
+      })
+    },
+    [getGridCoordinates, cutoutSettings, blobEngine],
+  )
+
+  /** Handle override tool click: set quadrant override, or alt+click to clear */
+  const handleOverrideClick = useCallback(
+    (clientX: number, clientY: number, isAltHeld: boolean) => {
+      const qCoords = getQuadrantCoordinates(clientX, clientY)
+      if (!qCoords) return
+
+      const currentLayersState = $layersState.get()
+      const { activeLayerId, layers } = currentLayersState
+      if (activeLayerId === null) return
+
+      const activeLayer = layers.find((l) => l.id === activeLayerId)
+      if (!activeLayer) return
+
+      const pointKey = `${qCoords.gridX},${qCoords.gridY}`
+      const allPoints = getLayerPoints(activeLayer)
+
+      if (isAltHeld) {
+        // Clear override on this specific quadrant (only if point exists)
+        if (!allPoints.has(pointKey)) return
+        const existingMods = activeLayer.pointModifications?.get(pointKey)
+        if (existingMods?.quadrantOverrides) {
+          const newOverrides = { ...existingMods.quadrantOverrides }
+          delete newOverrides[qCoords.quadrant]
+          const hasOverrides = Object.keys(newOverrides).length > 0
+          const newMods: PointModifications = {
+            ...existingMods,
+            quadrantOverrides: hasOverrides ? newOverrides : undefined,
+          }
+          const hasAnything = newMods.cutouts || newMods.quadrantOverrides
+          updatePointModifications(activeLayerId, pointKey, hasAnything ? newMods : undefined)
+        }
+      } else {
+        // If point doesn't exist yet, create it in the active group
+        if (!allPoints.has(pointKey)) {
+          const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
+          const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
+          if (activeGroup) {
+            const newPoints = new Set(activeGroup.points)
+            newPoints.add(pointKey)
+            updateGroupPoints(activeLayerId, newPoints, activeGroup.id)
+          }
+        }
+
+        // Apply the selected shape to this quadrant
+        const { shape } = overrideSettings
+        // Re-read mods after potential point creation
+        const freshLayer = $layersState.get().layers.find((l) => l.id === activeLayerId)
+        const existingMods = freshLayer?.pointModifications?.get(pointKey)
+        const existingOverrides = existingMods?.quadrantOverrides || {}
+        const newMods: PointModifications = {
+          ...existingMods,
+          quadrantOverrides: {
+            ...existingOverrides,
+            [qCoords.quadrant]: shape,
+          },
+        }
+        updatePointModifications(activeLayerId, pointKey, newMods)
+      }
+
+      // Invalidate cache
+      blobEngine.invalidateLayer(activeLayerId, {
+        minX: qCoords.gridX - 1,
+        minY: qCoords.gridY - 1,
+        maxX: qCoords.gridX + 1,
+        maxY: qCoords.gridY + 1,
+      })
+    },
+    [getQuadrantCoordinates, overrideSettings, activeGroupIndex, blobEngine],
+  )
+
   // Main render function - now just handles transforms and rendering
   const render = useCallback(() => {
     if (!renderer || !isReady || !cachedGeometry) return
@@ -272,18 +457,16 @@ export const GridPaintCanvas = forwardRef<
     // Render the cached geometry with current transforms
     renderer.renderComposite(
       cachedGeometry,
-      { style: baseStyle, transform },
+      { style: baseStyle, transform, mmPerUnit: canvasView.mmPerUnit },
       getLayerStyle,
     )
 
-    // Render active layer outline if enabled
+    // Render active layer outline if enabled (only for active group)
     if ($showActiveLayerOutline && layersState.activeLayerId !== null) {
       const activeLayer = layersState.layers.find(
         (l) => l.id === layersState.activeLayerId,
       )
       if (activeLayer && activeLayer.isVisible) {
-        // For now, use the old outline rendering system for compatibility
-        // TODO: Implement outline rendering in the new system
         renderActiveLayerOutlineCompat(activeLayer)
       }
     }
@@ -310,12 +493,13 @@ export const GridPaintCanvas = forwardRef<
     canvasView,
     layersState,
     $showActiveLayerOutline,
+    activeGroupIndex,
     currentTool,
     selection.hasSelection,
     selection.selectionStart,
     selection.selectionEnd,
     renderSelectionRectangle,
-  ]) // Much simpler dependencies!
+  ])
 
   // Center canvas to fit all visible content
   const centerCanvasToContent = useCallback(() => {
@@ -329,7 +513,7 @@ export const GridPaintCanvas = forwardRef<
 
     state.layers.forEach((layer) => {
       if (!layer.isVisible) return
-      for (const pointKey of layer.points) {
+      for (const pointKey of getLayerPoints(layer)) {
         const [x, y] = pointKey.split(",").map(Number)
         minX = Math.min(minX, x)
         minY = Math.min(minY, y)
@@ -372,7 +556,7 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [render])
 
-  // Compatibility function for active layer outline (temporary)
+  // Compatibility function for active layer outline (renders only active group)
   const renderActiveLayerOutlineCompat = useCallback(
     (activeLayer: Layer) => {
       if (!renderer || !renderer.context) return
@@ -382,12 +566,17 @@ export const GridPaintCanvas = forwardRef<
       ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
       ctx.scale(canvasView.zoom, canvasView.zoom)
 
+      // Get points for the active group only (not all groups)
+      const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
+      const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
+      const outlinePoints = activeGroup ? activeGroup.points : getLayerPoints(activeLayer)
+
       // Use current visible viewport for outline rendering
       const viewport = calculateCurrentViewport()
       for (let x = viewport.minX; x <= viewport.maxX; x++) {
         for (let y = viewport.minY; y <= viewport.maxY; y++) {
           const pointKey = `${x},${y}`
-          if (activeLayer.points.has(pointKey)) {
+          if (outlinePoints.has(pointKey)) {
             // Create temporary RasterPoint for compatibility
             const point = {
               x,
@@ -405,7 +594,7 @@ export const GridPaintCanvas = forwardRef<
                 const nx = x + dx
                 const ny = y + dy
                 const nkey = `${nx},${ny}`
-                point.neighbors[dx + 1][dy + 1] = activeLayer.points.has(nkey)
+                point.neighbors[dx + 1][dy + 1] = outlinePoints.has(nkey)
               }
             }
 
@@ -422,7 +611,7 @@ export const GridPaintCanvas = forwardRef<
 
       ctx.restore()
     },
-    [renderer, canvasView, calculateCurrentViewport],
+    [renderer, canvasView, activeGroupIndex, calculateCurrentViewport],
   )
 
   // Initialize canvas on mount and when ready
@@ -506,17 +695,23 @@ export const GridPaintCanvas = forwardRef<
         pointsToModify.add(`${coords.x},${coords.y}`)
       }
 
-      const newPoints = new Set(activeLayer.points)
+      // Get the active group (based on activeGroupIndex)
+      const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
+      const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
+      if (!activeGroup) return
+      const newPoints = new Set(activeGroup.points)
       pointsToModify.forEach((key) => {
         if (effectiveTool === "draw") {
           newPoints.add(key)
         } else if (effectiveTool === "erase") {
           newPoints.delete(key)
+          // Also clear point modifications when erasing
+          clearPointModifications(activeLayerId, key)
         }
       })
 
-      // Apply update
-      updateLayerPoints(activeLayerId, newPoints)
+      // Apply update to the active group
+      updateGroupPoints(activeLayerId, newPoints, activeGroup.id)
 
       // Targeted cache invalidation for the edited region (+1-cell padding for neighbors)
       if (pointsToModify.size > 0) {
@@ -540,29 +735,41 @@ export const GridPaintCanvas = forwardRef<
       }
       return coords
     },
-    [getGridCoordinates, currentTool],
+    [getGridCoordinates, currentTool, activeGroupIndex],
   )
 
-  // Mouse interaction handlers (same as original)
+  // Mouse interaction handlers
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+    }
+
     const handleMouseDown = (e: MouseEvent) => {
       setIsDragging(true)
+      const isInvertHeld = e.altKey || e.button === 2
 
       if (currentTool === "pan") {
         setPanStart({ x: e.clientX, y: e.clientY })
       } else if (currentTool === "select") {
         selection.startSelection(e.clientX, e.clientY, getGridCoordinates)
+      } else if (currentTool === "cutout") {
+        handleCutoutClick(e.clientX, e.clientY, isInvertHeld)
+      } else if (currentTool === "override") {
+        handleOverrideClick(e.clientX, e.clientY, isInvertHeld)
       } else {
-        const newCoords = paintAtPosition(e.clientX, e.clientY, e.altKey)
+        // draw or erase
+        const newCoords = paintAtPosition(e.clientX, e.clientY, isInvertHeld)
         setLastPaintCoords(newCoords || null)
       }
     }
 
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
+        const isInvertHeld = e.altKey || !!(e.buttons & 2)
+
         if (currentTool === "pan") {
           const deltaX = e.clientX - panStart.x
           const deltaY = e.clientY - panStart.y
@@ -575,11 +782,17 @@ export const GridPaintCanvas = forwardRef<
           setPanStart({ x: e.clientX, y: e.clientY })
         } else if (currentTool === "select") {
           selection.updateSelection(e.clientX, e.clientY, getGridCoordinates)
+        } else if (currentTool === "cutout") {
+          // No drag behavior for cutout (click-only)
+        } else if (currentTool === "override") {
+          // Allow painting overrides while dragging
+          handleOverrideClick(e.clientX, e.clientY, isInvertHeld)
         } else {
+          // draw or erase
           const newCoords = paintAtPosition(
             e.clientX,
             e.clientY,
-            e.altKey,
+            isInvertHeld,
             lastPaintCoords || undefined,
           )
           setLastPaintCoords(newCoords || null)
@@ -596,15 +809,19 @@ export const GridPaintCanvas = forwardRef<
     canvas.addEventListener("mousemove", handleMouseMove)
     canvas.addEventListener("mouseup", handleMouseUp)
     canvas.addEventListener("mouseleave", handleMouseUp)
+    canvas.addEventListener("contextmenu", handleContextMenu)
 
     return () => {
       canvas.removeEventListener("mousedown", handleMouseDown)
       canvas.removeEventListener("mousemove", handleMouseMove)
       canvas.removeEventListener("mouseup", handleMouseUp)
       canvas.removeEventListener("mouseleave", handleMouseUp)
+      canvas.removeEventListener("contextmenu", handleContextMenu)
     }
   }, [
     paintAtPosition,
+    handleCutoutClick,
+    handleOverrideClick,
     currentTool,
     isDragging,
     panStart,
@@ -756,7 +973,8 @@ export const GridPaintCanvas = forwardRef<
     setMmPerUnit: (mmPerUnit: number) => {
       const clampedMmPerUnit = Math.max(0.1, Math.min(100, mmPerUnit))
       $canvasView.setKey("mmPerUnit", clampedMmPerUnit)
-      // No need to clear caches or re-render as this only affects export
+      // Re-render so cutout sizes (stored in mm) update correctly
+      render()
     },
 
     saveIMG: () => {
@@ -791,6 +1009,7 @@ export const GridPaintCanvas = forwardRef<
 
     setActiveLayer: (layerId: number | null) => {
       setActiveLayer(layerId)
+      setActiveGroupIndex(0)
       render()
     },
 
@@ -933,8 +1152,9 @@ export const GridPaintCanvas = forwardRef<
   const getCursorClass = () => {
     switch (currentTool) {
       case "draw":
-        return "cursor-crosshair"
       case "erase":
+      case "cutout":
+      case "override":
         return "cursor-crosshair"
       case "pan":
         return "cursor-grab"

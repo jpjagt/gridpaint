@@ -16,9 +16,11 @@ import type {
   PrimitiveType,
   NeighborAnalysis,
 } from "./types"
+import { getGridLayerPoints } from "./types"
 
 import { NeighborhoodAnalyzer } from "./NeighborhoodAnalyzer"
 import { PrimitiveGenerator } from "./PrimitiveGenerator"
+import { GroupMerger } from "./GroupMerger"
 import { GeometryCache } from "./GeometryCache"
 import { BlobEngineError } from "./types"
 
@@ -71,6 +73,7 @@ const logPointInfo = (
 export class BlobEngine {
   private analyzer = new NeighborhoodAnalyzer()
   private generator = new PrimitiveGenerator()
+  private groupMerger = new GroupMerger()
   private cache = new GeometryCache()
 
   private options: BlobEngineOptions
@@ -169,6 +172,16 @@ export class BlobEngine {
   }
 
   /**
+   * Check if a layer needs the multi-group merge path
+   */
+  private needsGroupMerge(layer: GridLayer): boolean {
+    return (
+      layer.groups.length > 1 ||
+      (layer.pointModifications !== undefined && layer.pointModifications.size > 0)
+    )
+  }
+
+  /**
    * Generate geometry for a single layer
    */
   generateLayerGeometry(
@@ -177,10 +190,22 @@ export class BlobEngine {
     borderWidth: number = 0,
     viewport?: SpatialRegion,
   ): BlobGeometry {
-    if (!layer.isVisible || layer.points.size === 0) {
+    const allLayerPoints = getGridLayerPoints(layer)
+    if (!layer.isVisible || allLayerPoints.size === 0) {
       return this.createEmptyLayerGeometry(gridSize, borderWidth)
     }
 
+    // Use GroupMerger path for multi-group layers or layers with overrides
+    if (this.needsGroupMerge(layer)) {
+      const { primitives } = this.groupMerger.generateMergedPrimitives(
+        layer,
+        gridSize,
+        borderWidth,
+      )
+      return this.createGeometryFromPrimitives(primitives, gridSize, borderWidth)
+    }
+
+    // Fast path: single group, no overrides (original algorithm)
     // If caching and viewport provided, do region-based fetch/compute
     if (this.options.enableCaching && viewport) {
       const { geometry: hitPrimitives, hitRegions, missRegions } =
@@ -212,14 +237,14 @@ export class BlobEngine {
 
           const neighborhood = this.analyzer.getNeighborhoodMap(
             point,
-            layer.points,
+            allLayerPoints,
           )
           const analysis = this.analyzer.analyzeNeighborhood(
             neighborhood,
-            layer.points,
+            allLayerPoints,
             point,
           )
-          const isActivePoint = layer.points.has(pointKey)
+          const isActivePoint = allLayerPoints.has(pointKey)
 
           const pointPrimitives = this.generatePointPrimitives(
             point,
@@ -256,13 +281,13 @@ export class BlobEngine {
     for (const pointKey of pointsToProcess) {
       const [x, y] = pointKey.split(",").map(Number)
       const point: GridPoint = { x, y }
-      const neighborhood = this.analyzer.getNeighborhoodMap(point, layer.points)
+      const neighborhood = this.analyzer.getNeighborhoodMap(point, allLayerPoints)
       const analysis = this.analyzer.analyzeNeighborhood(
         neighborhood,
-        layer.points,
+        allLayerPoints,
         point,
       )
-      const isActivePoint = layer.points.has(pointKey)
+      const isActivePoint = allLayerPoints.has(pointKey)
       const pointPrimitives = this.generatePointPrimitives(
         point,
         neighborhood,
@@ -319,7 +344,7 @@ export class BlobEngine {
    * Get all points that need processing for a layer, including neighbors for bridges
    */
   private getAllLayerPoints(layer: GridLayer): Set<string> {
-    return this.analyzer.getPointsNeedingCalculation(layer.points)
+    return this.analyzer.getPointsNeedingCalculation(getGridLayerPoints(layer))
   }
 
   /**
@@ -437,6 +462,7 @@ export class BlobEngine {
 
     // Also clear analyzer caches since layer data changed
     this.analyzer.clearCache()
+    this.groupMerger.clearCache()
   }
 
   /**
@@ -445,6 +471,7 @@ export class BlobEngine {
   clearCaches(): void {
     this.cache.clear()
     this.analyzer.clearCache()
+    this.groupMerger.clearCache()
   }
 
   /**

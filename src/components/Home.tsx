@@ -2,7 +2,14 @@ import React, { useEffect, useState } from "react"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingMetadata, DrawingDocument } from "@/lib/storage/types"
 import { Button } from "@/components/ui/button"
-import { Plus, Trash2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Plus, Trash2, Download, User } from "lucide-react"
+import { ImportDrawingDialog } from "@/components/ImportDrawingDialog"
+import { PassphraseSetupModal } from "@/components/PassphraseSetupModal"
+import { useStore } from "@nanostores/react"
+import { $authState } from "@/stores/authStores"
+import { enableCloudSync, forceSyncNow } from "@/lib/storage/storage-manager"
+import { toast } from "sonner"
 
 // Generate a simple preview thumbnail from drawing data
 function generatePreview(drawing: DrawingDocument): string {
@@ -17,9 +24,15 @@ function generatePreview(drawing: DrawingDocument): string {
   ctx.fillRect(0, 0, size, size)
 
   // Find bounds of all points
-  const allPoints = drawing.layers
+  const allPoints: string[] = drawing.layers
     .filter((layer) => layer.isVisible)
-    .flatMap((layer) => Array.from(layer.points))
+    .flatMap((layer) => {
+      const pts: string[] = []
+      for (const group of layer.groups) {
+        for (const p of group.points) pts.push(p)
+      }
+      return pts
+    })
 
   if (allPoints.length === 0) {
     // Empty drawing - show grid pattern
@@ -84,21 +97,29 @@ function generatePreview(drawing: DrawingDocument): string {
 export default function Home() {
   const [drawings, setDrawings] = useState<DrawingMetadata[]>([])
   const [fullDrawings, setFullDrawings] = useState<DrawingDocument[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showPassphraseModal, setShowPassphraseModal] = useState(false)
+  const authState = useStore($authState)
 
   useEffect(() => {
     async function loadDrawings() {
+      setIsLoading(true)
       const metadata = await drawingStore.list()
-      setDrawings(metadata)
+      // Sort by last modified descending
+      const sorted = [...metadata].sort((a, b) => b.updatedAt - a.updatedAt)
+      setDrawings(sorted)
 
       // Load full drawing documents for previews
       const fullDocs = await Promise.all(
-        metadata.map(async (meta) => {
+        sorted.map(async (meta) => {
           const doc = await drawingStore.get(meta.id)
           return doc
         }),
       )
       setFullDrawings(fullDocs.filter(Boolean) as DrawingDocument[])
+      setIsLoading(false)
     }
     loadDrawings()
   }, [])
@@ -115,70 +136,140 @@ export default function Home() {
     setDeleteDialogId(null)
   }
 
+  const handleImport = async (drawingId: string) => {
+    try {
+      // Get the drawing from Firestore
+      const drawing = await drawingStore.get(drawingId)
+      if (!drawing) {
+        toast.error('Drawing not found')
+        return
+      }
+
+      // Create a new ID for the duplicate
+      const newId = crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
+      const newDrawing = {
+        ...drawing,
+        id: newId,
+        name: `${drawing.name} (imported)`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }
+
+      // Save the duplicate
+      await drawingStore.save(newDrawing)
+      
+      // Reload drawings list
+      const metadata = await drawingStore.list()
+      setDrawings(metadata)
+      
+      toast.success('Drawing imported successfully!')
+      
+      // Navigate to the new drawing
+      window.location.hash = `/grids/${newId}`
+    } catch (error) {
+      console.error('Error importing drawing:', error)
+      toast.error('Failed to import drawing')
+    }
+  }
+
   return (
     <div className='p-8'>
       <div className='flex items-center justify-between mb-6'>
         <h1 className='text-2xl font-medium'>your grids</h1>
-        <Button onClick={createNew} className='flex items-center'>
-          <Plus className='mr-2 w-4 h-4' /> new grid
-        </Button>
+        <div className='flex gap-2'>
+          {authState.isAuthenticated && (
+            <Button 
+              onClick={() => setShowImportDialog(true)} 
+              variant='outline'
+              className='flex items-center'
+            >
+              <Download className='mr-2 w-4 h-4' /> import
+            </Button>
+          )}
+          <Button 
+            onClick={() => setShowPassphraseModal(true)}
+            variant='outline'
+            className='flex items-center'
+            title={authState.isAuthenticated ? 'Change passphrase' : 'Set passphrase for cloud sync'}
+          >
+            <User className='mr-2 w-4 h-4' />
+            {authState.isAuthenticated ? 'account' : 'login'}
+          </Button>
+          <Button onClick={createNew} className='flex items-center'>
+            <Plus className='mr-2 w-4 h-4' /> new grid
+          </Button>
+        </div>
       </div>
 
       <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
-        {drawings.map((drawing) => {
-          const fullDrawing = fullDrawings.find((fd) => fd.id === drawing.id)
-          return (
-            <div
-              key={drawing.id}
-              className='group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow'
-            >
-              {/* Preview */}
-              <div className='aspect-square p-4'>
-                {fullDrawing ? (
-                  <img
-                    src={generatePreview(fullDrawing)}
-                    alt={`Preview of ${drawing.name}`}
-                    className='w-full h-full object-contain bg-gray-50 rounded border'
-                  />
-                ) : (
-                  <div className='w-full h-full bg-gray-100 rounded border flex items-center justify-center'>
-                    <span className='text-gray-400 text-sm'>Loading...</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Title and metadata */}
-              <div className='p-3 border-t border-gray-100'>
-                <a
-                  href={`#/grids/${drawing.id}`}
-                  className='block font-medium text-gray-900 hover:underline transition-colors mb-1'
-                >
-                  {drawing.name}
-                </a>
-                <p className='text-sm text-gray-500'>
-                  {new Date(drawing.updatedAt).toLocaleString()}
-                </p>
-              </div>
-
-              {/* Delete button */}
-              <button
-                onClick={(e) => {
-                  e.preventDefault()
-                  setDeleteDialogId(drawing.id)
-                }}
-                className='absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-white rounded-full shadow-sm hover:shadow-md border border-gray-200 hover:bg-red-50 hover:border-red-200'
-                title='delete grid'
+        {isLoading
+          ? Array.from({ length: 8 }, (_, i) => `skeleton-${i}`).map((key) => (
+              <div
+                key={key}
+                className='rounded-lg border border-border bg-card shadow-sm'
               >
-                <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600' />
-              </button>
-            </div>
-          )
-        })}
+                <div className='aspect-square p-4'>
+                  <Skeleton className='w-full h-full rounded' />
+                </div>
+                <div className='p-3 border-t border-border space-y-2'>
+                  <Skeleton className='h-4 w-3/4' />
+                  <Skeleton className='h-3 w-1/2' />
+                </div>
+              </div>
+            ))
+          : drawings.map((drawing) => {
+              const fullDrawing = fullDrawings.find((fd) => fd.id === drawing.id)
+              return (
+                <div
+                  key={drawing.id}
+                  className='group relative bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow'
+                >
+                  {/* Preview */}
+                  <div className='aspect-square p-4'>
+                    {fullDrawing ? (
+                      <img
+                        src={generatePreview(fullDrawing)}
+                        alt={`Preview of ${drawing.name}`}
+                        className='w-full h-full object-contain bg-muted rounded border border-border'
+                      />
+                    ) : (
+                      <Skeleton className='w-full h-full rounded' />
+                    )}
+                  </div>
+
+                  {/* Title and metadata */}
+                  <div className='p-3 border-t border-border'>
+                    <a
+                      href={`#/grids/${drawing.id}`}
+                      className='block font-medium text-card-foreground hover:underline transition-colors mb-1'
+                    >
+                      {drawing.name}
+                    </a>
+                    <p className='text-sm text-muted-foreground'>
+                      {new Date(drawing.updatedAt).toLocaleString()}
+                    </p>
+                  </div>
+
+                  {/* Delete button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setDeleteDialogId(drawing.id)
+                    }}
+                    className='absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-card rounded-full shadow-sm hover:shadow-md border border-border hover:bg-destructive/10 hover:border-destructive/30'
+                    title='delete grid'
+                  >
+                    <Trash2 className='w-4 h-4 text-muted-foreground hover:text-destructive' />
+                  </button>
+                </div>
+              )
+            })}
       </div>
 
-      {drawings.length === 0 && (
+      {!isLoading && drawings.length === 0 && (
         <div className='text-center py-12'>
-          <p className='text-gray-500 mb-4'>No grids yet</p>
+          <p className='text-muted-foreground mb-4'>No grids yet</p>
           <Button onClick={createNew} variant='outline'>
             <Plus className='mr-2 w-4 h-4' /> Create your first grid
           </Button>
@@ -187,10 +278,10 @@ export default function Home() {
 
       {/* Delete confirmation dialog */}
       {deleteDialogId && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-          <div className='bg-white rounded-lg p-6 max-w-sm mx-4'>
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
+          <div className='bg-card text-card-foreground rounded-lg p-6 max-w-sm mx-4 border border-border'>
             <h3 className='text-lg font-semibold mb-3'>delete grid</h3>
-            <p className='text-gray-600 mb-4'>
+            <p className='text-muted-foreground mb-4'>
               Are you sure you want to delete "
               {drawings.find((d) => d.id === deleteDialogId)?.name}"? This
               action cannot be undone.
@@ -209,6 +300,36 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Import drawing dialog */}
+      <ImportDrawingDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImport={handleImport}
+      />
+
+      {/* Passphrase setup modal */}
+      <PassphraseSetupModal
+        isOpen={showPassphraseModal}
+        onClose={() => setShowPassphraseModal(false)}
+        onSuccess={async (result) => {
+          enableCloudSync(result.userId, result.writeToken)
+          setShowPassphraseModal(false)
+          
+          // Sync existing LocalStorage drawings to cloud
+          try {
+            toast.info('Syncing drawings to cloud...')
+            await forceSyncNow()
+            toast.success('Drawings synced successfully!')
+          } catch (error) {
+            console.error('Failed to sync drawings:', error)
+            toast.error('Failed to sync some drawings')
+          }
+          
+          // Reload drawings to include cloud drawings
+          drawingStore.list().then(setDrawings)
+        }}
+      />
     </div>
   )
 }

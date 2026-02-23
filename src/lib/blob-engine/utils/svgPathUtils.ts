@@ -36,8 +36,11 @@ export function curvePrimitiveToSvgSegment(primitive: CurvePrimitive): string {
     return `L ${formatSvg(end.x)} ${formatSvg(end.y)}`
   }
 
-  // For curves, use SVG arc command
-  return calculateArcCommand(start, end, curveType, primitive.center)
+  // For curves, use SVG arc command.
+  // Use arcCenter (the actual quarter-circle center) when available;
+  // fall back to cell center for backward compatibility.
+  const referencePoint = primitive.arcCenter ?? primitive.center
+  return calculateArcCommand(start, end, curveType, referencePoint)
 }
 
 /**

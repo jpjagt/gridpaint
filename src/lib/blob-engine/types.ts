@@ -3,6 +3,8 @@
  * Based on the GridPaint Core Drawing Engine Specification
  */
 
+import type { InteractionGroup, PointModifications } from "@/types/gridpaint"
+
 // === Grid Data Model ===
 
 export interface GridPoint {
@@ -12,9 +14,21 @@ export interface GridPoint {
 
 export interface GridLayer {
   id: number
-  points: Set<string> // "x,y" format for efficient lookup
+  /** Interaction groups; all points live inside groups */
+  groups: InteractionGroup[]
   isVisible: boolean
   renderStyle: "default" | "tiles"
+  /** Per-point modifications keyed by "x,y" */
+  pointModifications?: Map<string, PointModifications>
+}
+
+/** Derive the union of all points across all groups in a GridLayer */
+export function getGridLayerPoints(layer: GridLayer): Set<string> {
+  const all = new Set<string>()
+  for (const group of layer.groups) {
+    for (const p of group.points) all.add(p)
+  }
+  return all
 }
 
 export interface SubgridPoint {
@@ -56,6 +70,13 @@ export interface BlobPrimitive {
   layerId: number
   // Indicates the local curve/edge shape for this primitive
   curveType: CurveType
+  /**
+   * Optional: override the rotation used for rendering.
+   * When present, the renderer uses this quadrant for rotation instead of `quadrant`.
+   * This allows placing a shape (e.g. convex-NE corner) in a different quadrant (e.g. SE).
+   * `quadrant` still determines the physical position within the cell.
+   */
+  renderQuadrant?: Quadrant
 }
 
 export interface BlobGeometry {
@@ -70,6 +91,21 @@ export interface CurvePrimitive {
   quadrant: Quadrant
   ends: [SubgridPoint, SubgridPoint] // Start and end points of the curve
   curveType: CurveType
+  /** Physical size of the quadrant (half grid-cell). Needed for arc radius. */
+  size?: number
+  /**
+   * When present and differs from quadrant, indicates the curve's visual
+   * orientation is rotated relative to its physical quadrant. The arc command
+   * must account for this when computing sweep direction.
+   */
+  renderQuadrant?: Quadrant
+  /**
+   * The center point of the quarter-circle arc (for convex/concave curves).
+   * Used by the SVG arc command to compute the correct sweep direction.
+   * For relOffset 0 this equals the quadrant's outer corner; for overrides
+   * it may be at a different position.
+   */
+  arcCenter?: GridPoint
 }
 
 // === Neighborhood Analysis ===

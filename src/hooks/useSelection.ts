@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import { useStore } from "@nanostores/react"
-import { $layersState, updateLayerPoints } from "@/stores/drawingStores"
+import { $layersState, updateGroupPoints, updatePointModifications } from "@/stores/drawingStores"
+import type { PointModifications } from "@/types/gridpaint"
+import type { SerializedPointModifications } from "@/lib/storage/types"
 
 export interface SelectionBounds {
   minX: number
@@ -10,8 +12,21 @@ export interface SelectionBounds {
   maxY: number
 }
 
+export interface ClipboardGroup {
+  id: string
+  name?: string
+  points: string[] // relative "x,y"
+}
+
+export interface ClipboardLayer {
+  layerId: number
+  groups: ClipboardGroup[]
+  /** Point modifications keyed by relative "x,y" */
+  pointModifications?: Record<string, SerializedPointModifications>
+}
+
 export interface ClipboardData {
-  layers: { layerId: number; points: string[] }[]
+  layers: ClipboardLayer[]
   bounds: SelectionBounds
 }
 
@@ -85,48 +100,64 @@ export const useSelection = () => {
 
     let totalPointsCopied = 0
 
-    // Copy points from all layers
+    // Copy points from all layers, preserving group structure and modifications
     layersState.layers.forEach((layer) => {
-      const layerPoints = new Set<string>()
+      const clipboardGroups: ClipboardGroup[] = []
 
-      for (let x = minX; x <= maxX; x++) {
-        for (let y = minY; y <= maxY; y++) {
-          const pointKey = `${x},${y}`
-          if (layer.points.has(pointKey)) {
-            // Store relative coordinates
-            const relativeKey = `${x - minX},${y - minY}`
-            layerPoints.add(relativeKey)
-            totalPointsCopied++
+      layer.groups.forEach((group) => {
+        const relativePoints: string[] = []
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
+            const pointKey = `${x},${y}`
+            if (group.points.has(pointKey)) {
+              relativePoints.push(`${x - minX},${y - minY}`)
+              totalPointsCopied++
+            }
+          }
+        }
+        if (relativePoints.length > 0) {
+          clipboardGroups.push({ id: group.id, name: group.name, points: relativePoints })
+        }
+      })
+
+      if (clipboardGroups.length === 0) return
+
+      // Copy point modifications for points within the selection, with relative keys
+      const relativeModifications: Record<string, SerializedPointModifications> = {}
+      if (layer.pointModifications) {
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
+            const absKey = `${x},${y}`
+            const mod = layer.pointModifications.get(absKey)
+            if (mod) {
+              relativeModifications[`${x - minX},${y - minY}`] = mod as SerializedPointModifications
+            }
           }
         }
       }
 
-      if (layerPoints.size > 0) {
-        clipboardData.layers.push({
-          layerId: layer.id,
-          points: Array.from(layerPoints), // Convert Set to Array for JSON
-        })
-      }
+      clipboardData.layers.push({
+        layerId: layer.id,
+        groups: clipboardGroups,
+        ...(Object.keys(relativeModifications).length > 0
+          ? { pointModifications: relativeModifications }
+          : {}),
+      })
     })
 
     // Create JSON payload with schema identifier
     const jsonPayload = {
       type: "gridpaint-selection",
-      version: "1.0.0",
+      version: "2.0.0",
       data: {
-        layers: clipboardData.layers.map((layer) => ({
-          layerId: layer.layerId,
-          points: layer.points,
-        })),
+        layers: clipboardData.layers,
         bounds: clipboardData.bounds,
         timestamp: Date.now(),
       },
     }
 
     try {
-      // Copy to system clipboard
       await navigator.clipboard.writeText(JSON.stringify(jsonPayload))
-
       toast.success(
         `Copied ${totalPointsCopied} points from ${clipboardData.layers.length} layers`,
       )
@@ -157,14 +188,10 @@ export const useSelection = () => {
       // Check if it's a valid gridpaint selection
       if (
         parsed.type === "gridpaint-selection" &&
-        parsed.version === "1.0.0" &&
         parsed.data
       ) {
         clipboardDataToPaste = {
-          layers: parsed.data.layers.map((layer: any) => ({
-            layerId: layer.layerId,
-            points: new Set(layer.points),
-          })),
+          layers: parsed.data.layers,
           bounds: parsed.data.bounds,
         }
       }
@@ -176,24 +203,36 @@ export const useSelection = () => {
 
       let totalPointsPasted = 0
 
-      // Paste to each layer that has data
-      clipboardDataToPaste.layers.forEach(({ layerId, points }) => {
+      // Paste to each layer that has data, preserving group structure and modifications
+      clipboardDataToPaste.layers.forEach(({ layerId, groups, pointModifications }) => {
         const layer = layersState.layers.find((l) => l.id === layerId)
         if (!layer) return
 
-        const newPoints = new Set(layer.points)
+        groups.forEach((clipGroup) => {
+          // Find matching group by id, or fall back to first group
+          const targetGroup = layer.groups.find((g) => g.id === clipGroup.id) ?? layer.groups[0]
+          if (!targetGroup) return
 
-        points.forEach((relativePointKey) => {
-          const [relativeX, relativeY] = relativePointKey.split(",").map(Number)
-          const absoluteX = targetGrid.x + relativeX
-          const absoluteY = targetGrid.y + relativeY
-          const absoluteKey = `${absoluteX},${absoluteY}`
+          const newPoints = new Set<string>(targetGroup.points)
 
-          newPoints.add(absoluteKey)
-          totalPointsPasted++
+          clipGroup.points.forEach((relativeKey: string) => {
+            const [relativeX, relativeY] = relativeKey.split(",").map(Number)
+            const absKey = `${targetGrid.x + relativeX},${targetGrid.y + relativeY}`
+            newPoints.add(absKey)
+            totalPointsPasted++
+          })
+
+          updateGroupPoints(layerId, newPoints, targetGroup.id)
         })
 
-        updateLayerPoints(layerId, newPoints)
+        // Restore point modifications with shifted keys
+        if (pointModifications) {
+          Object.entries(pointModifications).forEach(([relativeKey, mod]) => {
+            const [relativeX, relativeY] = relativeKey.split(",").map(Number)
+            const absKey = `${targetGrid.x + relativeX},${targetGrid.y + relativeY}`
+            updatePointModifications(layerId, absKey, mod)
+          })
+        }
       })
 
       toast.success(`Pasted ${totalPointsPasted} points`)
@@ -216,12 +255,10 @@ export const useSelection = () => {
       let totalPointsDeleted = 0
       let layersAffected = 0
 
-      if (deleteFromAllLayers) {
-        // Delete from all layers
-        layersState.layers.forEach((layer) => {
-          const newPoints = new Set(layer.points)
-          let deletedFromThisLayer = 0
-
+      const deleteFromLayer = (layer: (typeof layersState.layers)[number]) => {
+        let deletedFromThisLayer = 0
+        layer.groups.forEach((group) => {
+          const newPoints = new Set<string>(group.points)
           for (let x = minX; x <= maxX; x++) {
             for (let y = minY; y <= maxY; y++) {
               const pointKey = `${x},${y}`
@@ -232,11 +269,14 @@ export const useSelection = () => {
               }
             }
           }
+          updateGroupPoints(layer.id, newPoints, group.id)
+        })
+        return deletedFromThisLayer
+      }
 
-          if (deletedFromThisLayer > 0) {
-            updateLayerPoints(layer.id, newPoints)
-            layersAffected++
-          }
+      if (deleteFromAllLayers) {
+        layersState.layers.forEach((layer) => {
+          if (deleteFromLayer(layer) > 0) layersAffected++
         })
 
         toast.success(
@@ -252,20 +292,9 @@ export const useSelection = () => {
           return
         }
 
-        const newPoints = new Set(activeLayer.points)
-
-        for (let x = minX; x <= maxX; x++) {
-          for (let y = minY; y <= maxY; y++) {
-            const pointKey = `${x},${y}`
-            if (newPoints.has(pointKey)) {
-              newPoints.delete(pointKey)
-              totalPointsDeleted++
-            }
-          }
-        }
+        deleteFromLayer(activeLayer)
 
         if (totalPointsDeleted > 0) {
-          updateLayerPoints(activeLayer.id, newPoints)
           toast.success(
             `Deleted ${totalPointsDeleted} points from layer ${activeLayer.id}`,
           )

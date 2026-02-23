@@ -12,7 +12,7 @@ import type {
   BlobPrimitive, 
   CachedGeometry, 
   SpatialRegion,
-  CacheKey 
+  CacheKey
 } from './types'
 
 interface CacheRegion {
@@ -256,10 +256,12 @@ export class GeometryCache {
    * Generate hash of layer points for change detection
    */
   private hashLayerPoints(layer: GridLayer): string {
-    // Simple hash of sorted points
-    return Array.from(layer.points)
-      .sort()
-      .join('|')
+    // Simple hash of sorted points (union across all groups)
+    const allPoints: string[] = []
+    for (const group of layer.groups) {
+      for (const p of group.points) allPoints.push(p)
+    }
+    return allPoints.sort().join('|')
   }
 
   /**

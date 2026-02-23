@@ -5,18 +5,28 @@
 
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
 import type { Layer } from "@/stores/drawingStores"
+import { getLayerPoints } from "@/stores/drawingStores"
 import { magicNr } from "@/lib/constants"
 import { generateLayerSvgsForExport, DEFAULT_SVG_STYLE } from "./svgUtils"
 
 /**
- * Convert Set<string> points to Array<string> for JSON serialization
+ * Convert layers to serialized LayerData for JSON export
  */
 function convertPointsForExport(layers: Layer[]): LayerData[] {
-  return layers.map((layer) => ({
+  return layers.map((layer): LayerData => ({
     id: layer.id,
-    points: Array.from(layer.points) as any, // Will be serialized as array
     isVisible: layer.isVisible,
     renderStyle: layer.renderStyle,
+    groups: layer.groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      points: Array.from(g.points),
+    })),
+    ...(layer.pointModifications && layer.pointModifications.size > 0
+      ? {
+          pointModifications: Object.fromEntries(layer.pointModifications),
+        }
+      : {}),
   }))
 }
 
@@ -407,7 +417,7 @@ export function exportLayerAsSVG(
   name: string,
   mmPerUnit: number = 1.0,
 ): void {
-  if (layer.points.size === 0) {
+  if (getLayerPoints(layer).size === 0) {
     console.warn(`Layer ${layer.id} has no points to export`)
     return
   }

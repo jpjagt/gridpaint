@@ -38,17 +38,25 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  kbShortcut?: string
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, kbShortcut, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size, className }), kbShortcut && "relative")}
         ref={ref}
         {...props}
-      />
+      >
+        {children}
+        {kbShortcut && (
+          <span className="absolute bottom-0.5 right-0.5 text-[8px] leading-none opacity-50 font-mono pointer-events-none">
+            {kbShortcut}
+          </span>
+        )}
+      </Comp>
     )
   }
 )

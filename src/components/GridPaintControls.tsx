@@ -7,14 +7,13 @@ import {
   HelpCircle,
   Plus,
   Minus,
-  Circle,
-  CircleDot,
   Home,
-  Eye,
-  EyeOff,
+  Cloud,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
-import { showActiveLayerOutline, toggleActiveLayerOutline } from "@/stores/ui"
 import { ModeToggle } from "@/components/ModeToggle"
+import { $syncStatus, $authState } from "@/stores/authStores"
 
 interface GridPaintControlsProps {
   onReset: () => void
@@ -32,6 +31,8 @@ interface GridPaintControlsProps {
   mmPerUnit: number
   /** Callback when measuring bars should be shown */
   onShowMeasuringBars: (show: boolean) => void
+  /** Callback to open the shortcuts help modal */
+  onShowShortcuts: () => void
 }
 
 export const GridPaintControls = ({
@@ -45,9 +46,11 @@ export const GridPaintControls = ({
   onHome,
   mmPerUnit,
   onShowMeasuringBars,
+  onShowShortcuts,
 }: GridPaintControlsProps) => {
-  const $showActiveLayerOutline = useStore(showActiveLayerOutline)
   const [borderWidth, setBorderWidth] = useState(2)
+  const syncStatus = useStore($syncStatus)
+  const authState = useStore($authState)
 
   const handleBorderWidthChange = (delta: number) => {
     const newWidth = Math.max(0, Math.min(10, borderWidth + delta))
@@ -65,6 +68,31 @@ export const GridPaintControls = ({
           onChange={(e) => onNameChange(e.target.value)}
           className='bg-muted/50 text-muted-foreground placeholder-muted-foreground rounded px-2 py-1 backdrop-blur-sm'
         />
+
+        {/* Sync status indicator (icon only) */}
+        {authState.isAuthenticated && (
+          <div
+            className='w-8 h-8 flex items-center justify-center'
+            title={
+              syncStatus.error
+                ? `Sync error: ${syncStatus.error}`
+                : syncStatus.isSyncing
+                  ? "Syncing..."
+                  : syncStatus.lastSyncAt
+                    ? `Last synced: ${new Date(syncStatus.lastSyncAt).toLocaleTimeString()}`
+                    : "Connected"
+            }
+          >
+            {syncStatus.error ? (
+              <AlertCircle className='w-4 h-4 text-red-500' />
+            ) : syncStatus.isSyncing ? (
+              <Loader2 className='w-4 h-4 text-muted-foreground animate-spin' />
+            ) : (
+              <Cloud className='w-4 h-4 text-muted-foreground' />
+            )}
+          </div>
+        )}
+
         <Button
           size='icon'
           variant='ghost'
@@ -99,14 +127,11 @@ export const GridPaintControls = ({
         <Button
           size='icon'
           variant='ghost'
-          onClick={toggleActiveLayerOutline}
+          onClick={onShowShortcuts}
+          title='Keyboard shortcuts'
           className='w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm'
         >
-          {$showActiveLayerOutline ? (
-            <Eye className='w-4 h-4' />
-          ) : (
-            <EyeOff className='w-4 h-4' />
-          )}
+          <HelpCircle className='w-4 h-4' />
         </Button>
       </div>
 

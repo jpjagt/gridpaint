@@ -8,18 +8,37 @@
  */
 
 import type { Layer } from "@/stores/drawingStores"
+import type { CircularCutout, QuadrantOverrides } from "@/types/gridpaint"
+
+// === Serialized Types (JSON-safe) ===
+
+export interface SerializedInteractionGroup {
+  id: string
+  name?: string
+  points: string[]
+}
+
+export interface SerializedPointModifications {
+  cutouts?: CircularCutout[]
+  quadrantOverrides?: QuadrantOverrides
+}
 
 /**
- * Serialized representation of a drawing layer
+ * Serialized representation of a drawing layer.
+ * Supports both legacy format (points array) and new format (groups array).
  */
 export interface LayerData {
   id: number
-  /** Array of "x,y" strings representing active points */
-  points: Set<string>
   /** Whether this layer is visible */
   isVisible: boolean
   /** Rendering style for this layer */
   renderStyle: "default" | "tiles"
+  /** New format: interaction groups with their points */
+  groups?: SerializedInteractionGroup[]
+  /** Per-point modifications keyed by "x,y" */
+  pointModifications?: Record<string, SerializedPointModifications>
+  /** @deprecated Legacy format: flat array/set of "x,y" strings. Migrated to groups on load. */
+  points?: string[] | Set<string>
 }
 
 /**
@@ -52,6 +71,10 @@ export interface DrawingDocument extends DrawingMetadata {
   mmPerUnit: number
   /** All layers in this drawing */
   layers: Layer[]
+  /** Owner user ID (hashed passphrase) - for cloud storage */
+  ownerId?: string
+  /** Write token for authentication - for cloud storage */
+  writeToken?: string
 }
 
 export interface InnerDrawingDocument extends Omit<DrawingDocument, "layers"> {

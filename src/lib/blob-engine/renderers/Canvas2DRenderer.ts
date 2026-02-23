@@ -9,9 +9,12 @@ import type {
   BlobGeometry,
   BlobPrimitive,
   CompositeGeometry,
+  GridLayer,
   RenderStyle,
   GridPoint,
 } from "../types"
+import type { PointModifications } from "@/types/gridpaint"
+import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
 
 import {
   Renderer,
@@ -91,18 +94,25 @@ export class Canvas2DRenderer extends Renderer {
     this.stats.primitivesRendered = 0
     this.stats.primitivesCulled = 0
 
+    // Capture a non-null reference to the main context for the rest of this method
+    const mainCtx: CanvasRenderingContext2D = this.ctx
+
     // Clear canvas with background color
     this.clear()
 
     // Setup viewport transform
-    this.ctx.save()
-    this.ctx.translate(
+    mainCtx.save()
+    mainCtx.translate(
       options.transform.panOffset.x,
       options.transform.panOffset.y,
     )
-    this.ctx.scale(options.transform.zoom, options.transform.zoom)
+    mainCtx.scale(options.transform.zoom, options.transform.zoom)
 
-    // Render each layer in order (background to foreground)
+    // Render each layer in order (background to foreground).
+    // NOTE: ideally layers with cutouts should be rendered onto an isolated
+    // offscreen canvas so destination-out only punches holes in that layer and
+    // not through layers already beneath it. Disabled for now — the DPR
+    // pre-scale applied to the main canvas makes the coordinate mapping tricky.
     for (const layerGeometry of geometry.layers) {
       // Use layer-specific style if available, otherwise use base style
       const layerStyle = getLayerStyle
@@ -113,7 +123,8 @@ export class Canvas2DRenderer extends Renderer {
         layerGeometry.geometry,
         layerStyle,
         options.transform,
-        // layerGeometry.layer.renderStyle,
+        layerGeometry.layer,
+        options.mmPerUnit ?? 1,
       )
     }
 
@@ -125,7 +136,7 @@ export class Canvas2DRenderer extends Renderer {
       )
     }
 
-    this.ctx.restore()
+    mainCtx.restore()
 
     this.stats.renderTime = performance.now() - startTime
     this.stats.lastFrameTime = performance.now()
@@ -161,6 +172,8 @@ export class Canvas2DRenderer extends Renderer {
     geometry: BlobGeometry,
     baseStyle: RenderStyle,
     transform: ViewportTransform,
+    layer?: GridLayer,
+    mmPerUnit: number = 1,
   ): void {
     if (!this.ctx || geometry.primitives.length === 0) return
 
@@ -193,12 +206,68 @@ export class Canvas2DRenderer extends Renderer {
       }
     }
 
+    // If this layer has cutouts, establish a clipping region that excludes them
+    // before painting any primitives. Using an even-odd clip (large rect covering
+    // world space with the cutout circles subtracted) means the paint never
+    // reaches those areas — no compositing tricks, no offscreen canvas needed.
+    const hasCutouts =
+      layer?.pointModifications && layer.pointModifications.size > 0
+    if (hasCutouts) {
+      this.ctx.save()
+      this.applyCutoutClip(layer!.pointModifications!, geometry.gridSize, mmPerUnit)
+    }
+
     // Render each type in batch
     this.renderRectangleBatch(rectangles, baseStyle, geometry.gridSize)
     this.renderRoundedCornerBatch(roundedCorners, baseStyle, geometry.gridSize)
     this.renderBridgeBatch(bridges, baseStyle, geometry.gridSize)
 
+    if (hasCutouts) {
+      this.ctx.restore()
+    }
+
     this.stats.primitivesRendered += visiblePrimitives.length
+  }
+
+  /**
+   * Apply an even-odd clipping region that excludes cutout circles.
+   * Draws a large rect covering all world space, then subtracts each cutout
+   * circle using the even-odd rule so those areas are clipped out.
+   * Must be called inside a ctx.save()/ctx.restore() pair.
+   */
+  private applyCutoutClip(
+    pointModifications: Map<string, PointModifications>,
+    gridSize: number,
+    mmPerUnit: number = 1,
+  ): void {
+    if (!this.ctx) return
+
+    // A rect large enough to cover any reasonable canvas in world coordinates
+    const BIG = 1e6
+
+    this.ctx.beginPath()
+    // Outer rect (clockwise) — this is the "paintable" area
+    this.ctx.rect(-BIG, -BIG, BIG * 2, BIG * 2)
+
+    // Each cutout circle (also clockwise in canvas default) — even-odd rule
+    // means overlapping regions cancel, so circles become holes
+    for (const [pointKey, mods] of pointModifications) {
+      if (!mods.cutouts || mods.cutouts.length === 0) continue
+
+      const [px, py] = pointKey.split(",").map(Number)
+
+      for (const cutout of mods.cutouts) {
+        const anchorOffset = CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
+        const cx = (px + anchorOffset.x + (cutout.offset?.x ?? 0)) * gridSize + gridSize / 2
+        const cy = (py + anchorOffset.y + (cutout.offset?.y ?? 0)) * gridSize + gridSize / 2
+        const r = (cutout.radiusMm / mmPerUnit) * gridSize
+
+        this.ctx.moveTo(cx + r, cy)
+        this.ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      }
+    }
+
+    this.ctx.clip("evenodd")
   }
 
   /**
@@ -261,7 +330,9 @@ export class Canvas2DRenderer extends Renderer {
   }
 
   /**
-   * Render a single rounded corner primitive
+   * Render a single rounded corner primitive.
+   * If renderQuadrant is set and differs from quadrant, the curve is drawn
+   * with a different orientation within the physical quadrant area.
    */
   private renderRoundedCorner(
     primitive: BlobPrimitive,
@@ -273,29 +344,49 @@ export class Canvas2DRenderer extends Renderer {
 
     this.ctx.save()
     this.ctx.translate(worldPos.x, worldPos.y)
+    // Always position at the physical quadrant
     this.ctx.rotate(this.getQuadrantRotation(primitive.quadrant))
 
-    // Expand primitive outward for border effect
     const size = primitive.size
-    const borderExpansion = FEATHER_FACTOR
-    const expandedSize = size + borderExpansion
-    const controlPoint = expandedSize * magicNr
+    const b = FEATHER_FACTOR
+    const s = size + b
+    const cp = s * magicNr
 
+    // Compute relative rotation steps between desired and physical direction
+    const rq = primitive.renderQuadrant ?? primitive.quadrant
+    const relOffset = ((rq - primitive.quadrant) % 4 + 4) % 4
+
+    // Each offset replaces a different corner of the quadrant square with a curve.
+    // The curve bulges toward that corner; the two edges adjacent to the opposite
+    // corner remain straight.
+    //   offset 0 (SE): corner at (-b,-b), curve replaces (s,s) corner
+    //   offset 1 (SW): corner at (s,-b),  curve replaces (-b,s) corner
+    //   offset 2 (NW): corner at (s,s),   curve replaces (-b,-b) corner
+    //   offset 3 (NE): corner at (-b,s),  curve replaces (s,-b) corner
     this.ctx.beginPath()
-    this.ctx.moveTo(-borderExpansion, -borderExpansion)
-    this.ctx.lineTo(expandedSize, -borderExpansion)
-    this.ctx.bezierCurveTo(
-      expandedSize,
-      -borderExpansion + controlPoint,
-      -borderExpansion + controlPoint,
-      expandedSize,
-      -borderExpansion,
-      expandedSize,
-    )
-    this.ctx.closePath()
+    if (relOffset === 0) {
+      this.ctx.moveTo(-b, -b)
+      this.ctx.lineTo(s, -b)
+      this.ctx.bezierCurveTo(s, -b + cp, -b + cp, s, -b, s)
+      this.ctx.closePath()
+    } else if (relOffset === 1) {
+      this.ctx.moveTo(s, -b)
+      this.ctx.lineTo(-b, -b)
+      this.ctx.bezierCurveTo(-b, -b + cp, s - cp, s, s, s)
+      this.ctx.closePath()
+    } else if (relOffset === 2) {
+      this.ctx.moveTo(s, s)
+      this.ctx.lineTo(-b, s)
+      this.ctx.bezierCurveTo(-b, s - cp, s - cp, -b, s, -b)
+      this.ctx.closePath()
+    } else {
+      this.ctx.moveTo(-b, s)
+      this.ctx.lineTo(s, s)
+      this.ctx.bezierCurveTo(s, s - cp, -b + cp, -b, -b, -b)
+      this.ctx.closePath()
+    }
 
     this.ctx.fill()
-
     this.ctx.restore()
   }
 
@@ -317,7 +408,9 @@ export class Canvas2DRenderer extends Renderer {
   }
 
   /**
-   * Render a single bridge primitive
+   * Render a single bridge primitive.
+   * If renderQuadrant differs from quadrant, the concave curve is oriented
+   * differently within the physical quadrant area.
    */
   private renderBridge(primitive: BlobPrimitive, gridSize: number): void {
     if (!this.ctx) return
@@ -326,29 +419,49 @@ export class Canvas2DRenderer extends Renderer {
 
     this.ctx.save()
     this.ctx.translate(worldPos.x, worldPos.y)
+    // Always position at the physical quadrant
     this.ctx.rotate(this.getQuadrantRotation(primitive.quadrant))
 
-    // Expand primitive outward for border effect
     const size = primitive.size
-    const borderExpansion = FEATHER_FACTOR
-    const expandedSize = size + borderExpansion
-    const controlPoint = expandedSize * magicNr
+    const b = FEATHER_FACTOR
+    const s = size + b
+    const cp = s * magicNr
 
+    // Compute relative rotation steps between desired and physical direction
+    const rq = primitive.renderQuadrant ?? primitive.quadrant
+    const relOffset = ((rq - primitive.quadrant) % 4 + 4) % 4
+
+    // A bridge fills the triangular area between the curve and the corner it
+    // bulges toward. Same curve as roundedCorner but the filled region is
+    // on the opposite side.
+    //   offset 0 (SE): curve (s,-b)→(-b,s) bulging SE, fill triangle at (s,s)
+    //   offset 1 (SW): curve (-b,-b)→(s,s) bulging SW, fill triangle at (-b,s)
+    //   offset 2 (NW): curve (-b,s)→(s,-b) bulging NW, fill triangle at (-b,-b)
+    //   offset 3 (NE): curve (s,s)→(-b,-b) bulging NE, fill triangle at (s,-b)
     this.ctx.beginPath()
-    this.ctx.moveTo(expandedSize, -borderExpansion)
-    this.ctx.bezierCurveTo(
-      expandedSize,
-      -borderExpansion + controlPoint,
-      -borderExpansion + controlPoint,
-      expandedSize,
-      -borderExpansion,
-      expandedSize,
-    )
-    this.ctx.lineTo(expandedSize, expandedSize)
-    this.ctx.closePath()
+    if (relOffset === 0) {
+      this.ctx.moveTo(s, -b)
+      this.ctx.bezierCurveTo(s, -b + cp, -b + cp, s, -b, s)
+      this.ctx.lineTo(s, s)
+      this.ctx.closePath()
+    } else if (relOffset === 1) {
+      this.ctx.moveTo(-b, -b)
+      this.ctx.bezierCurveTo(-b, -b + cp, s - cp, s, s, s)
+      this.ctx.lineTo(-b, s)
+      this.ctx.closePath()
+    } else if (relOffset === 2) {
+      this.ctx.moveTo(-b, s)
+      this.ctx.bezierCurveTo(-b, s - cp, s - cp, -b, s, -b)
+      this.ctx.lineTo(-b, -b)
+      this.ctx.closePath()
+    } else {
+      this.ctx.moveTo(s, s)
+      this.ctx.bezierCurveTo(s, s - cp, -b + cp, -b, -b, -b)
+      this.ctx.lineTo(s, -b)
+      this.ctx.closePath()
+    }
 
     this.ctx.fill()
-
     this.ctx.restore()
   }
 

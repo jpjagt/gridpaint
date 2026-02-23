@@ -4,7 +4,6 @@ import {
   Route,
   useParams,
   useNavigate,
-  useSearchParams,
 } from "react-router-dom"
 import Home from "@/components/Home"
 import {
@@ -12,16 +11,19 @@ import {
   type GridPaintCanvasMethods,
 } from "@/components/GridPaintCanvas"
 import { GridPaintControls } from "@/components/GridPaintControls"
+import { ShortcutsModal } from "@/components/ShortcutsModal"
 import { LayerControls } from "@/components/LayerControls"
-import { ToolSelection, type Tool } from "@/components/ToolSelection"
+import { ToolSelection } from "@/components/ToolSelection"
+import { ToolOptionsPanel } from "@/components/ToolOptionsPanel"
 import { MeasuringBars } from "@/components/MeasuringBars"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
 import { useImagePaste } from "@/hooks/useImagePaste"
+import { useAuthInit } from "@/hooks/useAuthInit"
 import type { Layer } from "@/stores/drawingStores"
 import { drawingStore } from "@/lib/storage/store"
-import { generateSingleLayerSvg, generateLayerSvgContent, convertLayersToGridLayers } from "@/lib/export/svgUtils"
+import { generateSingleLayerSvg, convertLayerToGridLayer } from "@/lib/export/svgUtils"
 import { useStore } from "@nanostores/react"
-import { $canvasView } from "@/stores/drawingStores"
+import { $canvasView, $drawingMeta } from "@/stores/drawingStores"
 
 // Editor page for a given drawing ID
 function EditorPage() {
@@ -30,10 +32,10 @@ function EditorPage() {
   const canvasRef = useRef<GridPaintCanvasMethods>(null)
   const [layers, setLayers] = useState<Layer[]>([])
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null)
-  const [currentTool, setCurrentTool] = useState<Tool>("draw")
-  const [drawingName, setDrawingName] = useState<string>("")
   const [showMeasuringBars, setShowMeasuringBars] = useState<boolean>(false)
+  const [showShortcuts, setShowShortcuts] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
+  const drawingMeta = useStore($drawingMeta)
   // Enable paste-to-import
   useImagePaste()
 
@@ -60,7 +62,6 @@ function EditorPage() {
     canvasRef.current?.setBorderWidth(w)
   const handleMmPerUnitChange = (mmPerUnit: number) =>
     canvasRef.current?.setMmPerUnit(mmPerUnit)
-  const handleToolSelect = (t: Tool) => setCurrentTool(t)
   const handleLayerSelect = (id: number | null) =>
     canvasRef.current?.setActiveLayer(id)
   const handleVisibilityToggle = (id: number) =>
@@ -75,7 +76,6 @@ function EditorPage() {
     <div className='w-screen h-screen overflow-hidden relative'>
       <GridPaintCanvas
         ref={canvasRef}
-        currentTool={currentTool}
         drawingId={drawingId!}
       />
       {/* Image import overlay renders above the canvas when active */}
@@ -95,25 +95,27 @@ function EditorPage() {
         onGridSizeChange={handleGridSizeChange}
         onBorderWidthChange={handleBorderWidthChange}
         onMmPerUnitChange={handleMmPerUnitChange}
-        name={drawingName}
+        name={drawingMeta.name}
         onNameChange={(n) => {
-          setDrawingName(n)
           canvasRef.current?.setName(n)
         }}
         onHome={() => navigate("/")}
         mmPerUnit={canvasView.mmPerUnit}
         onShowMeasuringBars={setShowMeasuringBars}
+        onShowShortcuts={() => setShowShortcuts(true)}
       />
-      <ToolSelection
-        currentTool={currentTool}
-        onToolSelect={handleToolSelect}
+      <ShortcutsModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
       />
+      <ToolSelection />
+      <ToolOptionsPanel mmPerUnit={canvasView.mmPerUnit} />
       <MeasuringBars show={showMeasuringBars} />
     </div>
   )
 }
 
-// SVG export route for specific layer
+// SVG export route for specific layer — preserves groups, cutouts, and quadrant overrides
 function LayerSvgRoute() {
   const { drawingId, layerIndex } = useParams<{
     drawingId: string
@@ -148,9 +150,11 @@ function LayerSvgRoute() {
           return
         }
 
-        // Use centralized SVG utility with margin and centering for util routes
+        // Convert to GridLayer preserving groups, cutouts, and quadrant overrides
+        const gridLayer = convertLayerToGridLayer(layer)
+
         const svgOutput = generateSingleLayerSvg(
-          layer.points,
+          gridLayer,
           drawing.gridSize,
           drawing.borderWidth,
           undefined, // use default style
@@ -178,69 +182,20 @@ function LayerSvgRoute() {
   )
 }
 
-// SVG test route for arbitrary points
-function TestSvgRoute() {
-  const [searchParams] = useSearchParams()
-  const [svg, setSvg] = useState<string>("")
-  const [error, setError] = useState<string>("")
+export default function App() {
+  const { isInitialized } = useAuthInit()
 
-  useEffect(() => {
-    const generateSvg = async () => {
-      try {
-        const pointsParam = searchParams.get("points")
-        if (!pointsParam) {
-          setError("Missing points parameter. Use ?points=x1,y1;x2,y2;...")
-          return
-        }
-
-        // Parse points from "x1,y1;x2,y2;..." format
-        const pointsArray = pointsParam.split(";").map((pointStr) => {
-          const [x, y] = pointStr.trim().split(",").map(Number)
-          if (isNaN(x) || isNaN(y)) {
-            throw new Error(`Invalid point: ${pointStr}`)
-          }
-          return { x, y }
-        })
-
-        if (pointsArray.length === 0) {
-          setError("No valid points provided")
-          return
-        }
-
-        // Use centralized SVG utility with margin and centering for util routes
-        const svgOutput = generateSingleLayerSvg(
-          pointsArray,
-          50,        // Default grid size
-          2,         // Default border width
-          undefined, // use default style
-          true       // add margin and centering
-        )
-
-        setSvg(svgOutput)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error")
-      }
-    }
-
-    generateSvg()
-  }, [searchParams])
-
-  if (error) {
-    return <div>Error: {error}</div>
+  if (!isInitialized) {
+    // Show loading while initializing
+    return (
+      <div className="w-screen h-screen flex items-center justify-center">
+        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+      </div>
+    )
   }
 
   return (
-    <div
-      style={{ fontFamily: "monospace" }}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  )
-}
-
-export default function App() {
-  return (
     <Routes>
-      <Route path='/layer' element={<TestSvgRoute />} />
       <Route path='/grids/:drawingId' element={<EditorPage />} />
       <Route
         path='/grids/:drawingId/layers/:layerIndex'

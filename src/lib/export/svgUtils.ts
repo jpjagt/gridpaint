@@ -1,6 +1,6 @@
 /**
  * Centralized SVG utilities for consistent rendering across all use cases
- * - Util routes (/layer, /grids/:drawingId/layers/:layerIndex)
+ * - Util routes (/grids/:drawingId/layers/:layerIndex)
  * - Export functionality (download button)
  *
  * Ensures consistent rendering with:
@@ -10,20 +10,20 @@
  */
 
 import type { Layer } from "@/stores/drawingStores"
+import { getLayerPoints } from "@/stores/drawingStores"
 import type { GridLayer } from "@/lib/blob-engine/types"
+import { getGridLayerPoints } from "@/lib/blob-engine/types"
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
-import { SvgPathRenderer } from "@/lib/blob-engine/renderers/SvgPathRenderer"
+import { SvgPathFromPrimitivesRenderer } from "@/lib/blob-engine/renderers/SvgPathFromPrimitivesRenderer"
+import type { SvgPathFromPrimitivesDebugInfo } from "@/lib/blob-engine/renderers/SvgPathFromPrimitivesRenderer"
+
+export type { SvgPathFromPrimitivesDebugInfo as SvgRenderDebugInfo }
 
 export interface SvgRenderOptions {
   strokeColor?: string
   strokeWidth?: number
   fillColor?: string
   opacity?: number
-}
-
-export interface LayerPoint {
-  x: number
-  y: number
 }
 
 /**
@@ -37,23 +37,16 @@ export const DEFAULT_SVG_STYLE: SvgRenderOptions = {
 }
 
 /**
- * Convert points from various formats to GridLayer format
+ * Create a simple GridLayer from a Set of point keys.
+ * Use this only when you have raw points without group/modification data.
  */
 export function pointsToGridLayer(
-  points: Set<string> | LayerPoint[],
+  points: Set<string>,
   layerId: number = 1,
 ): GridLayer {
-  let pointsSet: Set<string>
-
-  if (Array.isArray(points)) {
-    pointsSet = new Set(points.map((p) => `${p.x},${p.y}`))
-  } else {
-    pointsSet = points
-  }
-
   return {
     id: layerId,
-    points: pointsSet,
+    groups: [{ id: "default", points: points }],
     isVisible: true,
     renderStyle: "default",
   }
@@ -72,7 +65,7 @@ export function calculateLayersBounds(layers: GridLayer[]): {
   let maxY = -Infinity
 
   for (const layer of layers) {
-    for (const pointStr of layer.points) {
+    for (const pointStr of getGridLayerPoints(layer)) {
       const [x, y] = pointStr.split(",").map(Number)
       minX = Math.min(minX, x)
       minY = Math.min(minY, y)
@@ -90,15 +83,20 @@ export function calculateLayersBounds(layers: GridLayer[]): {
 }
 
 /**
- * Generate SVG content for a single layer
+ * Generate SVG content for a single layer.
+ * This is the core rendering function — it runs BlobEngine (which invokes
+ * GroupMerger for multi-group layers / layers with pointModifications) and
+ * then renders the resulting geometry via SvgPathRenderer (which handles
+ * cutout paths).
  */
 export function generateLayerSvgContent(
   layer: GridLayer,
   gridSize: number,
   borderWidth: number,
   style: SvgRenderOptions = DEFAULT_SVG_STYLE,
+  mmPerUnit: number = 1,
 ): string {
-  if (layer.points.size === 0) {
+  if (getGridLayerPoints(layer).size === 0) {
     return ""
   }
 
@@ -109,7 +107,7 @@ export function generateLayerSvgContent(
     return ""
   }
 
-  const renderer = new SvgPathRenderer(false)
+  const renderer = new SvgPathFromPrimitivesRenderer(false)
   return renderer.renderLayer(
     geometry,
     {
@@ -124,23 +122,67 @@ export function generateLayerSvgContent(
       viewportWidth: 100,
       viewportHeight: 100,
     },
+    layer,
+    mmPerUnit,
   )
 }
 
 /**
- * Generate complete SVG document for a single layer
+ * Like generateLayerSvgContent but also returns the renderer's debug info
+ * (intermediate CurvePrimitive states). Pass debugMode=true to enable.
+ */
+export function generateLayerSvgContentWithDebug(
+  layer: GridLayer,
+  gridSize: number,
+  borderWidth: number,
+  style: SvgRenderOptions = DEFAULT_SVG_STYLE,
+): { content: string; debugInfo: SvgPathFromPrimitivesDebugInfo | null } {
+  if (getGridLayerPoints(layer).size === 0) {
+    return { content: "", debugInfo: null }
+  }
+
+  const engine = new BlobEngine({ enableCaching: false })
+  const geometry = engine.generateLayerGeometry(layer, gridSize, borderWidth)
+
+  if (geometry.primitives.length === 0) {
+    return { content: "", debugInfo: null }
+  }
+
+  const renderer = new SvgPathFromPrimitivesRenderer(true)
+  const content = renderer.renderLayer(
+    geometry,
+    {
+      strokeColor: style.strokeColor,
+      strokeWidth: style.strokeWidth,
+      fillColor: style.fillColor,
+      opacity: style.opacity,
+    },
+    {
+      zoom: 1,
+      panOffset: { x: 0, y: 0 },
+      viewportWidth: 100,
+      viewportHeight: 100,
+    },
+    layer,
+  )
+
+  return { content, debugInfo: renderer.getLastDebugInfo() }
+}
+
+/**
+ * Generate complete SVG document for a single layer.
+ * Accepts a full GridLayer so that groups, pointModifications (cutouts,
+ * quadrant overrides) are all preserved through the rendering pipeline.
  */
 export function generateSingleLayerSvg(
-  points: Set<string> | LayerPoint[],
+  layer: GridLayer,
   gridSize: number = 50,
   borderWidth: number = 2,
   style: SvgRenderOptions = DEFAULT_SVG_STYLE,
   addMargin: boolean = false,
   mmPerUnit: number = 1.0,
 ): string {
-  const layer = pointsToGridLayer(points, 1)
-
-  if (layer.points.size === 0) {
+  if (getGridLayerPoints(layer).size === 0) {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">
 </svg>`
@@ -182,7 +224,7 @@ export function generateSingleLayerSvg(
     viewH += marginY
   }
 
-  const content = generateLayerSvgContent(layer, gridSize, borderWidth, style)
+  const content = generateLayerSvgContent(layer, gridSize, borderWidth, style, mmPerUnit)
 
   // Calculate physical dimensions in mm
   const physicalWidth = viewW * mmPerUnit
@@ -220,7 +262,7 @@ export function generateMultiLayerSvg(
   mmPerUnit: number = 1.0,
 ): string {
   const visibleLayers = layers.filter(
-    (layer) => layer.isVisible && layer.points.size > 0,
+    (layer) => layer.isVisible && getGridLayerPoints(layer).size > 0,
   )
 
   if (visibleLayers.length === 0) {
@@ -280,7 +322,7 @@ export function generateMultiLayerSvg(
 
   const layerContents = visibleLayers
     .map((layer) =>
-      generateLayerSvgContent(layer, gridSize, borderWidth, style),
+      generateLayerSvgContent(layer, gridSize, borderWidth, style, mmPerUnit),
     )
     .filter(Boolean)
     .join("\n")
@@ -310,19 +352,34 @@ ${layerContents}
 }
 
 /**
- * Convert Layer[] format (from drawingStores) to GridLayer[] format
+ * Convert Layer[] format (from drawingStores) to GridLayer[] format.
+ * Preserves groups, pointModifications, and all layer metadata.
  */
 export function convertLayersToGridLayers(layers: Layer[]): GridLayer[] {
   return layers.map((layer) => ({
     id: layer.id,
-    points: new Set(layer.points),
+    groups: layer.groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      points: new Set(g.points),
+    })),
     isVisible: layer.isVisible,
     renderStyle: layer.renderStyle || "default",
+    pointModifications: layer.pointModifications,
   }))
 }
 
 /**
- * Generate SVG for export functionality (multiple layers as separate files)
+ * Convert a single Layer (from drawingStores) to GridLayer format.
+ * Preserves groups, pointModifications, and all layer metadata.
+ */
+export function convertLayerToGridLayer(layer: Layer): GridLayer {
+  return convertLayersToGridLayers([layer])[0]
+}
+
+/**
+ * Generate SVG for export functionality (multiple layers as separate files).
+ * Uses convertLayerToGridLayer to preserve groups and pointModifications.
  */
 export function generateLayerSvgsForExport(
   layers: Layer[],
@@ -332,13 +389,13 @@ export function generateLayerSvgsForExport(
   mmPerUnit: number = 1.0,
 ): { layerId: number; svg: string; filename: string }[] {
   const visibleLayers = layers.filter(
-    (layer) => layer.isVisible && layer.points.size > 0,
+    (layer) => layer.isVisible && getLayerPoints(layer).size > 0,
   )
 
   return visibleLayers.map((layer) => {
-    const gridLayer = pointsToGridLayer(layer.points, layer.id)
+    const gridLayer = convertLayerToGridLayer(layer)
     const svg = generateSingleLayerSvg(
-      layer.points,
+      gridLayer,
       gridSize,
       borderWidth,
       style,

@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection
+    // - Can read specific user doc if you know the userId
+    // - CANNOT list all users (blocked enumeration)
+    // - Can create/update/delete only with matching writeToken
+    match /users/{userId} {
+      // Allow reading specific documents
+      allow get: if true;
+      
+      // Block listing all users (security: prevents enumeration)
+      allow list: if false;
+      
+      // Create: must include writeToken
+      allow create: if request.resource.data.writeToken is string
+                    && request.resource.data.userId == userId;
+      
+      // Update/delete: must provide matching writeToken
+      allow update, delete: if resource.data.writeToken == request.resource.data.writeToken;
+    }
+    
+    // Drawings collection
+    // - Anyone can read any drawing (for sharing by ID)
+    // - Can create/update/delete only with matching writeToken
+    match /drawings/{drawingId} {
+      // Public reads (intentional - for sharing drawings by ID)
+      allow read: if true;
+      
+      // Create: must include ownerId and writeToken
+      allow create: if request.resource.data.ownerId is string
+                    && request.resource.data.writeToken is string;
+      
+      // Update/delete: writeToken must match stored writeToken
+      allow update, delete: if resource.data.writeToken == request.resource.data.writeToken;
+    }
+  }
+}

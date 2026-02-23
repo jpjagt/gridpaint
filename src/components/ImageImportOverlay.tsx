@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useStore } from '@nanostores/react'
 import { Button } from '@/components/ui/button'
 import { Check, X, RotateCcw, RotateCw, ZoomIn, ZoomOut, ArrowUpDown } from 'lucide-react'
-import { $canvasView, $layersState, updateLayerPoints, createOrActivateLayer, setActiveLayer } from '@/stores/drawingStores'
+import { $canvasView, $layersState, getLayerPoints, updateLayerPoints, createOrActivateLayer, setActiveLayer } from '@/stores/drawingStores'
 import { $imageImport, setOpacity, setTransform, resetImageImport, setPreview, setComputing, noteComputeRequested, setConfig } from '@/stores/imageImport'
 import { rasterizeImageToGridLayers } from '@/lib/image/rasterizeToGrid'
 import { BlobEngine } from '@/lib/blob-engine/BlobEngine'
@@ -68,9 +68,9 @@ export function ImageImportOverlay() {
     // Build temporary blob layers from preview sets
     const previewLayers: BlobGridLayer[] = imageImport.preview.map((set, idx) => ({
       id: idx + 1,
-      points: set,
+      groups: [{ id: "default", points: set }],
       isVisible: true,
-      renderStyle: 'default',
+      renderStyle: 'default' as const,
     }))
 
     // Generate composite geometry
@@ -228,7 +228,7 @@ export function ImageImportOverlay() {
     for (let id = 1; id <= 6; id++) {
       const layer = latest.layers.find(l => l.id === id)
       if (!layer) continue
-      const merged = new Set<string>(layer.points)
+      const merged = new Set<string>(getLayerPoints(layer))
       const previewSet = imageImport.preview[id - 1]
       previewSet.forEach(p => merged.add(p))
       updateLayerPoints(id, merged)
