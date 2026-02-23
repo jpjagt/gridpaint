@@ -186,14 +186,13 @@ export const GridPaintCanvas = forwardRef<
   const calculateCurrentViewport = useCallback((): SpatialRegion => {
     const displayWidth = window.innerWidth
     const displayHeight = window.innerHeight
-    const { zoom, panOffset, gridSize } = canvasView
 
-    const viewportMinX = Math.floor(-panOffset.x / (gridSize * zoom)) - 2
+    const viewportMinX = Math.floor(-canvasPanOffset.x / (canvasGridSize * canvasZoom)) - 2
     const viewportMaxX =
-      Math.ceil((displayWidth - panOffset.x) / (gridSize * zoom)) + 2
-    const viewportMinY = Math.floor(-panOffset.y / (gridSize * zoom)) - 2
+      Math.ceil((displayWidth - canvasPanOffset.x) / (canvasGridSize * canvasZoom)) + 2
+    const viewportMinY = Math.floor(-canvasPanOffset.y / (canvasGridSize * canvasZoom)) - 2
     const viewportMaxY =
-      Math.ceil((displayHeight - panOffset.y) / (gridSize * zoom)) + 2
+      Math.ceil((displayHeight - canvasPanOffset.y) / (canvasGridSize * canvasZoom)) + 2
 
     return {
       minX: viewportMinX,
@@ -201,9 +200,11 @@ export const GridPaintCanvas = forwardRef<
       maxX: viewportMaxX,
       maxY: viewportMaxY,
     }
-  }, [canvasView.zoom, canvasView.panOffset, canvasView.gridSize])
+  }, [canvasZoom, canvasPanOffset, canvasGridSize])
 
-  // Cache geometry generation - only regenerate when layers or settings change
+  // Cache geometry generation - only regenerate when layers or settings change.
+  // Zoom/pan do not trigger geometry regeneration; they are pure canvas transforms
+  // applied at render time on top of already-cached geometry.
   const cachedGeometry = useMemo(() => {
     if (!isReady) return null
 
@@ -212,16 +213,13 @@ export const GridPaintCanvas = forwardRef<
     // Convert layers to blob format
     const blobLayers = convertLayersToBlobFormat(layersState.layers)
 
-    // Use current visible viewport with a small buffer
-    const currentViewport = calculateCurrentViewport()
-    const expandedViewport = expandViewport(currentViewport, 2)
-
-    // Generate geometry using blob engine with expanded viewport
+    // Generate geometry for all points (no viewport culling here — zoom/pan must
+    // not invalidate this cache, and typical drawings are small enough that full
+    // computation is fast).
     return blobEngine.generateGeometry(
       blobLayers,
       canvasView.gridSize,
       canvasView.borderWidth,
-      expandedViewport,
     )
   }, [
     isReady,
@@ -230,10 +228,6 @@ export const GridPaintCanvas = forwardRef<
     layersState.layers,
     canvasView.gridSize,
     canvasView.borderWidth,
-    canvasView.zoom,
-    canvasView.panOffset,
-    calculateCurrentViewport,
-    expandViewport,
   ])
 
   const getGridCoordinates = useCallback(
