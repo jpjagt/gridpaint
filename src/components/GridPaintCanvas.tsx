@@ -29,6 +29,7 @@ import type {
 
 // Existing imports for compatibility
 import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
+import { clipLayersToSelection } from "@/lib/gridpaint/selectionUtils"
 import { showActiveLayerOutline } from "@/stores/ui"
 import useDrawingState from "@/hooks/useDrawingState"
 import {
@@ -311,13 +312,14 @@ export const GridPaintCanvas = forwardRef<
           updatePointModifications(activeLayerId, pointKey, hasAnything ? newMods : undefined)
         }
       } else {
-        // Add a cutout with current settings (store radiusMm as primary value;
+        // Add a cutout with current settings (store diameterMm as primary value;
         // renderers convert to grid units at draw time using mmPerUnit)
-        const { anchor, radiusMm } = cutoutSettings
+        const { anchor, diameterMm, customOffset } = cutoutSettings
 
         const newCutout: CircularCutout = {
           anchor,
-          radiusMm,
+          diameterMm,
+          ...(anchor === "custom" ? { customOffset } : {}),
         }
 
         const existingCutouts = existingMods?.cutouts || []
@@ -975,24 +977,44 @@ export const GridPaintCanvas = forwardRef<
       const canvas = canvasRef.current
       if (!canvas) return
 
-      // Export PNG
-      const pngLink = document.createElement("a")
-      pngLink.download = `${drawingMeta.name || "gridpaint"}.png`
-      pngLink.href = canvas.toDataURL()
-      pngLink.click()
+      // When the select tool is active and there is a selection, export only
+      // the points within that selection. Otherwise export the full drawing.
+      const selBounds =
+        currentTool === "select" && selection.hasSelection &&
+        selection.selectionStart && selection.selectionEnd
+          ? {
+              minX: Math.min(selection.selectionStart.x, selection.selectionEnd.x),
+              minY: Math.min(selection.selectionStart.y, selection.selectionEnd.y),
+              maxX: Math.max(selection.selectionStart.x, selection.selectionEnd.x),
+              maxY: Math.max(selection.selectionStart.y, selection.selectionEnd.y),
+            }
+          : null
 
-      // Export JSON data
+      const layersToExport = selBounds
+        ? clipLayersToSelection(layersState.layers, selBounds)
+        : layersState.layers
+
+      // Skip PNG export when exporting a selection (PNG is a viewport
+      // screenshot and cannot be easily cropped to grid coordinates)
+      if (!selBounds) {
+        const pngLink = document.createElement("a")
+        pngLink.download = `${drawingMeta.name || "gridpaint"}.png`
+        pngLink.href = canvas.toDataURL()
+        pngLink.click()
+      }
+
+      // Export JSON data (scoped to selection when active)
       const currentDocument = {
         ...drawingMeta,
         ...canvasView,
-        layers: layersState.layers,
+        layers: layersToExport,
       }
       exportDrawingAsJSON(currentDocument)
 
-      // Export SVG files for each layer
+      // Export SVG files for each layer (scoped to selection when active)
       setTimeout(() => {
         exportAllLayersAsSVG(
-          layersState.layers,
+          layersToExport,
           canvasView.gridSize,
           canvasView.borderWidth,
           drawingMeta.name,

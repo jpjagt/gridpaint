@@ -10,7 +10,7 @@ import type {
   LayerData,
 } from './types'
 import type { Layer } from '@/stores/drawingStores'
-import type { PointModifications } from '@/types/gridpaint'
+import type { CircularCutout, PointModifications } from '@/types/gridpaint'
 
 const STORAGE_KEY = 'gridpaint:drawings'
 
@@ -86,8 +86,8 @@ export class LocalStorageDrawingStore implements DrawingStore {
       }
 
       // Deserialize pointModifications (Record -> Map), with migration for
-      // old CircularCutout format that stored `radius` (grid units) instead
-      // of `radiusMm` (millimetres).
+      // old CircularCutout formats:
+      //   v1: `radius` (grid units) → v2: `radiusMm` (mm) → v3: `diameterMm` (mm)
       let pointModifications: Map<string, PointModifications> | undefined
       if (layer.pointModifications) {
         const mmPerUnit: number = (doc as { mmPerUnit?: number }).mmPerUnit ?? 5
@@ -97,9 +97,13 @@ export class LocalStorageDrawingStore implements DrawingStore {
             if (mods.cutouts) {
               migratedMods.cutouts = mods.cutouts.map((c) => {
                 const legacy = c as unknown as Record<string, unknown>
-                // Migration: old format had `radius` in grid units; new format uses `radiusMm`
-                if (!('radiusMm' in legacy) && typeof legacy.radius === 'number') {
-                  return { ...c, radiusMm: legacy.radius * mmPerUnit }
+                // v1→v2: old format had `radius` in grid units
+                if (!('radiusMm' in legacy) && !('diameterMm' in legacy) && typeof legacy.radius === 'number') {
+                  return { ...c, diameterMm: legacy.radius * mmPerUnit * 2 }
+                }
+                // v2→v3: old format used `radiusMm`; new format uses `diameterMm`
+                if ('radiusMm' in legacy && !('diameterMm' in legacy) && typeof legacy.radiusMm === 'number') {
+                  return { ...c, diameterMm: (legacy.radiusMm as number) * 2 } as CircularCutout
                 }
                 return c
               })

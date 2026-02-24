@@ -1,0 +1,7150 @@
+{
+  "id": "7853ac7d-ee02-46e8-8cc3-f7c49c341714",
+  "name": "hebrew",
+  "createdAt": 1771633220786,
+  "updatedAt": 1771869535628,
+  "gridSize": 25,
+  "borderWidth": 0.5,
+  "panOffset": {
+    "x": 848.9878748436545,
+    "y": 1088.299013057981
+  },
+  "zoom": 0.3177396012381977,
+  "mmPerUnit": 1.8,
+  "layers": [
+    {
+      "id": 1,
+      "isVisible": true,
+      "renderStyle": "default",
+      "groups": [
+        {
+          "id": "default",
+          "points": [
+            "12,-82",
+            "12,-81",
+            "12,-80",
+            "12,-79",
+            "12,-78",
+            "12,-77",
+            "12,-76",
+            "12,-75",
+            "12,-74",
+            "12,-73",
+            "12,-72",
+            "13,-82",
+            "13,-81",
+            "13,-80",
+            "13,-79",
+            "13,-78",
+            "13,-77",
+            "13,-76",
+            "13,-75",
+            "13,-74",
+            "13,-73",
+            "13,-72",
+            "14,-82",
+            "14,-81",
+            "14,-73",
+            "14,-72",
+            "15,-82",
+            "15,-81",
+            "15,-73",
+            "15,-72",
+            "16,-82",
+            "16,-81",
+            "16,-80",
+            "16,-79",
+            "16,-78",
+            "16,-77",
+            "16,-76",
+            "16,-75",
+            "16,-74",
+            "16,-73",
+            "16,-72",
+            "17,-82",
+            "17,-81",
+            "17,-73",
+            "17,-72",
+            "18,-82",
+            "18,-81",
+            "18,-73",
+            "18,-72",
+            "19,-82",
+            "19,-81",
+            "19,-73",
+            "19,-72",
+            "20,-82",
+            "20,-81",
+            "20,-73",
+            "20,-72",
+            "21,-82",
+            "21,-81",
+            "21,-73",
+            "21,-72",
+            "22,-82",
+            "22,-81",
+            "22,-73",
+            "22,-72",
+            "23,-82",
+            "23,-81",
+            "23,-73",
+            "23,-72",
+            "24,-82",
+            "24,-81",
+            "24,-80",
+            "24,-79",
+            "24,-78",
+            "24,-77",
+            "24,-76",
+            "24,-75",
+            "24,-74",
+            "24,-73",
+            "24,-72",
+            "25,-82",
+            "25,-81",
+            "25,-73",
+            "25,-72",
+            "26,-82",
+            "26,-81",
+            "26,-73",
+            "26,-72",
+            "27,-82",
+            "27,-81",
+            "27,-73",
+            "27,-72",
+            "28,-82",
+            "28,-81",
+            "28,-73",
+            "28,-72",
+            "29,-82",
+            "29,-81",
+            "29,-73",
+            "29,-72",
+            "30,-82",
+            "30,-81",
+            "30,-73",
+            "30,-72",
+            "31,-82",
+            "31,-81",
+            "31,-73",
+            "31,-72",
+            "32,-82",
+            "32,-81",
+            "32,-80",
+            "32,-79",
+            "32,-78",
+            "32,-77",
+            "32,-76",
+            "32,-75",
+            "32,-74",
+            "32,-73",
+            "32,-72",
+            "33,-82",
+            "33,-81",
+            "33,-73",
+            "33,-72",
+            "34,-82",
+            "34,-81",
+            "34,-73",
+            "34,-72",
+            "35,-82",
+            "35,-81",
+            "35,-73",
+            "35,-72",
+            "36,-82",
+            "36,-81",
+            "36,-73",
+            "36,-72",
+            "37,-82",
+            "37,-81",
+            "37,-73",
+            "37,-72",
+            "38,-82",
+            "38,-81",
+            "38,-73",
+            "38,-72",
+            "39,-82",
+            "39,-81",
+            "39,-73",
+            "39,-72",
+            "40,-82",
+            "40,-81",
+            "40,-80",
+            "40,-79",
+            "40,-78",
+            "40,-77",
+            "40,-76",
+            "40,-75",
+            "40,-74",
+            "40,-73",
+            "40,-72",
+            "41,-82",
+            "41,-81",
+            "41,-73",
+            "41,-72",
+            "42,-82",
+            "42,-81",
+            "42,-73",
+            "42,-72",
+            "43,-82",
+            "43,-81",
+            "43,-73",
+            "43,-72",
+            "44,-82",
+            "44,-81",
+            "44,-73",
+            "44,-72",
+            "45,-82",
+            "45,-81",
+            "45,-73",
+            "45,-72",
+            "46,-82",
+            "46,-81",
+            "46,-73",
+            "46,-72",
+            "47,-82",
+            "47,-81",
+            "47,-73",
+            "47,-72",
+            "48,-82",
+            "48,-81",
+            "48,-80",
+            "48,-79",
+            "48,-78",
+            "48,-77",
+            "48,-76",
+            "48,-75",
+            "48,-74",
+            "48,-73",
+            "48,-72",
+            "49,-82",
+            "49,-81",
+            "49,-73",
+            "49,-72",
+            "50,-82",
+            "50,-81",
+            "50,-73",
+            "50,-72",
+            "51,-82",
+            "51,-81",
+            "51,-80",
+            "51,-79",
+            "51,-78",
+            "51,-77",
+            "51,-76",
+            "51,-75",
+            "51,-74",
+            "51,-73",
+            "51,-72",
+            "52,-82",
+            "52,-81",
+            "52,-80",
+            "52,-79",
+            "52,-78",
+            "52,-77",
+            "52,-76",
+            "52,-75",
+            "52,-74",
+            "52,-73",
+            "52,-72",
+            "13,-96",
+            "13,-95",
+            "13,-94",
+            "13,-93",
+            "13,-92",
+            "13,-91",
+            "13,-90",
+            "13,-89",
+            "13,-88",
+            "13,-87",
+            "13,-86",
+            "14,-96",
+            "14,-95",
+            "14,-94",
+            "14,-93",
+            "14,-92",
+            "14,-91",
+            "14,-90",
+            "14,-89",
+            "14,-88",
+            "14,-87",
+            "14,-86",
+            "15,-96",
+            "15,-95",
+            "15,-87",
+            "15,-86",
+            "16,-96",
+            "16,-95",
+            "16,-87",
+            "16,-86",
+            "17,-96",
+            "17,-95",
+            "17,-94",
+            "17,-93",
+            "17,-92",
+            "17,-91",
+            "17,-90",
+            "17,-89",
+            "17,-88",
+            "17,-87",
+            "17,-86",
+            "18,-96",
+            "18,-95",
+            "18,-87",
+            "18,-86",
+            "19,-96",
+            "19,-95",
+            "19,-87",
+            "19,-86",
+            "20,-96",
+            "20,-95",
+            "20,-87",
+            "20,-86",
+            "21,-96",
+            "21,-95",
+            "21,-87",
+            "21,-86",
+            "22,-96",
+            "22,-95",
+            "22,-87",
+            "22,-86",
+            "23,-96",
+            "23,-95",
+            "23,-87",
+            "23,-86",
+            "24,-96",
+            "24,-95",
+            "24,-87",
+            "24,-86",
+            "25,-96",
+            "25,-95",
+            "25,-94",
+            "25,-93",
+            "25,-92",
+            "25,-91",
+            "25,-90",
+            "25,-89",
+            "25,-88",
+            "25,-87",
+            "25,-86",
+            "26,-96",
+            "26,-95",
+            "26,-87",
+            "26,-86",
+            "27,-96",
+            "27,-95",
+            "27,-87",
+            "27,-86",
+            "28,-96",
+            "28,-95",
+            "28,-87",
+            "28,-86",
+            "29,-96",
+            "29,-95",
+            "29,-87",
+            "29,-86",
+            "30,-96",
+            "30,-95",
+            "30,-87",
+            "30,-86",
+            "31,-96",
+            "31,-95",
+            "31,-87",
+            "31,-86",
+            "32,-96",
+            "32,-95",
+            "32,-87",
+            "32,-86",
+            "33,-96",
+            "33,-95",
+            "33,-94",
+            "33,-93",
+            "33,-92",
+            "33,-91",
+            "33,-90",
+            "33,-89",
+            "33,-88",
+            "33,-87",
+            "33,-86",
+            "34,-96",
+            "34,-95",
+            "34,-87",
+            "34,-86",
+            "35,-96",
+            "35,-95",
+            "35,-87",
+            "35,-86",
+            "36,-96",
+            "36,-95",
+            "36,-87",
+            "36,-86",
+            "37,-96",
+            "37,-95",
+            "37,-87",
+            "37,-86",
+            "38,-96",
+            "38,-95",
+            "38,-87",
+            "38,-86",
+            "39,-96",
+            "39,-95",
+            "39,-87",
+            "39,-86",
+            "40,-96",
+            "40,-95",
+            "40,-87",
+            "40,-86",
+            "41,-96",
+            "41,-95",
+            "41,-94",
+            "41,-93",
+            "41,-92",
+            "41,-91",
+            "41,-90",
+            "41,-89",
+            "41,-88",
+            "41,-87",
+            "41,-86",
+            "42,-96",
+            "42,-95",
+            "42,-87",
+            "42,-86",
+            "43,-96",
+            "43,-95",
+            "43,-87",
+            "43,-86",
+            "44,-96",
+            "44,-95",
+            "44,-87",
+            "44,-86",
+            "45,-96",
+            "45,-95",
+            "45,-87",
+            "45,-86",
+            "46,-96",
+            "46,-95",
+            "46,-87",
+            "46,-86",
+            "47,-96",
+            "47,-95",
+            "47,-87",
+            "47,-86",
+            "48,-96",
+            "48,-95",
+            "48,-87",
+            "48,-86",
+            "49,-96",
+            "49,-95",
+            "49,-94",
+            "49,-93",
+            "49,-92",
+            "49,-91",
+            "49,-90",
+            "49,-89",
+            "49,-88",
+            "49,-87",
+            "49,-86",
+            "50,-96",
+            "50,-95",
+            "50,-87",
+            "50,-86",
+            "51,-96",
+            "51,-95",
+            "51,-87",
+            "51,-86",
+            "52,-96",
+            "52,-95",
+            "52,-94",
+            "52,-93",
+            "52,-92",
+            "52,-91",
+            "52,-90",
+            "52,-89",
+            "52,-88",
+            "52,-87",
+            "52,-86",
+            "53,-96",
+            "53,-95",
+            "53,-94",
+            "53,-93",
+            "53,-92",
+            "53,-91",
+            "53,-90",
+            "53,-89",
+            "53,-88",
+            "53,-87",
+            "53,-86"
+          ]
+        },
+        {
+          "id": "group-2",
+          "points": []
+        }
+      ],
+      "pointModifications": {
+        "12,-82": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "12,-81": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-80": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-79": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-78": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-77": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-76": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-75": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-74": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-73": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "13,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "14,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "15,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "16,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.05,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "25,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "26,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "49,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "49,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "50,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "51,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "52,-82": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-80": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-79": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-78": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-77": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-76": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-75": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-74": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "13,-96": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-95": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-94": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-93": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-92": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-91": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-90": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-89": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-88": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-87": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "14,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "15,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "16,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "25,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "26,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "49,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "49,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "50,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "51,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "52,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "53,-96": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-94": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-93": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-92": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-91": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-90": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-89": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-88": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "14,-91": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": -0.25,
+                "y": 0
+              }
+            }
+          ]
+        },
+        "25,-95": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "49,-95": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "24,-81": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "48,-81": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "13,-77": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": -0.2,
+                "y": 0
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "isVisible": true,
+      "renderStyle": "default",
+      "groups": [
+        {
+          "id": "default",
+          "points": [
+            "2,-82",
+            "2,-81",
+            "2,-80",
+            "2,-79",
+            "2,-78",
+            "2,-77",
+            "2,-76",
+            "2,-75",
+            "2,-74",
+            "3,-82",
+            "3,-81",
+            "3,-80",
+            "3,-79",
+            "3,-78",
+            "3,-77",
+            "3,-76",
+            "3,-75",
+            "3,-74",
+            "4,-82",
+            "4,-74",
+            "5,-82",
+            "5,-74",
+            "6,-82",
+            "6,-81",
+            "6,-80",
+            "6,-79",
+            "6,-78",
+            "6,-77",
+            "6,-76",
+            "6,-75",
+            "6,-74",
+            "12,-82",
+            "12,-81",
+            "12,-73",
+            "12,-72",
+            "13,-82",
+            "13,-81",
+            "13,-73",
+            "13,-72",
+            "14,-82",
+            "14,-81",
+            "14,-73",
+            "14,-72",
+            "15,-82",
+            "15,-81",
+            "15,-73",
+            "15,-72",
+            "16,-82",
+            "16,-81",
+            "16,-73",
+            "16,-72",
+            "17,-82",
+            "17,-81",
+            "17,-73",
+            "17,-72",
+            "18,-82",
+            "18,-81",
+            "18,-73",
+            "18,-72",
+            "19,-82",
+            "19,-81",
+            "19,-73",
+            "19,-72",
+            "20,-82",
+            "20,-81",
+            "20,-73",
+            "20,-72",
+            "21,-82",
+            "21,-81",
+            "21,-73",
+            "21,-72",
+            "22,-82",
+            "22,-81",
+            "22,-73",
+            "22,-72",
+            "23,-82",
+            "23,-81",
+            "23,-73",
+            "23,-72",
+            "24,-82",
+            "24,-81",
+            "24,-73",
+            "24,-72",
+            "25,-82",
+            "25,-81",
+            "25,-73",
+            "25,-72",
+            "26,-82",
+            "26,-81",
+            "26,-73",
+            "26,-72",
+            "27,-82",
+            "27,-81",
+            "27,-73",
+            "27,-72",
+            "28,-82",
+            "28,-81",
+            "28,-73",
+            "28,-72",
+            "29,-82",
+            "29,-81",
+            "29,-73",
+            "29,-72",
+            "30,-82",
+            "30,-81",
+            "30,-73",
+            "30,-72",
+            "31,-82",
+            "31,-81",
+            "31,-73",
+            "31,-72",
+            "32,-82",
+            "32,-81",
+            "32,-73",
+            "32,-72",
+            "33,-82",
+            "33,-81",
+            "33,-73",
+            "33,-72",
+            "34,-82",
+            "34,-81",
+            "34,-73",
+            "34,-72",
+            "35,-82",
+            "35,-81",
+            "35,-73",
+            "35,-72",
+            "36,-82",
+            "36,-81",
+            "36,-73",
+            "36,-72",
+            "37,-82",
+            "37,-81",
+            "37,-73",
+            "37,-72",
+            "38,-82",
+            "38,-81",
+            "38,-73",
+            "38,-72",
+            "39,-82",
+            "39,-81",
+            "39,-73",
+            "39,-72",
+            "40,-82",
+            "40,-81",
+            "40,-73",
+            "40,-72",
+            "41,-82",
+            "41,-81",
+            "41,-73",
+            "41,-72",
+            "42,-82",
+            "42,-81",
+            "42,-73",
+            "42,-72",
+            "43,-82",
+            "43,-81",
+            "43,-73",
+            "43,-72",
+            "44,-82",
+            "44,-81",
+            "44,-73",
+            "44,-72",
+            "45,-82",
+            "45,-81",
+            "45,-73",
+            "45,-72",
+            "46,-82",
+            "46,-81",
+            "46,-73",
+            "46,-72",
+            "47,-82",
+            "47,-81",
+            "47,-73",
+            "47,-72",
+            "48,-82",
+            "48,-81",
+            "48,-80",
+            "48,-79",
+            "48,-78",
+            "48,-77",
+            "48,-76",
+            "48,-75",
+            "48,-74",
+            "48,-73",
+            "48,-72",
+            "49,-82",
+            "49,-81",
+            "49,-73",
+            "49,-72",
+            "50,-82",
+            "50,-81",
+            "50,-73",
+            "50,-72",
+            "51,-82",
+            "51,-81",
+            "51,-80",
+            "51,-79",
+            "51,-78",
+            "51,-77",
+            "51,-76",
+            "51,-75",
+            "51,-74",
+            "51,-73",
+            "51,-72",
+            "52,-82",
+            "52,-81",
+            "52,-80",
+            "52,-79",
+            "52,-78",
+            "52,-77",
+            "52,-76",
+            "52,-75",
+            "52,-74",
+            "52,-73",
+            "52,-72",
+            "3,-96",
+            "3,-95",
+            "3,-94",
+            "3,-93",
+            "3,-92",
+            "3,-91",
+            "3,-90",
+            "3,-89",
+            "3,-88",
+            "4,-96",
+            "4,-95",
+            "4,-94",
+            "4,-93",
+            "4,-92",
+            "4,-91",
+            "4,-90",
+            "4,-89",
+            "4,-88",
+            "5,-96",
+            "5,-88",
+            "6,-96",
+            "6,-88",
+            "7,-96",
+            "7,-95",
+            "7,-94",
+            "7,-93",
+            "7,-92",
+            "7,-91",
+            "7,-90",
+            "7,-89",
+            "7,-88",
+            "13,-96",
+            "13,-95",
+            "13,-87",
+            "13,-86",
+            "14,-96",
+            "14,-95",
+            "14,-87",
+            "14,-86",
+            "15,-96",
+            "15,-95",
+            "15,-87",
+            "15,-86",
+            "16,-96",
+            "16,-95",
+            "16,-87",
+            "16,-86",
+            "17,-96",
+            "17,-95",
+            "17,-87",
+            "17,-86",
+            "18,-96",
+            "18,-95",
+            "18,-87",
+            "18,-86",
+            "19,-96",
+            "19,-95",
+            "19,-87",
+            "19,-86",
+            "20,-96",
+            "20,-95",
+            "20,-87",
+            "20,-86",
+            "21,-96",
+            "21,-95",
+            "21,-87",
+            "21,-86",
+            "22,-96",
+            "22,-95",
+            "22,-87",
+            "22,-86",
+            "23,-96",
+            "23,-95",
+            "23,-87",
+            "23,-86",
+            "24,-96",
+            "24,-95",
+            "24,-87",
+            "24,-86",
+            "25,-96",
+            "25,-95",
+            "25,-87",
+            "25,-86",
+            "26,-96",
+            "26,-95",
+            "26,-87",
+            "26,-86",
+            "27,-96",
+            "27,-95",
+            "27,-87",
+            "27,-86",
+            "28,-96",
+            "28,-95",
+            "28,-87",
+            "28,-86",
+            "29,-96",
+            "29,-95",
+            "29,-87",
+            "29,-86",
+            "30,-96",
+            "30,-95",
+            "30,-87",
+            "30,-86",
+            "31,-96",
+            "31,-95",
+            "31,-87",
+            "31,-86",
+            "32,-96",
+            "32,-95",
+            "32,-87",
+            "32,-86",
+            "33,-96",
+            "33,-95",
+            "33,-87",
+            "33,-86",
+            "34,-96",
+            "34,-95",
+            "34,-87",
+            "34,-86",
+            "35,-96",
+            "35,-95",
+            "35,-87",
+            "35,-86",
+            "36,-96",
+            "36,-95",
+            "36,-87",
+            "36,-86",
+            "37,-96",
+            "37,-95",
+            "37,-87",
+            "37,-86",
+            "38,-96",
+            "38,-95",
+            "38,-87",
+            "38,-86",
+            "39,-96",
+            "39,-95",
+            "39,-87",
+            "39,-86",
+            "40,-96",
+            "40,-95",
+            "40,-87",
+            "40,-86",
+            "41,-96",
+            "41,-95",
+            "41,-87",
+            "41,-86",
+            "42,-96",
+            "42,-95",
+            "42,-87",
+            "42,-86",
+            "43,-96",
+            "43,-95",
+            "43,-87",
+            "43,-86",
+            "44,-96",
+            "44,-95",
+            "44,-87",
+            "44,-86",
+            "45,-96",
+            "45,-95",
+            "45,-87",
+            "45,-86",
+            "46,-96",
+            "46,-95",
+            "46,-87",
+            "46,-86",
+            "47,-96",
+            "47,-95",
+            "47,-87",
+            "47,-86",
+            "48,-96",
+            "48,-95",
+            "48,-87",
+            "48,-86",
+            "49,-96",
+            "49,-95",
+            "49,-94",
+            "49,-93",
+            "49,-92",
+            "49,-91",
+            "49,-90",
+            "49,-89",
+            "49,-88",
+            "49,-87",
+            "49,-86",
+            "50,-96",
+            "50,-95",
+            "50,-87",
+            "50,-86",
+            "51,-96",
+            "51,-95",
+            "51,-87",
+            "51,-86",
+            "52,-96",
+            "52,-95",
+            "52,-94",
+            "52,-93",
+            "52,-92",
+            "52,-91",
+            "52,-90",
+            "52,-89",
+            "52,-88",
+            "52,-87",
+            "52,-86",
+            "53,-96",
+            "53,-95",
+            "53,-94",
+            "53,-93",
+            "53,-92",
+            "53,-91",
+            "53,-90",
+            "53,-89",
+            "53,-88",
+            "53,-87",
+            "53,-86"
+          ]
+        }
+      ],
+      "pointModifications": {
+        "2,-82": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-nw"
+          }
+        },
+        "2,-81": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-80": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-79": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-78": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-77": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-76": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-75": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "2,-74": {
+          "quadrantOverrides": {
+            "0": "convex-sw",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "4,-72": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.75
+            }
+          ]
+        },
+        "6,-82": {
+          "quadrantOverrides": {
+            "0": "empty"
+          }
+        },
+        "6,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-80": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-79": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-78": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-77": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-76": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-75": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "6,-74": {
+          "quadrantOverrides": {
+            "3": "empty"
+          }
+        },
+        "12,-82": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "12,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "12,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "12,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "13,-82": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "full"
+          }
+        },
+        "14,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "15,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "16,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-81": {
+          "cutouts": [
+            {
+              "radiusMm": 0.5,
+              "anchor": "center",
+              "radius": 0.2,
+              "diameterMm": 1
+            },
+            {
+              "radius": 0.2,
+              "anchor": "center",
+              "radiusMm": 0.5,
+              "diameterMm": 1
+            }
+          ],
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "concave-ne"
+          }
+        },
+        "16,-73": {
+          "quadrantOverrides": {
+            "0": "concave-se",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-82": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-74": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-82": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-74": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-82": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-74": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.75,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "24,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.75,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "25,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "25,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "26,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "26,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-73": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-81": {
+          "quadrantOverrides": {
+            "1": "concave-ne"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.75,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "48,-80": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-79": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-78": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-77": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-76": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-75": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-74": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "48,-73": {
+          "quadrantOverrides": {
+            "2": "concave-se"
+          }
+        },
+        "48,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.75,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "49,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "49,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "50,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "51,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "52,-82": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-80": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-79": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-78": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-77": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-76": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-75": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-74": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "3,-96": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-nw"
+          }
+        },
+        "3,-95": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-94": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-93": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-92": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-91": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-90": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-89": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "3,-88": {
+          "quadrantOverrides": {
+            "0": "convex-sw",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "5,-86": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.75
+            }
+          ]
+        },
+        "7,-96": {
+          "quadrantOverrides": {
+            "0": "empty"
+          }
+        },
+        "7,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-94": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-93": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-92": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-91": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-90": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-89": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "7,-88": {
+          "quadrantOverrides": {
+            "3": "empty"
+          }
+        },
+        "13,-96": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "14,-96": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "full"
+          }
+        },
+        "15,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "16,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-95": {
+          "cutouts": [
+            {
+              "radiusMm": 0.5,
+              "anchor": "center",
+              "radius": 0.2,
+              "diameterMm": 1
+            },
+            {
+              "radius": 0.2,
+              "anchor": "center",
+              "radiusMm": 0.5,
+              "diameterMm": 1
+            }
+          ],
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "concave-ne"
+          }
+        },
+        "17,-87": {
+          "quadrantOverrides": {
+            "0": "concave-se",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-96": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-88": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-96": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-88": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-96": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-88": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "25,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.8,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "25,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.8,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "26,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "26,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-87": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "49,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "49,-95": {
+          "quadrantOverrides": {
+            "1": "concave-ne"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.8,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "49,-94": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-93": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-92": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-91": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-90": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-89": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-88": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "49,-87": {
+          "quadrantOverrides": {
+            "2": "concave-se"
+          }
+        },
+        "49,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.8,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "50,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "51,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "52,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "53,-96": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-94": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-93": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-92": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-91": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-90": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-89": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-88": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "4,-92": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.8,
+              "customOffset": {
+                "x": -0.25,
+                "y": 0
+              }
+            }
+          ]
+        },
+        "3,-78": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 0.75,
+              "customOffset": {
+                "x": -0.2,
+                "y": 0
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 6,
+      "isVisible": true,
+      "renderStyle": "default",
+      "groups": [
+        {
+          "id": "default",
+          "points": [
+            "12,-82",
+            "12,-81",
+            "12,-80",
+            "12,-79",
+            "12,-78",
+            "12,-77",
+            "12,-76",
+            "12,-75",
+            "12,-74",
+            "12,-73",
+            "12,-72",
+            "13,-82",
+            "13,-81",
+            "13,-80",
+            "13,-79",
+            "13,-78",
+            "13,-77",
+            "13,-76",
+            "13,-75",
+            "13,-74",
+            "13,-73",
+            "13,-72",
+            "14,-82",
+            "14,-81",
+            "14,-78",
+            "14,-77",
+            "14,-76",
+            "14,-73",
+            "14,-72",
+            "15,-82",
+            "15,-81",
+            "15,-79",
+            "15,-78",
+            "15,-77",
+            "15,-76",
+            "15,-75",
+            "15,-73",
+            "15,-72",
+            "16,-82",
+            "16,-81",
+            "16,-80",
+            "16,-79",
+            "16,-78",
+            "16,-77",
+            "16,-76",
+            "16,-75",
+            "16,-74",
+            "16,-73",
+            "16,-72",
+            "17,-82",
+            "17,-81",
+            "17,-80",
+            "17,-79",
+            "17,-78",
+            "17,-77",
+            "17,-76",
+            "17,-75",
+            "17,-74",
+            "17,-73",
+            "17,-72",
+            "18,-82",
+            "18,-81",
+            "18,-80",
+            "18,-79",
+            "18,-78",
+            "18,-77",
+            "18,-76",
+            "18,-75",
+            "18,-74",
+            "18,-73",
+            "18,-72",
+            "19,-82",
+            "19,-81",
+            "19,-80",
+            "19,-79",
+            "19,-78",
+            "19,-77",
+            "19,-76",
+            "19,-75",
+            "19,-74",
+            "19,-73",
+            "19,-72",
+            "20,-82",
+            "20,-81",
+            "20,-80",
+            "20,-79",
+            "20,-78",
+            "20,-77",
+            "20,-76",
+            "20,-75",
+            "20,-74",
+            "20,-73",
+            "20,-72",
+            "21,-82",
+            "21,-81",
+            "21,-80",
+            "21,-79",
+            "21,-78",
+            "21,-77",
+            "21,-76",
+            "21,-75",
+            "21,-74",
+            "21,-73",
+            "21,-72",
+            "22,-82",
+            "22,-81",
+            "22,-80",
+            "22,-79",
+            "22,-78",
+            "22,-77",
+            "22,-76",
+            "22,-75",
+            "22,-74",
+            "22,-73",
+            "22,-72",
+            "23,-82",
+            "23,-81",
+            "23,-80",
+            "23,-79",
+            "23,-78",
+            "23,-77",
+            "23,-76",
+            "23,-75",
+            "23,-74",
+            "23,-73",
+            "23,-72",
+            "24,-82",
+            "24,-81",
+            "24,-80",
+            "24,-79",
+            "24,-78",
+            "24,-77",
+            "24,-76",
+            "24,-75",
+            "24,-74",
+            "24,-73",
+            "24,-72",
+            "25,-82",
+            "25,-81",
+            "25,-80",
+            "25,-79",
+            "25,-78",
+            "25,-77",
+            "25,-76",
+            "25,-75",
+            "25,-74",
+            "25,-73",
+            "25,-72",
+            "26,-82",
+            "26,-81",
+            "26,-80",
+            "26,-79",
+            "26,-78",
+            "26,-77",
+            "26,-76",
+            "26,-75",
+            "26,-74",
+            "26,-73",
+            "26,-72",
+            "27,-82",
+            "27,-81",
+            "27,-80",
+            "27,-79",
+            "27,-78",
+            "27,-77",
+            "27,-76",
+            "27,-75",
+            "27,-74",
+            "27,-73",
+            "27,-72",
+            "28,-82",
+            "28,-81",
+            "28,-80",
+            "28,-79",
+            "28,-78",
+            "28,-77",
+            "28,-76",
+            "28,-75",
+            "28,-74",
+            "28,-73",
+            "28,-72",
+            "29,-82",
+            "29,-81",
+            "29,-80",
+            "29,-79",
+            "29,-78",
+            "29,-77",
+            "29,-76",
+            "29,-75",
+            "29,-74",
+            "29,-73",
+            "29,-72",
+            "30,-82",
+            "30,-81",
+            "30,-80",
+            "30,-79",
+            "30,-78",
+            "30,-77",
+            "30,-76",
+            "30,-75",
+            "30,-74",
+            "30,-73",
+            "30,-72",
+            "31,-82",
+            "31,-81",
+            "31,-80",
+            "31,-79",
+            "31,-78",
+            "31,-77",
+            "31,-76",
+            "31,-75",
+            "31,-74",
+            "31,-73",
+            "31,-72",
+            "32,-82",
+            "32,-81",
+            "32,-80",
+            "32,-79",
+            "32,-78",
+            "32,-77",
+            "32,-76",
+            "32,-75",
+            "32,-74",
+            "32,-73",
+            "32,-72",
+            "33,-82",
+            "33,-81",
+            "33,-80",
+            "33,-79",
+            "33,-78",
+            "33,-77",
+            "33,-76",
+            "33,-75",
+            "33,-74",
+            "33,-73",
+            "33,-72",
+            "34,-82",
+            "34,-81",
+            "34,-80",
+            "34,-79",
+            "34,-78",
+            "34,-77",
+            "34,-76",
+            "34,-75",
+            "34,-74",
+            "34,-73",
+            "34,-72",
+            "35,-82",
+            "35,-81",
+            "35,-80",
+            "35,-79",
+            "35,-78",
+            "35,-77",
+            "35,-76",
+            "35,-75",
+            "35,-74",
+            "35,-73",
+            "35,-72",
+            "36,-82",
+            "36,-81",
+            "36,-80",
+            "36,-79",
+            "36,-78",
+            "36,-77",
+            "36,-76",
+            "36,-75",
+            "36,-74",
+            "36,-73",
+            "36,-72",
+            "37,-82",
+            "37,-81",
+            "37,-80",
+            "37,-79",
+            "37,-78",
+            "37,-77",
+            "37,-76",
+            "37,-75",
+            "37,-74",
+            "37,-73",
+            "37,-72",
+            "38,-82",
+            "38,-81",
+            "38,-80",
+            "38,-79",
+            "38,-78",
+            "38,-77",
+            "38,-76",
+            "38,-75",
+            "38,-74",
+            "38,-73",
+            "38,-72",
+            "39,-82",
+            "39,-81",
+            "39,-80",
+            "39,-79",
+            "39,-78",
+            "39,-77",
+            "39,-76",
+            "39,-75",
+            "39,-74",
+            "39,-73",
+            "39,-72",
+            "40,-82",
+            "40,-81",
+            "40,-80",
+            "40,-79",
+            "40,-78",
+            "40,-77",
+            "40,-76",
+            "40,-75",
+            "40,-74",
+            "40,-73",
+            "40,-72",
+            "41,-82",
+            "41,-81",
+            "41,-80",
+            "41,-79",
+            "41,-78",
+            "41,-77",
+            "41,-76",
+            "41,-75",
+            "41,-74",
+            "41,-73",
+            "41,-72",
+            "42,-82",
+            "42,-81",
+            "42,-80",
+            "42,-79",
+            "42,-78",
+            "42,-77",
+            "42,-76",
+            "42,-75",
+            "42,-74",
+            "42,-73",
+            "42,-72",
+            "43,-82",
+            "43,-81",
+            "43,-80",
+            "43,-79",
+            "43,-78",
+            "43,-77",
+            "43,-76",
+            "43,-75",
+            "43,-74",
+            "43,-73",
+            "43,-72",
+            "44,-82",
+            "44,-81",
+            "44,-80",
+            "44,-79",
+            "44,-78",
+            "44,-77",
+            "44,-76",
+            "44,-75",
+            "44,-74",
+            "44,-73",
+            "44,-72",
+            "45,-82",
+            "45,-81",
+            "45,-80",
+            "45,-79",
+            "45,-78",
+            "45,-77",
+            "45,-76",
+            "45,-75",
+            "45,-74",
+            "45,-73",
+            "45,-72",
+            "46,-82",
+            "46,-81",
+            "46,-80",
+            "46,-79",
+            "46,-78",
+            "46,-77",
+            "46,-76",
+            "46,-75",
+            "46,-74",
+            "46,-73",
+            "46,-72",
+            "47,-82",
+            "47,-81",
+            "47,-80",
+            "47,-79",
+            "47,-78",
+            "47,-77",
+            "47,-76",
+            "47,-75",
+            "47,-74",
+            "47,-73",
+            "47,-72",
+            "48,-82",
+            "48,-81",
+            "48,-80",
+            "48,-79",
+            "48,-78",
+            "48,-77",
+            "48,-76",
+            "48,-75",
+            "48,-74",
+            "48,-73",
+            "48,-72",
+            "49,-82",
+            "49,-81",
+            "49,-79",
+            "49,-78",
+            "49,-77",
+            "49,-76",
+            "49,-75",
+            "49,-73",
+            "49,-72",
+            "50,-82",
+            "50,-81",
+            "50,-78",
+            "50,-77",
+            "50,-76",
+            "50,-73",
+            "50,-72",
+            "51,-82",
+            "51,-81",
+            "51,-80",
+            "51,-79",
+            "51,-78",
+            "51,-77",
+            "51,-76",
+            "51,-75",
+            "51,-74",
+            "51,-73",
+            "51,-72",
+            "52,-82",
+            "52,-81",
+            "52,-80",
+            "52,-79",
+            "52,-78",
+            "52,-77",
+            "52,-76",
+            "52,-75",
+            "52,-74",
+            "52,-73",
+            "52,-72",
+            "13,-96",
+            "13,-95",
+            "13,-94",
+            "13,-93",
+            "13,-92",
+            "13,-91",
+            "13,-90",
+            "13,-89",
+            "13,-88",
+            "13,-87",
+            "13,-86",
+            "14,-96",
+            "14,-95",
+            "14,-94",
+            "14,-93",
+            "14,-92",
+            "14,-91",
+            "14,-90",
+            "14,-89",
+            "14,-88",
+            "14,-87",
+            "14,-86",
+            "15,-96",
+            "15,-95",
+            "15,-92",
+            "15,-91",
+            "15,-90",
+            "15,-87",
+            "15,-86",
+            "16,-96",
+            "16,-95",
+            "16,-93",
+            "16,-92",
+            "16,-91",
+            "16,-90",
+            "16,-89",
+            "16,-87",
+            "16,-86",
+            "17,-96",
+            "17,-95",
+            "17,-94",
+            "17,-93",
+            "17,-92",
+            "17,-91",
+            "17,-90",
+            "17,-89",
+            "17,-88",
+            "17,-87",
+            "17,-86",
+            "18,-96",
+            "18,-95",
+            "18,-94",
+            "18,-93",
+            "18,-92",
+            "18,-91",
+            "18,-90",
+            "18,-89",
+            "18,-88",
+            "18,-87",
+            "18,-86",
+            "19,-96",
+            "19,-95",
+            "19,-94",
+            "19,-93",
+            "19,-92",
+            "19,-91",
+            "19,-90",
+            "19,-89",
+            "19,-88",
+            "19,-87",
+            "19,-86",
+            "20,-96",
+            "20,-95",
+            "20,-94",
+            "20,-93",
+            "20,-92",
+            "20,-91",
+            "20,-90",
+            "20,-89",
+            "20,-88",
+            "20,-87",
+            "20,-86",
+            "21,-96",
+            "21,-95",
+            "21,-94",
+            "21,-93",
+            "21,-92",
+            "21,-91",
+            "21,-90",
+            "21,-89",
+            "21,-88",
+            "21,-87",
+            "21,-86",
+            "22,-96",
+            "22,-95",
+            "22,-94",
+            "22,-93",
+            "22,-92",
+            "22,-91",
+            "22,-90",
+            "22,-89",
+            "22,-88",
+            "22,-87",
+            "22,-86",
+            "23,-96",
+            "23,-95",
+            "23,-94",
+            "23,-93",
+            "23,-92",
+            "23,-91",
+            "23,-90",
+            "23,-89",
+            "23,-88",
+            "23,-87",
+            "23,-86",
+            "24,-96",
+            "24,-95",
+            "24,-94",
+            "24,-93",
+            "24,-92",
+            "24,-91",
+            "24,-90",
+            "24,-89",
+            "24,-88",
+            "24,-87",
+            "24,-86",
+            "25,-96",
+            "25,-95",
+            "25,-94",
+            "25,-93",
+            "25,-92",
+            "25,-91",
+            "25,-90",
+            "25,-89",
+            "25,-88",
+            "25,-87",
+            "25,-86",
+            "26,-96",
+            "26,-95",
+            "26,-94",
+            "26,-93",
+            "26,-92",
+            "26,-91",
+            "26,-90",
+            "26,-89",
+            "26,-88",
+            "26,-87",
+            "26,-86",
+            "27,-96",
+            "27,-95",
+            "27,-94",
+            "27,-93",
+            "27,-92",
+            "27,-91",
+            "27,-90",
+            "27,-89",
+            "27,-88",
+            "27,-87",
+            "27,-86",
+            "28,-96",
+            "28,-95",
+            "28,-94",
+            "28,-93",
+            "28,-92",
+            "28,-91",
+            "28,-90",
+            "28,-89",
+            "28,-88",
+            "28,-87",
+            "28,-86",
+            "29,-96",
+            "29,-95",
+            "29,-94",
+            "29,-93",
+            "29,-92",
+            "29,-91",
+            "29,-90",
+            "29,-89",
+            "29,-88",
+            "29,-87",
+            "29,-86",
+            "30,-96",
+            "30,-95",
+            "30,-94",
+            "30,-93",
+            "30,-92",
+            "30,-91",
+            "30,-90",
+            "30,-89",
+            "30,-88",
+            "30,-87",
+            "30,-86",
+            "31,-96",
+            "31,-95",
+            "31,-94",
+            "31,-93",
+            "31,-92",
+            "31,-91",
+            "31,-90",
+            "31,-89",
+            "31,-88",
+            "31,-87",
+            "31,-86",
+            "32,-96",
+            "32,-95",
+            "32,-94",
+            "32,-93",
+            "32,-92",
+            "32,-91",
+            "32,-90",
+            "32,-89",
+            "32,-88",
+            "32,-87",
+            "32,-86",
+            "33,-96",
+            "33,-95",
+            "33,-94",
+            "33,-93",
+            "33,-92",
+            "33,-91",
+            "33,-90",
+            "33,-89",
+            "33,-88",
+            "33,-87",
+            "33,-86",
+            "34,-96",
+            "34,-95",
+            "34,-94",
+            "34,-93",
+            "34,-92",
+            "34,-91",
+            "34,-90",
+            "34,-89",
+            "34,-88",
+            "34,-87",
+            "34,-86",
+            "35,-96",
+            "35,-95",
+            "35,-94",
+            "35,-93",
+            "35,-92",
+            "35,-91",
+            "35,-90",
+            "35,-89",
+            "35,-88",
+            "35,-87",
+            "35,-86",
+            "36,-96",
+            "36,-95",
+            "36,-94",
+            "36,-93",
+            "36,-92",
+            "36,-91",
+            "36,-90",
+            "36,-89",
+            "36,-88",
+            "36,-87",
+            "36,-86",
+            "37,-96",
+            "37,-95",
+            "37,-94",
+            "37,-93",
+            "37,-92",
+            "37,-91",
+            "37,-90",
+            "37,-89",
+            "37,-88",
+            "37,-87",
+            "37,-86",
+            "38,-96",
+            "38,-95",
+            "38,-94",
+            "38,-93",
+            "38,-92",
+            "38,-91",
+            "38,-90",
+            "38,-89",
+            "38,-88",
+            "38,-87",
+            "38,-86",
+            "39,-96",
+            "39,-95",
+            "39,-94",
+            "39,-93",
+            "39,-92",
+            "39,-91",
+            "39,-90",
+            "39,-89",
+            "39,-88",
+            "39,-87",
+            "39,-86",
+            "40,-96",
+            "40,-95",
+            "40,-94",
+            "40,-93",
+            "40,-92",
+            "40,-91",
+            "40,-90",
+            "40,-89",
+            "40,-88",
+            "40,-87",
+            "40,-86",
+            "41,-96",
+            "41,-95",
+            "41,-94",
+            "41,-93",
+            "41,-92",
+            "41,-91",
+            "41,-90",
+            "41,-89",
+            "41,-88",
+            "41,-87",
+            "41,-86",
+            "42,-96",
+            "42,-95",
+            "42,-94",
+            "42,-93",
+            "42,-92",
+            "42,-91",
+            "42,-90",
+            "42,-89",
+            "42,-88",
+            "42,-87",
+            "42,-86",
+            "43,-96",
+            "43,-95",
+            "43,-94",
+            "43,-93",
+            "43,-92",
+            "43,-91",
+            "43,-90",
+            "43,-89",
+            "43,-88",
+            "43,-87",
+            "43,-86",
+            "44,-96",
+            "44,-95",
+            "44,-94",
+            "44,-93",
+            "44,-92",
+            "44,-91",
+            "44,-90",
+            "44,-89",
+            "44,-88",
+            "44,-87",
+            "44,-86",
+            "45,-96",
+            "45,-95",
+            "45,-94",
+            "45,-93",
+            "45,-92",
+            "45,-91",
+            "45,-90",
+            "45,-89",
+            "45,-88",
+            "45,-87",
+            "45,-86",
+            "46,-96",
+            "46,-95",
+            "46,-94",
+            "46,-93",
+            "46,-92",
+            "46,-91",
+            "46,-90",
+            "46,-89",
+            "46,-88",
+            "46,-87",
+            "46,-86",
+            "47,-96",
+            "47,-95",
+            "47,-94",
+            "47,-93",
+            "47,-92",
+            "47,-91",
+            "47,-90",
+            "47,-89",
+            "47,-88",
+            "47,-87",
+            "47,-86",
+            "48,-96",
+            "48,-95",
+            "48,-94",
+            "48,-93",
+            "48,-92",
+            "48,-91",
+            "48,-90",
+            "48,-89",
+            "48,-88",
+            "48,-87",
+            "48,-86",
+            "49,-96",
+            "49,-95",
+            "49,-94",
+            "49,-93",
+            "49,-92",
+            "49,-91",
+            "49,-90",
+            "49,-89",
+            "49,-88",
+            "49,-87",
+            "49,-86",
+            "50,-96",
+            "50,-95",
+            "50,-93",
+            "50,-92",
+            "50,-91",
+            "50,-90",
+            "50,-89",
+            "50,-87",
+            "50,-86",
+            "51,-96",
+            "51,-95",
+            "51,-92",
+            "51,-91",
+            "51,-90",
+            "51,-87",
+            "51,-86",
+            "52,-96",
+            "52,-95",
+            "52,-94",
+            "52,-93",
+            "52,-92",
+            "52,-91",
+            "52,-90",
+            "52,-89",
+            "52,-88",
+            "52,-87",
+            "52,-86",
+            "53,-96",
+            "53,-95",
+            "53,-94",
+            "53,-93",
+            "53,-92",
+            "53,-91",
+            "53,-90",
+            "53,-89",
+            "53,-88",
+            "53,-87",
+            "53,-86"
+          ]
+        },
+        {
+          "id": "group-2",
+          "points": []
+        }
+      ],
+      "pointModifications": {
+        "12,-82": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "12,-81": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-80": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-79": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-78": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-77": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-76": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-75": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-74": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-73": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "12,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "13,-82": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "full"
+          }
+        },
+        "14,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-78": {
+          "quadrantOverrides": {
+            "0": "concave-ne",
+            "1": "concave-nw"
+          }
+        },
+        "14,-77": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-76": {
+          "quadrantOverrides": {
+            "2": "concave-sw",
+            "3": "concave-se"
+          }
+        },
+        "14,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "15,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "16,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            },
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            },
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            },
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            },
+            {
+              "anchor": "custom",
+              "diameterMm": 1.05,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "25,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "26,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-81": {
+          "quadrantOverrides": {
+            "1": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "48,-73": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "48,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "49,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "49,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "50,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-78": {
+          "quadrantOverrides": {
+            "0": "concave-ne",
+            "1": "concave-nw"
+          }
+        },
+        "50,-77": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-76": {
+          "quadrantOverrides": {
+            "2": "concave-sw",
+            "3": "concave-se"
+          }
+        },
+        "50,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "51,-82": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "52,-82": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-81": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-80": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-79": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-78": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-77": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-76": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-75": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-74": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-73": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-72": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "13,-96": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "13,-95": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-94": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-93": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-92": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-91": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-90": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-89": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-88": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-87": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "13,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "14,-96": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "14,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "full"
+          }
+        },
+        "15,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-92": {
+          "quadrantOverrides": {
+            "0": "concave-ne",
+            "1": "concave-nw"
+          }
+        },
+        "15,-91": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "15,-90": {
+          "quadrantOverrides": {
+            "2": "concave-sw",
+            "3": "concave-se"
+          }
+        },
+        "15,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "16,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "16,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "17,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "17,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "18,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "18,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "19,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "19,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "20,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "20,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "21,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "21,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "22,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "22,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "23,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "23,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "24,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "24,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "25,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "25,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "26,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "26,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "27,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "27,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "28,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "28,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "29,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "29,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "30,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "30,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "31,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "31,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "32,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "32,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "33,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "33,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "34,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "34,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "35,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "35,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "36,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "36,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "37,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "37,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "38,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "38,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "39,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "39,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "40,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "40,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "41,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "41,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "42,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "42,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "43,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "43,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "44,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "44,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "45,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "45,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "46,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "46,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "47,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "47,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "48,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "48,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "49,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "49,-95": {
+          "quadrantOverrides": {
+            "1": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "49,-87": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "49,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          },
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "50,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "50,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "51,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-92": {
+          "quadrantOverrides": {
+            "0": "concave-ne",
+            "1": "concave-nw"
+          }
+        },
+        "51,-91": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "51,-90": {
+          "quadrantOverrides": {
+            "2": "concave-sw",
+            "3": "concave-se"
+          }
+        },
+        "51,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "52,-96": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "52,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "53,-96": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-95": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-94": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-93": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-92": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-91": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-90": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-89": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-88": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-87": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "53,-86": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "14,-91": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": -0.25,
+                "y": 0
+              }
+            }
+          ]
+        },
+        "25,-95": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.12,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "24,-81": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": 0,
+                "y": -0.5
+              }
+            }
+          ]
+        },
+        "13,-77": {
+          "cutouts": [
+            {
+              "anchor": "custom",
+              "diameterMm": 1.051,
+              "customOffset": {
+                "x": -0.2,
+                "y": 0
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

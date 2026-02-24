@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { ModeToggle } from "@/components/ModeToggle"
 import { $syncStatus, $authState } from "@/stores/authStores"
+import { $selectionState, $currentTool } from "@/stores/ui"
 
 interface GridPaintControlsProps {
   onReset: () => void
@@ -51,6 +52,9 @@ export const GridPaintControls = ({
   const [borderWidth, setBorderWidth] = useState(2)
   const syncStatus = useStore($syncStatus)
   const authState = useStore($authState)
+  const selectionState = useStore($selectionState)
+  const currentTool = useStore($currentTool)
+  const hasActiveSelection = currentTool === "select" && selectionState.bounds !== null
 
   const handleBorderWidthChange = (delta: number) => {
     const newWidth = Math.max(0, Math.min(10, borderWidth + delta))
@@ -119,7 +123,12 @@ export const GridPaintControls = ({
           size='icon'
           variant='ghost'
           onClick={onDownload}
-          className='w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm'
+          title={hasActiveSelection ? "Download selection" : "Download"}
+          className={`w-8 h-8 backdrop-blur-sm ${
+            hasActiveSelection
+              ? "bg-primary/20 hover:bg-primary/30 text-primary ring-1 ring-primary/50"
+              : "bg-white/10 hover:bg-white/20"
+          }`}
         >
           <Download className='w-4 h-4' />
         </Button>

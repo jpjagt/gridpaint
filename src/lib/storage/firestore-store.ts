@@ -123,7 +123,8 @@ export class FirestoreDrawingStore implements DrawingStore {
         }
 
         // Deserialize pointModifications, with migration for old CircularCutout
-        // format that stored `radius` (grid units) instead of `radiusMm` (mm).
+        // formats:
+        //   v1: `radius` (grid units) → v2: `radiusMm` (mm) → v3: `diameterMm` (mm)
         let pointModifications: Map<string, PointModifications> | undefined
         if (layer.pointModifications) {
           const mmPerUnit: number = (data as { mmPerUnit?: number }).mmPerUnit ?? 5
@@ -133,8 +134,13 @@ export class FirestoreDrawingStore implements DrawingStore {
               if (mods.cutouts) {
                 migratedMods.cutouts = mods.cutouts.map((c) => {
                   const legacy = c as unknown as Record<string, unknown>
-                  if (!('radiusMm' in legacy) && typeof legacy.radius === 'number') {
-                    return { ...c, radiusMm: legacy.radius * mmPerUnit }
+                  // v1→v2: old format had `radius` in grid units
+                  if (!('radiusMm' in legacy) && !('diameterMm' in legacy) && typeof legacy.radius === 'number') {
+                    return { ...c, diameterMm: legacy.radius * mmPerUnit * 2 }
+                  }
+                  // v2→v3: old format used `radiusMm`; new format uses `diameterMm`
+                  if ('radiusMm' in legacy && !('diameterMm' in legacy) && typeof legacy.radiusMm === 'number') {
+                    return { ...c, diameterMm: (legacy.radiusMm as number) * 2 }
                   }
                   return c
                 })

@@ -257,10 +257,12 @@ export class Canvas2DRenderer extends Renderer {
       const [px, py] = pointKey.split(",").map(Number)
 
       for (const cutout of mods.cutouts) {
-        const anchorOffset = CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
+        const anchorOffset = cutout.anchor === "custom"
+          ? (cutout.customOffset ?? { x: 0, y: 0 })
+          : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
         const cx = (px + anchorOffset.x + (cutout.offset?.x ?? 0)) * gridSize + gridSize / 2
         const cy = (py + anchorOffset.y + (cutout.offset?.y ?? 0)) * gridSize + gridSize / 2
-        const r = (cutout.radiusMm / mmPerUnit) * gridSize
+        const r = (cutout.diameterMm / 2 / mmPerUnit) * gridSize
 
         this.ctx.moveTo(cx + r, cy)
         this.ctx.arc(cx, cy, r, 0, Math.PI * 2)

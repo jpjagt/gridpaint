@@ -25,7 +25,7 @@ export interface RenderOptions {
   transform: ViewportTransform
   clipToViewport?: boolean
   showDebugInfo?: boolean
-  /** Millimetres per grid unit; used to convert cutout radiusMm → grid units at render time */
+  /** Millimetres per grid unit; used to convert cutout diameterMm → grid units at render time */
   mmPerUnit?: number
 }
 

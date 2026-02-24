@@ -2,6 +2,7 @@ import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import { useStore } from "@nanostores/react"
 import { $layersState, updateGroupPoints, updatePointModifications } from "@/stores/drawingStores"
+import { $selectionState } from "@/stores/ui"
 import type { PointModifications } from "@/types/gridpaint"
 import type { SerializedPointModifications } from "@/lib/storage/types"
 
@@ -42,6 +43,26 @@ export const useSelection = () => {
     y: number
   } | null>(null)
 
+  /** Sync the current start/end pair to the $selectionState store */
+  const syncSelectionStore = useCallback(
+    (
+      start: { x: number; y: number } | null,
+      end: { x: number; y: number } | null,
+    ) => {
+      if (start && end) {
+        $selectionState.setKey("bounds", {
+          minX: Math.min(start.x, end.x),
+          minY: Math.min(start.y, end.y),
+          maxX: Math.max(start.x, end.x),
+          maxY: Math.max(start.y, end.y),
+        })
+      } else {
+        $selectionState.setKey("bounds", null)
+      }
+    },
+    [],
+  )
+
   const startSelection = useCallback(
     (
       clientX: number,
@@ -55,9 +76,10 @@ export const useSelection = () => {
       if (gridCoords) {
         setSelectionStart(gridCoords)
         setSelectionEnd(gridCoords)
+        syncSelectionStore(gridCoords, gridCoords)
       }
     },
-    [],
+    [syncSelectionStore],
   )
 
   const updateSelection = useCallback(
@@ -72,14 +94,16 @@ export const useSelection = () => {
       const gridCoords = getGridCoordinates(clientX, clientY)
       if (gridCoords) {
         setSelectionEnd(gridCoords)
+        syncSelectionStore(selectionStart, gridCoords)
       }
     },
-    [],
+    [selectionStart, syncSelectionStore],
   )
 
   const clearSelection = useCallback(() => {
     setSelectionStart(null)
     setSelectionEnd(null)
+    $selectionState.setKey("bounds", null)
   }, [])
 
   const copySelection = useCallback(async () => {

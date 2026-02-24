@@ -1,0 +1,2057 @@
+{
+  "id": "7853ac7d-ee02-46e8-8cc3-f7c49c341714",
+  "name": "hebrew",
+  "createdAt": 1771633220786,
+  "updatedAt": 1771869764027,
+  "gridSize": 25,
+  "borderWidth": 0.5,
+  "panOffset": {
+    "x": 1743.0859291320796,
+    "y": -62.86298097581965
+  },
+  "zoom": 1.136004641882139,
+  "mmPerUnit": 1.8,
+  "layers": [
+    {
+      "id": 1,
+      "isVisible": true,
+      "renderStyle": "default",
+      "groups": [
+        {
+          "id": "default",
+          "points": [
+            "-48,11",
+            "-48,13",
+            "-48,14",
+            "-47,10",
+            "-47,13",
+            "-47,14",
+            "-46,10",
+            "-46,11",
+            "-46,13",
+            "-46,14",
+            "-45,11",
+            "-45,13",
+            "-45,14",
+            "-44,14",
+            "-40,10",
+            "-40,11",
+            "-40,13",
+            "-40,14",
+            "-39,10",
+            "-39,11",
+            "-39,13",
+            "-38,10",
+            "-38,11",
+            "-37,10",
+            "-37,11",
+            "-37,12",
+            "-37,14",
+            "-36,10",
+            "-36,11",
+            "-36,13",
+            "-36,14",
+            "-32,10",
+            "-32,11",
+            "-32,13",
+            "-32,14",
+            "-31,10",
+            "-31,11",
+            "-31,12",
+            "-31,14",
+            "-30,12",
+            "-29,12",
+            "-29,13",
+            "-29,14",
+            "-28,10",
+            "-28,11",
+            "-28,13",
+            "-28,14",
+            "-40,25",
+            "-40,26",
+            "-40,28",
+            "-40,29",
+            "-39,25",
+            "-39,26",
+            "-39,28",
+            "-39,29",
+            "-38,25",
+            "-38,26",
+            "-38,28",
+            "-38,29",
+            "-37,26",
+            "-37,27",
+            "-37,28",
+            "-37,29",
+            "-36,28",
+            "-36,29",
+            "-32,25",
+            "-32,26",
+            "-32,28",
+            "-32,29",
+            "-31,26",
+            "-31,28",
+            "-29,25",
+            "-29,27",
+            "-29,29",
+            "-28,25",
+            "-28,28",
+            "-28,29",
+            "-24,25",
+            "-24,26",
+            "-24,29",
+            "-23,25",
+            "-23,26",
+            "-23,27",
+            "-22,27",
+            "-21,27",
+            "-21,28",
+            "-21,29",
+            "-20,25",
+            "-20,26",
+            "-20,28",
+            "-20,29",
+            "-48,10",
+            "-47,11",
+            "-45,12",
+            "-44,13",
+            "-31,25",
+            "-30,25",
+            "-30,26",
+            "-29,26",
+            "-28,26",
+            "-24,28",
+            "-23,29"
+          ]
+        },
+        {
+          "id": "group-2",
+          "points": [
+            "-31,10",
+            "-31,11",
+            "-31,12",
+            "-30,11",
+            "-30,12",
+            "-30,13",
+            "-29,12",
+            "-29,13",
+            "-29,14",
+            "-28,14",
+            "-23,25",
+            "-23,26",
+            "-23,27",
+            "-22,26",
+            "-22,27",
+            "-22,28",
+            "-21,27",
+            "-21,28",
+            "-21,29",
+            "-20,29"
+          ]
+        }
+      ],
+      "pointModifications": {
+        "-48,11": {
+          "quadrantOverrides": {
+            "1": "convex-sw"
+          }
+        },
+        "-48,13": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        },
+        "-48,14": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-47,14": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-46,14": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-45,11": {
+          "quadrantOverrides": {
+            "3": "convex-ne"
+          }
+        },
+        "-45,14": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-44,14": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-40,10": {
+          "quadrantOverrides": {
+            "2": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-39,13": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-37,14": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-32,10": {
+          "quadrantOverrides": {
+            "2": "convex-nw"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-32,14": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-31,10": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-29,14": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-28,10": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        },
+        "-28,14": {
+          "quadrantOverrides": {
+            "0": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-40,14": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-36,14": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-40,25": {
+          "quadrantOverrides": {
+            "2": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-40,26": {
+          "quadrantOverrides": {
+            "1": "convex-sw"
+          }
+        },
+        "-40,28": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        },
+        "-40,29": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-39,29": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-38,29": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-37,26": {
+          "quadrantOverrides": {
+            "3": "convex-ne"
+          }
+        },
+        "-37,29": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          }
+        },
+        "-36,28": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-36,29": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-32,25": {
+          "quadrantOverrides": {
+            "2": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-31,28": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-29,29": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-24,25": {
+          "quadrantOverrides": {
+            "2": "convex-nw"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-24,29": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-23,25": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-21,29": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-20,25": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        },
+        "-20,29": {
+          "quadrantOverrides": {
+            "0": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-28,29": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-32,29": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.12
+            }
+          ]
+        },
+        "-44,13": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-48,10": {
+          "quadrantOverrides": {
+            "2": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 1.2
+            }
+          ]
+        },
+        "-31,25": {
+          "quadrantOverrides": {
+            "2": "full",
+            "3": "full"
+          }
+        },
+        "-30,25": {
+          "quadrantOverrides": {
+            "0": "full",
+            "2": "full"
+          }
+        },
+        "-30,26": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        },
+        "-29,26": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        },
+        "-28,26": {
+          "quadrantOverrides": {
+            "2": "full",
+            "3": "full"
+          }
+        },
+        "-24,28": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-23,29": {
+          "quadrantOverrides": {
+            "2": "full"
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "isVisible": true,
+      "renderStyle": "default",
+      "groups": [
+        {
+          "id": "default",
+          "points": [
+            "-49,9",
+            "-49,10",
+            "-49,11",
+            "-49,12",
+            "-49,13",
+            "-49,14",
+            "-49,15",
+            "-48,9",
+            "-48,10",
+            "-48,11",
+            "-48,12",
+            "-48,13",
+            "-48,14",
+            "-48,15",
+            "-47,9",
+            "-47,10",
+            "-47,11",
+            "-47,12",
+            "-47,13",
+            "-47,14",
+            "-47,15",
+            "-46,9",
+            "-46,10",
+            "-46,11",
+            "-46,12",
+            "-46,13",
+            "-46,14",
+            "-46,15",
+            "-45,9",
+            "-45,10",
+            "-45,11",
+            "-45,12",
+            "-45,13",
+            "-45,14",
+            "-45,15",
+            "-44,9",
+            "-44,10",
+            "-44,11",
+            "-44,12",
+            "-44,13",
+            "-44,14",
+            "-44,15",
+            "-43,9",
+            "-43,10",
+            "-43,11",
+            "-43,12",
+            "-43,13",
+            "-43,14",
+            "-43,15",
+            "-41,9",
+            "-41,10",
+            "-41,11",
+            "-41,12",
+            "-41,13",
+            "-41,14",
+            "-41,15",
+            "-40,9",
+            "-40,10",
+            "-40,11",
+            "-40,12",
+            "-40,13",
+            "-40,14",
+            "-40,15",
+            "-39,9",
+            "-39,10",
+            "-39,11",
+            "-39,12",
+            "-39,13",
+            "-39,14",
+            "-39,15",
+            "-38,9",
+            "-38,10",
+            "-38,11",
+            "-38,12",
+            "-38,13",
+            "-38,14",
+            "-38,15",
+            "-37,9",
+            "-37,10",
+            "-37,11",
+            "-37,12",
+            "-37,13",
+            "-37,14",
+            "-37,15",
+            "-36,9",
+            "-36,10",
+            "-36,11",
+            "-36,12",
+            "-36,13",
+            "-36,14",
+            "-36,15",
+            "-35,9",
+            "-35,10",
+            "-35,11",
+            "-35,12",
+            "-35,13",
+            "-35,14",
+            "-35,15",
+            "-33,9",
+            "-33,10",
+            "-33,11",
+            "-33,12",
+            "-33,13",
+            "-33,14",
+            "-33,15",
+            "-32,9",
+            "-32,10",
+            "-32,11",
+            "-32,12",
+            "-32,13",
+            "-32,14",
+            "-32,15",
+            "-31,9",
+            "-31,10",
+            "-31,11",
+            "-31,12",
+            "-31,13",
+            "-31,14",
+            "-31,15",
+            "-30,9",
+            "-30,10",
+            "-30,11",
+            "-30,12",
+            "-30,13",
+            "-30,14",
+            "-30,15",
+            "-29,9",
+            "-29,10",
+            "-29,11",
+            "-29,12",
+            "-29,13",
+            "-29,14",
+            "-29,15",
+            "-28,9",
+            "-28,10",
+            "-28,11",
+            "-28,12",
+            "-28,13",
+            "-28,14",
+            "-28,15",
+            "-27,9",
+            "-27,10",
+            "-27,11",
+            "-27,12",
+            "-27,13",
+            "-27,14",
+            "-27,15",
+            "-41,24",
+            "-41,25",
+            "-41,26",
+            "-41,27",
+            "-41,28",
+            "-41,29",
+            "-41,30",
+            "-40,24",
+            "-40,25",
+            "-40,26",
+            "-40,27",
+            "-40,28",
+            "-40,29",
+            "-40,30",
+            "-39,24",
+            "-39,25",
+            "-39,26",
+            "-39,27",
+            "-39,28",
+            "-39,29",
+            "-39,30",
+            "-38,24",
+            "-38,25",
+            "-38,26",
+            "-38,27",
+            "-38,28",
+            "-38,29",
+            "-38,30",
+            "-37,24",
+            "-37,25",
+            "-37,26",
+            "-37,27",
+            "-37,28",
+            "-37,29",
+            "-37,30",
+            "-36,24",
+            "-36,25",
+            "-36,26",
+            "-36,27",
+            "-36,28",
+            "-36,29",
+            "-36,30",
+            "-35,24",
+            "-35,25",
+            "-35,26",
+            "-35,27",
+            "-35,28",
+            "-35,29",
+            "-35,30",
+            "-33,24",
+            "-33,25",
+            "-33,26",
+            "-33,27",
+            "-33,28",
+            "-33,29",
+            "-33,30",
+            "-32,24",
+            "-32,25",
+            "-32,26",
+            "-32,27",
+            "-32,28",
+            "-32,29",
+            "-32,30",
+            "-31,24",
+            "-31,25",
+            "-31,26",
+            "-31,27",
+            "-31,28",
+            "-31,29",
+            "-31,30",
+            "-30,24",
+            "-30,25",
+            "-30,26",
+            "-30,27",
+            "-30,28",
+            "-30,29",
+            "-30,30",
+            "-29,24",
+            "-29,25",
+            "-29,26",
+            "-29,27",
+            "-29,28",
+            "-29,29",
+            "-29,30",
+            "-28,24",
+            "-28,25",
+            "-28,26",
+            "-28,27",
+            "-28,28",
+            "-28,29",
+            "-28,30",
+            "-27,24",
+            "-27,25",
+            "-27,26",
+            "-27,27",
+            "-27,28",
+            "-27,29",
+            "-27,30",
+            "-25,24",
+            "-25,25",
+            "-25,26",
+            "-25,27",
+            "-25,28",
+            "-25,29",
+            "-25,30",
+            "-24,24",
+            "-24,25",
+            "-24,26",
+            "-24,27",
+            "-24,28",
+            "-24,29",
+            "-24,30",
+            "-23,24",
+            "-23,25",
+            "-23,26",
+            "-23,27",
+            "-23,28",
+            "-23,29",
+            "-23,30",
+            "-22,24",
+            "-22,25",
+            "-22,26",
+            "-22,27",
+            "-22,28",
+            "-22,29",
+            "-22,30",
+            "-21,24",
+            "-21,25",
+            "-21,26",
+            "-21,27",
+            "-21,28",
+            "-21,29",
+            "-21,30",
+            "-20,24",
+            "-20,25",
+            "-20,26",
+            "-20,27",
+            "-20,28",
+            "-20,29",
+            "-20,30",
+            "-19,24",
+            "-19,25",
+            "-19,26",
+            "-19,27",
+            "-19,28",
+            "-19,29",
+            "-19,30"
+          ]
+        },
+        {
+          "id": "group-2",
+          "points": []
+        }
+      ],
+      "pointModifications": {
+        "-49,9": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-49,10": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-49,11": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-49,12": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "-49,13": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-49,14": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-49,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-48,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-48,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-47,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-47,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-46,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-46,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-45,9": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-45,10": {
+          "quadrantOverrides": {
+            "3": "concave-sw"
+          }
+        },
+        "-45,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-44,9": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-44,10": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-44,11": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-44,12": {
+          "quadrantOverrides": {
+            "3": "concave-sw"
+          }
+        },
+        "-44,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-43,9": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-43,10": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-43,11": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-43,12": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-43,13": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-43,14": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-43,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "3": "empty"
+          }
+        },
+        "-41,9": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-41,10": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,11": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,12": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,13": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,14": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "-40,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-40,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-39,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-39,14": {
+          "quadrantOverrides": {
+            "0": "concave-nw"
+          }
+        },
+        "-39,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-38,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-38,13": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "3": "convex-sw"
+          }
+        },
+        "-38,14": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "convex-se"
+          }
+        },
+        "-38,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-37,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-37,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-36,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-36,12": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-36,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-35,9": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,10": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,11": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,12": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-35,13": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,14": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-33,9": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-33,10": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,11": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,12": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "-33,13": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,14": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-32,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-32,11": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-32,12": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "full"
+          }
+        },
+        "-32,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-31,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-31,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "3": "full"
+          }
+        },
+        "-30,9": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-30,10": {
+          "quadrantOverrides": {
+            "3": "concave-sw"
+          }
+        },
+        "-30,11": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-30,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "convex-sw"
+          }
+        },
+        "-29,9": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-29,10": {
+          "quadrantOverrides": {
+            "1": "convex-ne",
+            "2": "empty"
+          }
+        },
+        "-29,11": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "full"
+          }
+        },
+        "-29,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-28,9": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-28,11": {
+          "quadrantOverrides": {
+            "0": "full"
+          }
+        },
+        "-28,12": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "full",
+            "3": "full"
+          }
+        },
+        "-28,14": {
+          "quadrantOverrides": {
+            "0": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-28,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-27,9": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,10": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,11": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "full",
+            "3": "empty"
+          }
+        },
+        "-27,12": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-27,13": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "2": "full",
+            "3": "empty"
+          }
+        },
+        "-27,14": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,15": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "3": "empty"
+          }
+        },
+        "-44,14": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-48,10": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-40,10": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-40,14": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-36,14": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-32,10": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.9
+            }
+          ]
+        },
+        "-41,24": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-41,25": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,26": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,27": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "-41,28": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,29": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-41,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-40,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-40,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-39,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-39,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-38,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-38,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-37,24": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-37,25": {
+          "quadrantOverrides": {
+            "3": "concave-sw"
+          }
+        },
+        "-37,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-36,24": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-36,25": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-36,26": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-36,27": {
+          "quadrantOverrides": {
+            "3": "concave-sw"
+          }
+        },
+        "-36,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-35,24": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,25": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,26": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,27": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,28": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,29": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-35,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "3": "empty"
+          }
+        },
+        "-33,24": {
+          "quadrantOverrides": {
+            "0": "full",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-33,25": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,26": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,27": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,28": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,29": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-33,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "-32,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-32,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-31,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-31,29": {
+          "quadrantOverrides": {
+            "0": "concave-nw"
+          }
+        },
+        "-31,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-30,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-30,28": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "3": "convex-sw"
+          }
+        },
+        "-30,29": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "convex-se"
+          }
+        },
+        "-30,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-29,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-29,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-28,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-28,27": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-28,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-27,24": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,25": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,26": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,27": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-27,28": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,29": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-27,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-25,24": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-25,25": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-25,26": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-25,27": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "convex-sw"
+          }
+        },
+        "-25,28": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-25,29": {
+          "quadrantOverrides": {
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-25,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "empty"
+          }
+        },
+        "-24,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-24,26": {
+          "quadrantOverrides": {
+            "1": "full"
+          }
+        },
+        "-24,27": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "full"
+          }
+        },
+        "-24,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-23,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-23,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "3": "full"
+          }
+        },
+        "-22,24": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "full",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-22,25": {
+          "quadrantOverrides": {
+            "3": "concave-sw"
+          }
+        },
+        "-22,26": {
+          "quadrantOverrides": {
+            "3": "full"
+          }
+        },
+        "-22,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "2": "convex-se",
+            "3": "convex-sw"
+          }
+        },
+        "-21,24": {
+          "quadrantOverrides": {
+            "0": "convex-nw",
+            "1": "empty",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-21,25": {
+          "quadrantOverrides": {
+            "1": "convex-ne",
+            "2": "empty"
+          }
+        },
+        "-21,26": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "full"
+          }
+        },
+        "-21,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-20,24": {
+          "quadrantOverrides": {
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-20,26": {
+          "quadrantOverrides": {
+            "0": "full"
+          }
+        },
+        "-20,27": {
+          "quadrantOverrides": {
+            "1": "full",
+            "2": "full",
+            "3": "full"
+          }
+        },
+        "-20,29": {
+          "quadrantOverrides": {
+            "0": "full"
+          },
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        },
+        "-20,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty"
+          }
+        },
+        "-19,24": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "empty",
+            "3": "empty"
+          }
+        },
+        "-19,25": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-19,26": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "full",
+            "3": "empty"
+          }
+        },
+        "-19,27": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "convex-ne",
+            "2": "convex-se",
+            "3": "empty"
+          }
+        },
+        "-19,28": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "2": "full",
+            "3": "empty"
+          }
+        },
+        "-19,29": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "3": "empty"
+          }
+        },
+        "-19,30": {
+          "quadrantOverrides": {
+            "0": "empty",
+            "1": "empty",
+            "3": "empty"
+          }
+        },
+        "-40,25": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        },
+        "-36,29": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        },
+        "-32,29": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        },
+        "-32,25": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        },
+        "-28,29": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        },
+        "-24,25": {
+          "cutouts": [
+            {
+              "anchor": "center",
+              "diameterMm": 0.83
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

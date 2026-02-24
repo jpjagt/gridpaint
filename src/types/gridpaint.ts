@@ -63,27 +63,38 @@ export interface QuadrantOverrides {
 
 /** Anchor position for a cutout center relative to the grid point */
 export type CutoutAnchor =
+  | "nw"
+  | "n"
+  | "ne"
+  | "w"
   | "center"
-  | "quadrant-se"
-  | "quadrant-sw"
-  | "quadrant-nw"
-  | "quadrant-ne"
+  | "e"
+  | "sw"
+  | "s"
+  | "se"
+  | "custom"
 
 export interface CircularCutout {
   anchor: CutoutAnchor
-  /** Radius in millimetres (primary/leading value; converted to grid units via mmPerUnit at render time) */
-  radiusMm: number
+  /** Diameter in millimetres (primary/leading value; converted to grid units via mmPerUnit at render time) */
+  diameterMm: number
   /** Optional fine offset from anchor position, in grid units */
   offset?: { x: number; y: number }
+  /** Custom anchor position in grid units (used when anchor === "custom") */
+  customOffset?: { x: number; y: number }
 }
 
 /** Offsets from grid point center for each cutout anchor, in grid units */
-export const CUTOUT_ANCHOR_OFFSETS: Record<CutoutAnchor, { x: number; y: number }> = {
-  "center":      { x: 0,     y: 0     },
-  "quadrant-se": { x: 0.25,  y: 0.25  },
-  "quadrant-sw": { x: -0.25, y: 0.25  },
-  "quadrant-nw": { x: -0.25, y: -0.25 },
-  "quadrant-ne": { x: 0.25,  y: -0.25 },
+export const CUTOUT_ANCHOR_OFFSETS: Record<Exclude<CutoutAnchor, "custom">, { x: number; y: number }> = {
+  "nw":     { x: -0.5,  y: -0.5 },
+  "n":      { x: 0,     y: -0.5 },
+  "ne":     { x: 0.5,   y: -0.5 },
+  "w":      { x: -0.5,  y: 0    },
+  "center": { x: 0,     y: 0    },
+  "e":      { x: 0.5,   y: 0    },
+  "sw":     { x: -0.5,  y: 0.5  },
+  "s":      { x: 0,     y: 0.5  },
+  "se":     { x: 0.5,   y: 0.5  },
 }
 
 // === Point Modifications ===

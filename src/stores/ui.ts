@@ -1,5 +1,6 @@
 import { atom, map } from 'nanostores'
 import type { CutoutAnchor, QuadrantState } from '@/types/gridpaint'
+import type { SelectionBounds } from '@/hooks/useSelection'
 
 // === Tool types ===
 
@@ -49,12 +50,25 @@ export const toggleActiveLayerOutline = () => {
 
 export interface CutoutToolSettings {
   anchor: CutoutAnchor
-  radiusMm: number // radius in mm, converted to grid units using mmPerUnit
+  diameterMm: number // diameter in mm, converted to grid units using mmPerUnit
+  customOffset: { x: number; y: number }
 }
 
 export const $cutoutToolSettings = map<CutoutToolSettings>({
   anchor: "center",
-  radiusMm: 1.0,
+  diameterMm: 2.0,
+  customOffset: { x: 0, y: 0 },
+})
+
+// === Selection state ===
+
+export interface SelectionState {
+  bounds: SelectionBounds | null
+}
+
+/** Reactive selection bounds — written by useSelection, read by controls/export */
+export const $selectionState = map<SelectionState>({
+  bounds: null,
 })
 
 // === Override tool settings ===

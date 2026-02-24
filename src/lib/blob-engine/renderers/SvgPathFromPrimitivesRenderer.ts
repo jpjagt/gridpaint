@@ -629,10 +629,12 @@ function generateCutoutPaths(
     const [px, py] = pointKey.split(",").map(Number)
 
     for (const cutout of mods.cutouts) {
-      const anchorOffset = CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
+      const anchorOffset = cutout.anchor === "custom"
+        ? (cutout.customOffset ?? { x: 0, y: 0 })
+        : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
       const cx = px + anchorOffset.x + (cutout.offset?.x ?? 0)
       const cy = py + anchorOffset.y + (cutout.offset?.y ?? 0)
-      const r = cutout.radiusMm / mmPerUnit
+      const r = cutout.diameterMm / 2 / mmPerUnit
 
       // CCW circle as two half-arcs (sweep-flag=0 for CCW)
       paths.push(

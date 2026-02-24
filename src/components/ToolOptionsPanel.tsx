@@ -7,17 +7,17 @@ import {
 } from "@/stores/ui"
 import type { CutoutAnchor, QuadrantState } from "@/types/gridpaint"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface ToolOptionsPanelProps {
   mmPerUnit: number
 }
 
-const ANCHOR_OPTIONS: { id: CutoutAnchor; label: string; symbol: string; shortcut: string }[] = [
-  { id: "center", label: "Center", symbol: "+", shortcut: "Q" },
-  { id: "quadrant-se", label: "SE", symbol: "◣", shortcut: "X" },
-  { id: "quadrant-sw", label: "SW", symbol: "◢", shortcut: "Z" },
-  { id: "quadrant-nw", label: "NW", symbol: "◥", shortcut: "A" },
-  { id: "quadrant-ne", label: "NE", symbol: "◤", shortcut: "W" },
+// 3×3 grid layout: rows top→bottom, cols left→right
+const ANCHOR_GRID: { id: CutoutAnchor; label: string }[][] = [
+  [{ id: "nw", label: "NW" }, { id: "n", label: "N" }, { id: "ne", label: "NE" }],
+  [{ id: "w",  label: "W"  }, { id: "center", label: "Center" }, { id: "e", label: "E" }],
+  [{ id: "sw", label: "SW" }, { id: "s", label: "S" }, { id: "se", label: "SE" }],
 ]
 
 const SHAPE_OPTIONS: { id: QuadrantState; label: string; renderIcon: () => JSX.Element; shortcut: string }[] = [
@@ -141,68 +141,93 @@ function CutoutOptions({
   settings,
   mmPerUnit,
 }: {
-  settings: { anchor: CutoutAnchor; radiusMm: number }
+  settings: { anchor: CutoutAnchor; diameterMm: number; customOffset: { x: number; y: number } }
   mmPerUnit: number
 }) {
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input
-      if (e.target instanceof HTMLInputElement) return
-      
-      const key = e.key.toUpperCase()
-      const option = ANCHOR_OPTIONS.find(opt => opt.shortcut === key)
-      if (option) {
-        e.preventDefault()
-        $cutoutToolSettings.setKey("anchor", option.id)
-      }
-    }
-    
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
-
   return (
-    <div className="flex items-center gap-3">
-      {/* Anchor selection */}
-      <div className="flex gap-1">
-        {ANCHOR_OPTIONS.map(({ id, label, symbol, shortcut }) => (
-          <Button
-            key={id}
-            type="button"
-            size="icon"
-            variant={settings.anchor === id ? "default" : "ghost"}
-            onClick={() => $cutoutToolSettings.setKey("anchor", id)}
-            className="w-8 h-8 font-mono"
-            title={label}
-            kbShortcut={shortcut}
-          >
-            {symbol}
-          </Button>
-        ))}
+    <div className="flex items-start gap-3">
+      {/* Anchor 3×3 grid + custom */}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-muted-foreground font-mono leading-none mb-0.5">anchor</span>
+        <div className="grid grid-cols-3 gap-0.5">
+          {ANCHOR_GRID.flat().map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => $cutoutToolSettings.setKey("anchor", id)}
+              title={label}
+              className={cn(
+                "w-6 h-6 border rounded-sm transition-colors",
+                settings.anchor === id
+                  ? "bg-foreground border-foreground"
+                  : "bg-transparent border-border hover:border-foreground/50"
+              )}
+            />
+          ))}
+        </div>
+        {/* Custom option */}
+        <button
+          type="button"
+          onClick={() => $cutoutToolSettings.setKey("anchor", "custom")}
+          className={cn(
+            "text-xs font-mono px-1.5 py-0.5 border rounded-sm transition-colors text-left",
+            settings.anchor === "custom"
+              ? "bg-foreground text-background border-foreground"
+              : "bg-transparent text-muted-foreground border-border hover:border-foreground/50"
+          )}
+        >
+          custom
+        </button>
+        {/* Custom x/y inputs */}
+        {settings.anchor === "custom" && (
+          <div className="flex flex-col gap-1 mt-0.5">
+            {(["x", "y"] as const).map((axis) => (
+              <div key={axis} className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground font-mono w-3">{axis}:</span>
+                <input
+                  type="number"
+                  value={settings.customOffset[axis]}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value)
+                    if (!isNaN(val)) {
+                      $cutoutToolSettings.setKey("customOffset", {
+                        ...settings.customOffset,
+                        [axis]: val,
+                      })
+                    }
+                  }}
+                  className="w-14 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-0.5 font-mono"
+                  step="0.05"
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="w-px h-6 bg-border" />
+      <div className="w-px self-stretch bg-border" />
 
-      {/* Radius input */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground font-mono">r:</span>
-        <input
-          type="number"
-          value={settings.radiusMm}
-          onChange={(e) => {
-            const val = parseFloat(e.target.value)
-            if (!isNaN(val) && val > 0) {
-              $cutoutToolSettings.setKey("radiusMm", val)
-            }
-          }}
-          className="w-16 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-1 font-mono"
-          min="0.1"
-          step="0.1"
-        />
-        <span className="text-xs text-muted-foreground font-mono">mm</span>
+      {/* Diameter input */}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-muted-foreground font-mono leading-none mb-0.5">diameter</span>
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={settings.diameterMm}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value)
+              if (!isNaN(val) && val > 0) {
+                $cutoutToolSettings.setKey("diameterMm", val)
+              }
+            }}
+            className="w-16 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-1 font-mono"
+            min="0.1"
+            step="0.1"
+          />
+          <span className="text-xs text-muted-foreground font-mono">mm</span>
+        </div>
         <span className="text-xs text-muted-foreground/60 font-mono">
-          ({(settings.radiusMm / mmPerUnit).toFixed(2)} gu)
+          {(settings.diameterMm / mmPerUnit).toFixed(2)} gu
         </span>
       </div>
     </div>
