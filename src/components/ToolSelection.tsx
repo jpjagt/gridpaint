@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Brush, Eraser, Hand, MousePointer, Circle, Layers, Ruler } from "lucide-react"
+import { Brush, Eraser, Hand, MousePointer, Circle, Layers, Ruler, BoxSelect } from "lucide-react"
 import { useStore } from "@nanostores/react"
 import { $currentTool, setCurrentTool, $measureState, type Tool } from "@/stores/ui"
 
@@ -21,6 +21,7 @@ export const ToolSelection = ({ onToolSelect }: ToolSelectionProps) => {
     { id: "cutout" as const, icon: Circle, label: "Cutout", shortcut: "O" },
     { id: "override" as const, icon: Layers, label: "Override", shortcut: "V" },
     { id: "measure" as const, icon: Ruler, label: "Measure", shortcut: "T" },
+    { id: "export" as const, icon: BoxSelect, label: "Export", shortcut: "X" },
   ]
 
   const handleSelect = (tool: Tool) => {

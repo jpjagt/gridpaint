@@ -8,7 +8,7 @@
  */
 
 import type { Layer } from "@/stores/drawingStores"
-import type { CircularCutout, QuadrantOverrides } from "@/types/gridpaint"
+import type { CircularCutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
 
 // === Serialized Types (JSON-safe) ===
 
@@ -71,6 +71,8 @@ export interface DrawingDocument extends DrawingMetadata {
   mmPerUnit: number
   /** All layers in this drawing */
   layers: Layer[]
+  /** Export rectangles — regions of the grid to include in SVG export */
+  exportRects?: ExportRect[]
   /** Owner user ID (hashed passphrase) - for cloud storage */
   ownerId?: string
   /** Write token for authentication - for cloud storage */

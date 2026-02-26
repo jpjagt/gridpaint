@@ -24,7 +24,7 @@ import type { Layer } from "@/stores/drawingStores"
 import { drawingStore } from "@/lib/storage/store"
 import { generateSingleLayerSvg, convertLayerToGridLayer } from "@/lib/export/svgUtils"
 import { useStore } from "@nanostores/react"
-import { $canvasView, $drawingMeta } from "@/stores/drawingStores"
+import { $canvasView, $drawingMeta, $layersState, $exportRects } from "@/stores/drawingStores"
 
 // Editor page for a given drawing ID
 function EditorPage() {
@@ -37,6 +37,7 @@ function EditorPage() {
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
   const drawingMeta = useStore($drawingMeta)
+  const layersState = useStore($layersState)
   // Enable paste-to-import
   useImagePaste()
 
@@ -124,7 +125,13 @@ function EditorPage() {
         onClose={() => setShowShortcuts(false)}
       />
       <ToolSelection />
-      <ToolOptionsPanel mmPerUnit={canvasView.mmPerUnit} />
+      <ToolOptionsPanel
+        mmPerUnit={canvasView.mmPerUnit}
+        layers={layersState.layers}
+        canvasView={canvasView}
+        drawingName={drawingMeta.name}
+        onClearExportRects={() => $exportRects.set([])}
+      />
       <MeasuringBars show={showMeasuringBars} />
       <MeasuringTapeOverlay />
     </div>

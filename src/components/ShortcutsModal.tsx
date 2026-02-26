@@ -61,6 +61,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys="O" description="Cutout — add circular cutouts to existing points" />
             <KbdRow keys="V" description="Override — paint per-quadrant shape overrides" />
             <KbdRow keys="T" description="Measure — drag to measure distance in mm" />
+            <KbdRow keys="X" description="Export — draw rects to define SVG export regions" />
           </Section>
 
           <Section title="Drawing">
@@ -89,11 +90,11 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
           <Section title="Copy / Paste / Selection">
             <KbdRow keys={["cmd/ctrl", "C"]} description="Copy selection (select tool)" />
             <KbdRow keys={["cmd/ctrl", "V"]} description="Paste at cursor — enters floating mode (select tool)" />
-            <KbdRow keys="↑ ↓ ← →" description="Move selection or floating paste (1 grid unit)" />
-            <KbdRow keys={["shift", "↑ ↓ ← →"]} description="Move floating paste 10 grid units (during floating paste) / move active layer only (during selection)" />
-            <KbdRow keys={["alt", "↑ ↓ ← →"]} description="Move selection 10 grid units" />
-            <KbdRow keys="drag inside selection" description="Drag-to-move selected points (all layers)" />
-            <KbdRow keys={["shift", "drag"]} description="Drag-to-move active layer only" />
+            <KbdRow keys="↑ ↓ ← →" description="Lift selection into floating mode and nudge 1 grid unit; or move floating paste 1 grid unit" />
+            <KbdRow keys={["shift", "↑ ↓ ← →"]} description="Lift/move active layer only (selection); or move floating paste 10 grid units" />
+            <KbdRow keys={["alt", "↑ ↓ ← →"]} description="Lift and nudge 10 grid units" />
+            <KbdRow keys="drag inside selection" description="Lift and drag selected points (all layers); bakes on release" />
+            <KbdRow keys={["shift", "drag"]} description="Lift and drag active layer only; bakes on release" />
             <KbdRow keys="Enter" description="Place / bake floating paste" />
             <KbdRow keys="Escape" description="Cancel floating paste / clear selection" />
             <KbdRow keys={["Delete", "/ Backspace"]} description="Delete selected points from current layer" />

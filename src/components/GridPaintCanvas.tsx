@@ -20,6 +20,9 @@ import {
 } from "@/stores/ui"
 import { useSelection } from "@/hooks/useSelection"
 import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
+import { useExportRects } from "@/hooks/useExportRects"
+import { renderExportRects } from "@/lib/gridpaint/renderExportRects"
+import { ExportRectOverlay } from "@/components/ExportRectOverlay"
 
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
@@ -45,6 +48,7 @@ import {
   $canvasView,
   $layersState,
   $drawingMeta,
+  $exportRects,
   addLayer,
   setActiveLayer,
   toggleLayerVisibility,
@@ -130,6 +134,13 @@ export const GridPaintCanvas = forwardRef<
   /** Last known mouse position in client coordinates (used for cursor-position paste) */
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
+  /**
+   * Drag-to-move: the grid cell where the current move-drag gesture started.
+   * Stored in a ref so mouse-move handlers always read the latest value without
+   * triggering re-renders or stale-closure issues.
+   */
+  const moveDragStartRef = useRef<{ x: number; y: number } | null>(null)
+
   /** Tracks the cutout currently under the cursor (cutout tool only) */
   const hoveredCutoutRef = useRef<{
     pointKey: string
@@ -144,6 +155,10 @@ export const GridPaintCanvas = forwardRef<
   const selection = useSelection()
   const { renderSelectionRectangle, renderFloatingPaste } = useSelectionRenderer()
   const selectionState = useStore($selectionState)
+
+  // Export rect hooks
+  const exportRectsHook = useExportRects()
+  const exportRects = useStore($exportRects)
 
   const [didInitialize, setDidInitialize] = useState(false)
 
@@ -608,6 +623,16 @@ export const GridPaintCanvas = forwardRef<
       )
     }
 
+    // Render export rects when export tool is active
+    if (currentTool === "export" && renderer?.context) {
+      renderExportRects(
+        renderer.context,
+        exportRects,
+        exportRectsHook.draftBounds,
+        canvasView,
+      )
+    }
+
     // Render floating paste overlay if active
     if (selectionState.floatingPaste && renderer) {
       renderFloatingPaste(renderer, selectionState.floatingPaste, canvasView)
@@ -678,6 +703,8 @@ export const GridPaintCanvas = forwardRef<
     renderSelectionRectangle,
     selectionState.floatingPaste,
     renderFloatingPaste,
+    exportRects,
+    exportRectsHook.draftBounds,
   ])
 
   // Center canvas to fit all visible content
@@ -936,11 +963,18 @@ export const GridPaintCanvas = forwardRef<
         setPanStart({ x: e.clientX, y: e.clientY })
       } else if (currentTool === "select") {
         const grid = getGridCoordinates(e.clientX, e.clientY)
-        if (grid && selection.isInsideSelection(grid.x, grid.y) && selection.hasSelection) {
-          // Start a drag-to-move gesture inside the selection
-          selection.startMoveDrag(grid.x, grid.y)
+        const fp = $selectionState.get().floatingPaste
+        if (fp) {
+          // Already floating — record drag start so the user can reposition it
+          moveDragStartRef.current = grid
+        } else if (grid && selection.isInsideSelection(grid.x, grid.y) && selection.hasSelection) {
+          // Lift the selection into floating state, then start drag.
+          // Shift = active layer only.
+          selection.liftSelection(e.shiftKey)
+          moveDragStartRef.current = grid
         } else {
           // Start a new selection rectangle
+          moveDragStartRef.current = null
           selection.startSelection(e.clientX, e.clientY, getGridCoordinates)
         }
       } else if (currentTool === "cutout") {
@@ -955,6 +989,17 @@ export const GridPaintCanvas = forwardRef<
           end: { x: e.clientX, y: e.clientY },
           isDragging: true,
         })
+      } else if (currentTool === "export") {
+        if (e.altKey) {
+          // Alt+click: delete the rect under the cursor
+          const grid = getGridCoordinates(e.clientX, e.clientY)
+          if (grid) {
+            const hit = exportRectsHook.getHitRect(grid.x, grid.y)
+            if (hit) exportRectsHook.deleteById(hit.id)
+          }
+        } else {
+          exportRectsHook.startDraw(e.clientX, e.clientY, getGridCoordinates)
+        }
       } else {
         // draw or erase — snapshot before the stroke begins
         pushHistory($layersState.get().layers)
@@ -993,9 +1038,17 @@ export const GridPaintCanvas = forwardRef<
           })
           setPanStart({ x: e.clientX, y: e.clientY })
         } else if (currentTool === "select") {
-          if (selection.isMoveDragging) {
-            // Drag-to-move: Shift = active layer only
-            selection.updateMoveDrag(e.clientX, e.clientY, getGridCoordinates, e.shiftKey)
+          if (moveDragStartRef.current) {
+            // Moving a floating paste via drag — compute delta from last grid cell
+            const grid = getGridCoordinates(e.clientX, e.clientY)
+            if (grid) {
+              const dx = grid.x - moveDragStartRef.current.x
+              const dy = grid.y - moveDragStartRef.current.y
+              if (dx !== 0 || dy !== 0) {
+                selection.moveFloatingPaste(dx, dy)
+                moveDragStartRef.current = grid
+              }
+            }
           } else {
             selection.updateSelection(e.clientX, e.clientY, getGridCoordinates)
           }
@@ -1012,6 +1065,8 @@ export const GridPaintCanvas = forwardRef<
               end: { x: e.clientX, y: e.clientY },
             })
           }
+        } else if (currentTool === "export") {
+          exportRectsHook.updateDraw(e.clientX, e.clientY, getGridCoordinates)
         } else {
           // draw or erase
           const newCoords = paintAtPosition(
@@ -1028,12 +1083,16 @@ export const GridPaintCanvas = forwardRef<
     const handleMouseUp = () => {
       setIsDragging(false)
       setLastPaintCoords(null)
-      if (currentTool === "select" && selection.isMoveDragging) {
-        selection.endMoveDrag()
+      if (currentTool === "select" && moveDragStartRef.current) {
+        // End the drag — leave the float in place so Enter/Escape can finish it
+        moveDragStartRef.current = null
       }
       if (currentTool === "measure") {
         const current = $measureState.get()
         $measureState.set({ ...current, isDragging: false })
+      }
+      if (currentTool === "export" && exportRectsHook.isDrawing) {
+        exportRectsHook.commitDraw()
       }
     }
 
@@ -1066,18 +1125,19 @@ export const GridPaintCanvas = forwardRef<
     isDragging,
     panStart,
     lastPaintCoords,
-    canvasView,
     selection.startSelection,
     selection.updateSelection,
     selection.hasSelection,
     selection.isInsideSelection,
-    selection.startMoveDrag,
-    selection.updateMoveDrag,
-    selection.endMoveDrag,
-    selection.isMoveDragging,
+    selection.liftSelection,
+    selection.moveFloatingPaste,
     getGridCoordinates,
     getHoveredCutout,
     render,
+    exportRectsHook.startDraw,
+    exportRectsHook.updateDraw,
+    exportRectsHook.commitDraw,
+    exportRectsHook.isDrawing,
   ])
 
   // Wheel event handler for zoom/pan (same as original)
@@ -1180,7 +1240,10 @@ export const GridPaintCanvas = forwardRef<
         }
       }
 
-      // ── Arrow key move of live selection ────────────────────────────────
+      // ── Arrow key move: lift-then-move (select tool with active selection) ─
+      // The floating-paste arrow block above handles the case where floatingPaste
+      // is already set. This block handles the case where we have a live selection
+      // but no floating paste yet — we lift first, then immediately move.
       if (
         currentTool === "select" &&
         selection.hasSelection &&
@@ -1188,13 +1251,16 @@ export const GridPaintCanvas = forwardRef<
         (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")
       ) {
         e.preventDefault()
-        const step = e.altKey ? 10 : 1
-        // Shift = active layer only (inverse of delete which uses Shift for all)
+        // Shift = active layer only; Alt = 10-unit step
         const activeLayerOnly = e.shiftKey
-        if (e.key === "ArrowUp")    selection.moveSelection(0, -step, activeLayerOnly)
-        if (e.key === "ArrowDown")  selection.moveSelection(0, step, activeLayerOnly)
-        if (e.key === "ArrowLeft")  selection.moveSelection(-step, 0, activeLayerOnly)
-        if (e.key === "ArrowRight") selection.moveSelection(step, 0, activeLayerOnly)
+        const step = e.altKey ? 10 : 1
+        // Lift into floating state (clears selection bounds)
+        selection.liftSelection(activeLayerOnly)
+        // Then immediately nudge the floating paste
+        if (e.key === "ArrowUp")    selection.moveFloatingPaste(0, -step)
+        if (e.key === "ArrowDown")  selection.moveFloatingPaste(0, step)
+        if (e.key === "ArrowLeft")  selection.moveFloatingPaste(-step, 0)
+        if (e.key === "ArrowRight") selection.moveFloatingPaste(step, 0)
         return
       }
 
@@ -1235,7 +1301,7 @@ export const GridPaintCanvas = forwardRef<
     selection.pasteSelection,
     selection.clearSelection,
     selection.deleteSelection,
-    selection.moveSelection,
+    selection.liftSelection,
     selection.moveFloatingPaste,
     selection.bakeFloatingPaste,
     selection.cancelFloatingPaste,
@@ -1497,16 +1563,26 @@ export const GridPaintCanvas = forwardRef<
         return "cursor-pointer"
       case "measure":
         return "cursor-crosshair"
+      case "export":
+        return "cursor-crosshair"
       default:
         return "cursor-crosshair"
     }
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={`w-full h-full ${getCursorClass()}`}
-      style={{ display: "block" }}
-    />
+    <div className="relative w-full h-full">
+      <canvas
+        ref={canvasRef}
+        className={`w-full h-full ${getCursorClass()}`}
+        style={{ display: "block" }}
+      />
+      <ExportRectOverlay
+        canvasView={canvasView}
+        onQuantityChange={exportRectsHook.setQuantity}
+        onDelete={exportRectsHook.deleteById}
+        visible={currentTool === "export"}
+      />
+    </div>
   )
 })

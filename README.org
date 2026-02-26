@@ -35,6 +35,7 @@ pnpm dev
 | =O= | cutout   | add circular cutouts to existing points               |
 | =V= | override | paint per-quadrant shape overrides                    |
 | =T= | measure  | drag to measure distance in mm                        |
+| =X= | export   | draw rects to define SVG export regions               |
 
 tools can also be selected by clicking the toolbar at the bottom center.
 
@@ -130,10 +131,10 @@ when the override tool is active, an options panel shows 10 shape options:
 |------------------+---------------------------------------------------------------------------------|
 | cmd/ctrl + =C=   | copy selection (select tool)                                                    |
 | cmd/ctrl + =V=   | paste at cursor — enters floating mode (select tool)                            |
-| arrow keys       | move selection or floating paste 1 grid unit                                    |
-| shift + arrows   | move floating paste 10 grid units; or move active layer only (live selection)   |
-| alt + arrows     | move live selection 10 grid units                                               |
-| drag inside selection | drag-to-move selected points (all layers; hold shift = active layer only) |
+| arrow keys       | lift selection into floating mode and nudge 1 grid unit; or move floating paste 1 grid unit |
+| shift + arrows   | lift/move active layer only (selection); or move floating paste 10 grid units               |
+| alt + arrows     | lift and nudge 10 grid units                                                                |
+| drag inside selection | lift and drag selected points (all layers; hold shift = active layer only); bakes on release |
 | =Enter=          | place / bake floating paste                                                     |
 | =Escape=         | cancel floating paste / clear selection                                         |
 | =Delete= / =Backspace= | delete selected points from current layer                               |

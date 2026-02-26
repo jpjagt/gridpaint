@@ -2,7 +2,7 @@ import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
-import type { InteractionGroup, PointModifications } from "@/types/gridpaint"
+import type { InteractionGroup, PointModifications, ExportRect } from "@/types/gridpaint"
 import { pushHistory, clearHistory } from "@/stores/historyStore"
 
 export interface Layer {
@@ -68,6 +68,9 @@ export const $layersState = map<LayersState>({
   activeLayerId: null,
 })
 
+/** Export rectangles — persisted with the drawing, rendered when export tool is active */
+export const $exportRects = atom<ExportRect[]>([])
+
 // Helper functions
 export function createDefaultLayer(id: number = 1): Layer {
   return {
@@ -106,6 +109,8 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         layers: stored.layers,
         activeLayerId: stored.layers.length > 0 ? stored.layers[0].id : null,
       })
+
+      $exportRects.set(stored.exportRects ?? [])
     } else {
       // Create new drawing
       const now = Date.now()
@@ -130,6 +135,8 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         layers: [defaultLayer],
         activeLayerId: defaultLayer.id,
       })
+
+      $exportRects.set([])
     }
 
     clearHistory()
@@ -151,6 +158,7 @@ export async function saveDrawingState(): Promise<void> {
     ...meta,
     ...canvasView,
     layers: layersState.layers,
+    exportRects: $exportRects.get(),
     updatedAt: Date.now(),
   }
 

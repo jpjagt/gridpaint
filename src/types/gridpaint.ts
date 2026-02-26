@@ -121,6 +121,23 @@ export interface InteractionGroup {
   points: Set<string> // "x,y" format
 }
 
+// === Export Rects ===
+
+/**
+ * A named region of the grid to be included in SVG export.
+ * Persisted with the drawing document.
+ */
+export interface ExportRect {
+  /** Unique identifier */
+  id: string
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  /** How many copies to include in the export layout (default 1) */
+  quantity: number
+}
+
 // === Validation ===
 
 export interface ValidationIssue {

@@ -48,6 +48,7 @@
     --canvas-layer-border: 0 0% 0%;
     --canvas-outline-active: var(--highlighted);
     --canvas-outline-bridge: var(--highlighted);
+    --canvas-outline-export: 210 100% 56%; /* blue for export rects */
   }
 
   .dark {
@@ -85,6 +86,7 @@
     --canvas-layer-border: 0 0% 100%;
     --canvas-outline-active: var(--highlighted);
     --canvas-outline-bridge: var(--highlighted);
+    --canvas-outline-export: 210 100% 56%; /* blue for export rects */
   }
 }
 

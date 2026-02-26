@@ -128,11 +128,11 @@ export const LayerControls = ({
         return
       }
 
-      // Tool shortcuts: D, E, P, S, O, V, T
+      // Tool shortcuts: D, E, P, S, O, V, T, X
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         const toolMap: Record<string, Tool> = {
           d: "draw", e: "erase", p: "pan", s: "select",
-          o: "cutout", v: "override", t: "measure",
+          o: "cutout", v: "override", t: "measure", x: "export",
         }
         const lowerKey = key.toLowerCase()
         if (lowerKey in toolMap) {

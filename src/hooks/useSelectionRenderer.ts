@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import type { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
 import type { FloatingPaste } from "@/stores/ui"
+import { renderDashedRect } from "@/lib/gridpaint/renderDashedRect"
 
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
@@ -24,29 +25,21 @@ export const useSelectionRenderer = () => {
     ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
     ctx.scale(canvasView.zoom, canvasView.zoom)
 
-    // selectionStart and selectionEnd are already in grid coordinates
     const minX = Math.min(selectionStart.x, selectionEnd.x)
     const minY = Math.min(selectionStart.y, selectionEnd.y)
     const maxX = Math.max(selectionStart.x, selectionEnd.x)
     const maxY = Math.max(selectionStart.y, selectionEnd.y)
 
-    // Draw selection rectangle
-    ctx.strokeStyle = getCanvasColor("--canvas-outline-active")
-    ctx.lineWidth = 2 / canvasView.zoom
-    ctx.setLineDash([5 / canvasView.zoom, 5 / canvasView.zoom])
+    renderDashedRect(
+      ctx,
+      minX * canvasView.gridSize,
+      minY * canvasView.gridSize,
+      (maxX - minX + 1) * canvasView.gridSize,
+      (maxY - minY + 1) * canvasView.gridSize,
+      getCanvasColor("--canvas-outline-active"),
+      canvasView.zoom,
+    )
 
-    const rectX = minX * canvasView.gridSize
-    const rectY = minY * canvasView.gridSize
-    const rectWidth = (maxX - minX + 1) * canvasView.gridSize
-    const rectHeight = (maxY - minY + 1) * canvasView.gridSize
-
-    ctx.strokeRect(rectX, rectY, rectWidth, rectHeight)
-
-    // Fill with semi-transparent black overlay
-    ctx.fillStyle = "rgba(0, 0, 0, 0.1)"
-    ctx.fillRect(rectX, rectY, rectWidth, rectHeight)
-
-    ctx.setLineDash([]) // Reset line dash
     ctx.restore()
   }, [])
 
@@ -101,16 +94,16 @@ export const useSelectionRenderer = () => {
 
     // Draw dashed bounding rectangle around the floating content
     if (boundsMinX !== Infinity) {
-      ctx.strokeStyle = getCanvasColor("--canvas-outline-active")
-      ctx.lineWidth = 2 / canvasView.zoom
-      ctx.setLineDash([5 / canvasView.zoom, 3 / canvasView.zoom])
-      ctx.strokeRect(
+      renderDashedRect(
+        ctx,
         boundsMinX * gs,
         boundsMinY * gs,
         (boundsMaxX - boundsMinX + 1) * gs,
         (boundsMaxY - boundsMinY + 1) * gs,
+        getCanvasColor("--canvas-outline-active"),
+        canvasView.zoom,
+        "transparent",
       )
-      ctx.setLineDash([])
     }
 
     ctx.restore()

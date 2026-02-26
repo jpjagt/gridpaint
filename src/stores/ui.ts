@@ -4,7 +4,7 @@ import type { SelectionBounds, ClipboardData } from '@/hooks/useSelection'
 
 // === Tool types ===
 
-export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure"
+export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure" | "export"
 
 export const $currentTool = atom<Tool>("draw")
 
@@ -70,6 +70,12 @@ export interface FloatingPaste {
   offset: { x: number; y: number }
   /** The grid coordinate where the paste was first initiated (used as base for rendering) */
   origin: { x: number; y: number }
+  /**
+   * When true this float was produced by lifting points off the canvas (move gesture).
+   * Cancelling a lifted float restores the points to their original position.
+   * When false/absent the float came from a clipboard paste; cancelling discards it.
+   */
+  lifted?: boolean
 }
 
 export interface SelectionState {
