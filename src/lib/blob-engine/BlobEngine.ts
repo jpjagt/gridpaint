@@ -191,7 +191,8 @@ export class BlobEngine {
     viewport?: SpatialRegion,
   ): BlobGeometry {
     const allLayerPoints = getGridLayerPoints(layer)
-    if (!layer.isVisible || allLayerPoints.size === 0) {
+    const hasPointMods = layer.pointModifications !== undefined && layer.pointModifications.size > 0
+    if (!layer.isVisible || (allLayerPoints.size === 0 && !hasPointMods)) {
       return this.createEmptyLayerGeometry(gridSize, borderWidth)
     }
 

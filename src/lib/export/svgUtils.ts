@@ -14,10 +14,10 @@ import { getLayerPoints } from "@/stores/drawingStores"
 import type { GridLayer } from "@/lib/blob-engine/types"
 import { getGridLayerPoints } from "@/lib/blob-engine/types"
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
-import { SvgPathFromPrimitivesRenderer } from "@/lib/blob-engine/renderers/SvgPathFromPrimitivesRenderer"
-import type { SvgPathFromPrimitivesDebugInfo } from "@/lib/blob-engine/renderers/SvgPathFromPrimitivesRenderer"
+import { SvgPathRenderer } from "@/lib/blob-engine/renderers/SvgPathRenderer"
+import type { SvgPathRendererDebugInfo } from "@/lib/blob-engine/renderers/SvgPathRenderer"
 
-export type { SvgPathFromPrimitivesDebugInfo as SvgRenderDebugInfo }
+export type { SvgPathRendererDebugInfo as SvgRenderDebugInfo }
 
 export interface SvgRenderOptions {
   strokeColor?: string
@@ -31,7 +31,7 @@ export interface SvgRenderOptions {
  */
 export const DEFAULT_SVG_STYLE: SvgRenderOptions = {
   strokeColor: "#000",
-  strokeWidth: 0.02,
+  strokeWidth: 0.5,
   fillColor: "transparent",
   opacity: 1,
 }
@@ -107,7 +107,7 @@ export function generateLayerSvgContent(
     return ""
   }
 
-  const renderer = new SvgPathFromPrimitivesRenderer(false)
+  const renderer = new SvgPathRenderer(false)
   return renderer.renderLayer(
     geometry,
     {
@@ -136,7 +136,7 @@ export function generateLayerSvgContentWithDebug(
   gridSize: number,
   borderWidth: number,
   style: SvgRenderOptions = DEFAULT_SVG_STYLE,
-): { content: string; debugInfo: SvgPathFromPrimitivesDebugInfo | null } {
+): { content: string; debugInfo: SvgPathRendererDebugInfo | null } {
   if (getGridLayerPoints(layer).size === 0) {
     return { content: "", debugInfo: null }
   }
@@ -148,7 +148,7 @@ export function generateLayerSvgContentWithDebug(
     return { content: "", debugInfo: null }
   }
 
-  const renderer = new SvgPathFromPrimitivesRenderer(true)
+  const renderer = new SvgPathRenderer(true)
   const content = renderer.renderLayer(
     geometry,
     {
@@ -224,7 +224,13 @@ export function generateSingleLayerSvg(
     viewH += marginY
   }
 
-  const content = generateLayerSvgContent(layer, gridSize, borderWidth, style, mmPerUnit)
+  const content = generateLayerSvgContent(
+    layer,
+    gridSize,
+    borderWidth,
+    style,
+    mmPerUnit,
+  )
 
   // Calculate physical dimensions in mm
   const physicalWidth = viewW * mmPerUnit

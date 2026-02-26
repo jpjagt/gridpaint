@@ -11,9 +11,4 @@ export { GeometryCache } from "./GeometryCache"
 // Renderers
 export { Renderer, RenderUtils } from "./renderers/Renderer"
 export { Canvas2DRenderer } from "./renderers/Canvas2DRenderer"
-// export { SvgPathRenderer } from './renderers/SvgPathRenderer'
-import { SvgPathFromPrimitivesRenderer } from "./renderers/SvgPathFromPrimitivesRenderer"
-export {
-  SvgPathFromPrimitivesRenderer as SvgPathRenderer,
-  SvgPathFromPrimitivesRenderer,
-}
+export { SvgPathRenderer } from "./renderers/SvgPathRenderer"

@@ -14,6 +14,8 @@ import {
   $activeGroupIndex,
   $cutoutToolSettings,
   $overrideToolSettings,
+  $measureState,
+  $selectionState,
   setActiveGroupIndex,
 } from "@/stores/ui"
 import { useSelection } from "@/hooks/useSelection"
@@ -36,6 +38,7 @@ import {
   exportDrawingAsJSON,
   exportAllLayersAsSVG,
 } from "@/lib/export/exportUtils"
+import { pushHistory } from "@/stores/historyStore"
 import {
   type Layer,
   getLayerPoints,
@@ -55,6 +58,7 @@ import {
   resetDrawing,
 } from "@/stores/drawingStores"
 import type { CircularCutout, PointModifications } from "@/types/gridpaint"
+import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
 
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
@@ -99,7 +103,11 @@ export const GridPaintCanvas = forwardRef<
   const overrideSettings = useStore($overrideToolSettings)
   const $showActiveLayerOutline = useStore(showActiveLayerOutline)
   const canvasView = useStore($canvasView)
-  const { zoom: canvasZoom, panOffset: canvasPanOffset, gridSize: canvasGridSize } = canvasView
+  const {
+    zoom: canvasZoom,
+    panOffset: canvasPanOffset,
+    gridSize: canvasGridSize,
+  } = canvasView
   const layersState = useStore($layersState)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -119,9 +127,23 @@ export const GridPaintCanvas = forwardRef<
     y: number
   } | null>(null)
 
+  /** Last known mouse position in client coordinates (used for cursor-position paste) */
+  const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  /** Tracks the cutout currently under the cursor (cutout tool only) */
+  const hoveredCutoutRef = useRef<{
+    pointKey: string
+    index: number
+    cx: number
+    cy: number
+    r: number
+    cutout: CircularCutout
+  } | null>(null)
+
   // Selection hooks
   const selection = useSelection()
-  const { renderSelectionRectangle } = useSelectionRenderer()
+  const { renderSelectionRectangle, renderFloatingPaste } = useSelectionRenderer()
+  const selectionState = useStore($selectionState)
 
   const [didInitialize, setDidInitialize] = useState(false)
 
@@ -188,12 +210,18 @@ export const GridPaintCanvas = forwardRef<
     const displayWidth = window.innerWidth
     const displayHeight = window.innerHeight
 
-    const viewportMinX = Math.floor(-canvasPanOffset.x / (canvasGridSize * canvasZoom)) - 2
+    const viewportMinX =
+      Math.floor(-canvasPanOffset.x / (canvasGridSize * canvasZoom)) - 2
     const viewportMaxX =
-      Math.ceil((displayWidth - canvasPanOffset.x) / (canvasGridSize * canvasZoom)) + 2
-    const viewportMinY = Math.floor(-canvasPanOffset.y / (canvasGridSize * canvasZoom)) - 2
+      Math.ceil(
+        (displayWidth - canvasPanOffset.x) / (canvasGridSize * canvasZoom),
+      ) + 2
+    const viewportMinY =
+      Math.floor(-canvasPanOffset.y / (canvasGridSize * canvasZoom)) - 2
     const viewportMaxY =
-      Math.ceil((displayHeight - canvasPanOffset.y) / (canvasGridSize * canvasZoom)) + 2
+      Math.ceil(
+        (displayHeight - canvasPanOffset.y) / (canvasGridSize * canvasZoom),
+      ) + 2
 
     return {
       minX: viewportMinX,
@@ -253,7 +281,10 @@ export const GridPaintCanvas = forwardRef<
    * Quadrant indices: 0=SE (+x,+y), 1=SW (-x,+y), 2=NW (-x,-y), 3=NE (+x,-y)
    */
   const getQuadrantCoordinates = useCallback(
-    (clientX: number, clientY: number): { gridX: number; gridY: number; quadrant: 0 | 1 | 2 | 3 } | null => {
+    (
+      clientX: number,
+      clientY: number,
+    ): { gridX: number; gridY: number; quadrant: 0 | 1 | 2 | 3 } | null => {
       const canvas = canvasRef.current
       if (!canvas) return null
 
@@ -265,8 +296,8 @@ export const GridPaintCanvas = forwardRef<
       const gridY = Math.floor(y / canvasView.gridSize)
 
       // Position within the cell (0..1)
-      const cellX = (x / canvasView.gridSize) - gridX
-      const cellY = (y / canvasView.gridSize) - gridY
+      const cellX = x / canvasView.gridSize - gridX
+      const cellY = y / canvasView.gridSize - gridY
 
       // Determine quadrant: right half = E, left half = W; bottom half = S, top half = N
       // Quadrant mapping: 0=SE, 1=SW, 2=NW, 3=NE
@@ -282,9 +313,129 @@ export const GridPaintCanvas = forwardRef<
     [canvasView],
   )
 
-  /** Handle cutout tool click: add cutout to a point, or alt+click to clear all cutouts */
+  /**
+   * Given a screen-space mouse position, find the smallest cutout (across all points
+   * on the active layer) whose circle contains that position.
+   * Returns world-space circle center + radius so the render overlay can use it directly.
+   */
+  const getHoveredCutout = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current
+      if (!canvas) return null
+
+      const rect = canvas.getBoundingClientRect()
+      // World-space mouse coords (after removing pan+zoom)
+      const wx =
+        (clientX - rect.left - canvasView.panOffset.x) / canvasView.zoom
+      const wy = (clientY - rect.top - canvasView.panOffset.y) / canvasView.zoom
+
+      const { activeLayerId, layers } = $layersState.get()
+      if (activeLayerId === null) return null
+      const activeLayer = layers.find((l) => l.id === activeLayerId)
+      if (!activeLayer?.pointModifications) return null
+
+      let best: {
+        pointKey: string
+        index: number
+        cx: number
+        cy: number
+        r: number
+        cutout: CircularCutout
+      } | null = null
+
+      for (const [pointKey, mods] of activeLayer.pointModifications) {
+        if (!mods.cutouts || mods.cutouts.length === 0) continue
+        const [px, py] = pointKey.split(",").map(Number)
+
+        mods.cutouts.forEach((cutout, index) => {
+          const anchorOffset =
+            cutout.anchor === "custom"
+              ? (cutout.customOffset ?? { x: 0, y: 0 })
+              : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
+          const cx =
+            (px + anchorOffset.x + (cutout.offset?.x ?? 0)) *
+              canvasView.gridSize +
+            canvasView.gridSize / 2
+          const cy =
+            (py + anchorOffset.y + (cutout.offset?.y ?? 0)) *
+              canvasView.gridSize +
+            canvasView.gridSize / 2
+          const r =
+            (cutout.diameterMm / 2 / canvasView.mmPerUnit) * canvasView.gridSize
+
+          const dist = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2)
+          if (dist <= r) {
+            // Prefer the smallest circle that contains the cursor
+            if (!best || r < best.r) {
+              best = { pointKey, index, cx, cy, r, cutout }
+            }
+          }
+        })
+      }
+
+      return best as {
+        pointKey: string
+        index: number
+        cx: number
+        cy: number
+        r: number
+        cutout: CircularCutout
+      } | null
+    },
+    [canvasView],
+  )
+
+  /** Handle cutout tool click: add cutout to a point, or alt+click-on-cutout to remove it */
   const handleCutoutClick = useCallback(
     (clientX: number, clientY: number, isAltHeld: boolean) => {
+      if (isAltHeld) {
+        // Alt+click: only remove the specific hovered cutout; do nothing if none hovered
+        const hovered = hoveredCutoutRef.current
+        if (!hovered) return
+
+        const currentLayersState = $layersState.get()
+        const { activeLayerId, layers } = currentLayersState
+        if (activeLayerId === null) return
+        const activeLayer = layers.find((l) => l.id === activeLayerId)
+        if (!activeLayer) return
+
+        const existingMods = activeLayer.pointModifications?.get(
+          hovered.pointKey,
+        )
+        if (!existingMods?.cutouts) return
+
+        const newCutouts = existingMods.cutouts.filter(
+          (_, i) => i !== hovered.index,
+        )
+        const newMods: PointModifications = { ...existingMods }
+        if (newCutouts.length > 0) {
+          newMods.cutouts = newCutouts
+        } else {
+          delete newMods.cutouts
+        }
+        const hasAnything =
+          newMods.cutouts ||
+          (newMods.quadrantOverrides &&
+            Object.keys(newMods.quadrantOverrides).length > 0)
+        updatePointModifications(
+          activeLayerId,
+          hovered.pointKey,
+          hasAnything ? newMods : undefined,
+        )
+
+        // Clear hover state since we just removed the cutout
+        hoveredCutoutRef.current = null
+
+        const [hx, hy] = hovered.pointKey.split(",").map(Number)
+        blobEngine.invalidateLayer(activeLayerId, {
+          minX: hx - 1,
+          minY: hy - 1,
+          maxX: hx + 1,
+          maxY: hy + 1,
+        })
+        return
+      }
+
       const coords = getGridCoordinates(clientX, clientY)
       if (!coords) return
 
@@ -303,32 +454,22 @@ export const GridPaintCanvas = forwardRef<
 
       const existingMods = activeLayer.pointModifications?.get(pointKey)
 
-      if (isAltHeld) {
-        // Clear all cutouts on this point
-        if (existingMods?.cutouts) {
-          const newMods: PointModifications = { ...existingMods }
-          delete newMods.cutouts
-          const hasAnything = newMods.quadrantOverrides && Object.keys(newMods.quadrantOverrides).length > 0
-          updatePointModifications(activeLayerId, pointKey, hasAnything ? newMods : undefined)
-        }
-      } else {
-        // Add a cutout with current settings (store diameterMm as primary value;
-        // renderers convert to grid units at draw time using mmPerUnit)
-        const { anchor, diameterMm, customOffset } = cutoutSettings
+      // Add a cutout with current settings (store diameterMm as primary value;
+      // renderers convert to grid units at draw time using mmPerUnit)
+      const { anchor, diameterMm, customOffset } = cutoutSettings
 
-        const newCutout: CircularCutout = {
-          anchor,
-          diameterMm,
-          ...(anchor === "custom" ? { customOffset } : {}),
-        }
-
-        const existingCutouts = existingMods?.cutouts || []
-        const newMods: PointModifications = {
-          ...existingMods,
-          cutouts: [...existingCutouts, newCutout],
-        }
-        updatePointModifications(activeLayerId, pointKey, newMods)
+      const newCutout: CircularCutout = {
+        anchor,
+        diameterMm,
+        ...(anchor === "custom" ? { customOffset } : {}),
       }
+
+      const existingCutouts = existingMods?.cutouts || []
+      const newMods: PointModifications = {
+        ...existingMods,
+        cutouts: [...existingCutouts, newCutout],
+      }
+      updatePointModifications(activeLayerId, pointKey, newMods)
 
       // Invalidate cache
       blobEngine.invalidateLayer(activeLayerId, {
@@ -355,12 +496,11 @@ export const GridPaintCanvas = forwardRef<
       if (!activeLayer) return
 
       const pointKey = `${qCoords.gridX},${qCoords.gridY}`
-      const allPoints = getLayerPoints(activeLayer)
 
       if (isAltHeld) {
-        // Clear override on this specific quadrant (only if point exists)
-        if (!allPoints.has(pointKey)) return
+        // Clear override on this specific quadrant (works for both group points and override-only points)
         const existingMods = activeLayer.pointModifications?.get(pointKey)
+        if (!existingMods) return
         if (existingMods?.quadrantOverrides) {
           const newOverrides = { ...existingMods.quadrantOverrides }
           delete newOverrides[qCoords.quadrant]
@@ -370,25 +510,16 @@ export const GridPaintCanvas = forwardRef<
             quadrantOverrides: hasOverrides ? newOverrides : undefined,
           }
           const hasAnything = newMods.cutouts || newMods.quadrantOverrides
-          updatePointModifications(activeLayerId, pointKey, hasAnything ? newMods : undefined)
+          updatePointModifications(
+            activeLayerId,
+            pointKey,
+            hasAnything ? newMods : undefined,
+          )
         }
       } else {
-        // If point doesn't exist yet, create it in the active group
-        if (!allPoints.has(pointKey)) {
-          const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
-          const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
-          if (activeGroup) {
-            const newPoints = new Set(activeGroup.points)
-            newPoints.add(pointKey)
-            updateGroupPoints(activeLayerId, newPoints, activeGroup.id)
-          }
-        }
-
-        // Apply the selected shape to this quadrant
+        // Apply the selected shape to this quadrant (no need to create a layer point first)
         const { shape } = overrideSettings
-        // Re-read mods after potential point creation
-        const freshLayer = $layersState.get().layers.find((l) => l.id === activeLayerId)
-        const existingMods = freshLayer?.pointModifications?.get(pointKey)
+        const existingMods = activeLayer.pointModifications?.get(pointKey)
         const existingOverrides = existingMods?.quadrantOverrides || {}
         const newMods: PointModifications = {
           ...existingMods,
@@ -408,7 +539,7 @@ export const GridPaintCanvas = forwardRef<
         maxY: qCoords.gridY + 1,
       })
     },
-    [getQuadrantCoordinates, overrideSettings, activeGroupIndex, blobEngine],
+    [getQuadrantCoordinates, overrideSettings, blobEngine],
   )
 
   // Main render function - now just handles transforms and rendering
@@ -477,6 +608,56 @@ export const GridPaintCanvas = forwardRef<
       )
     }
 
+    // Render floating paste overlay if active
+    if (selectionState.floatingPaste && renderer) {
+      renderFloatingPaste(renderer, selectionState.floatingPaste, canvasView)
+    }
+
+    // Render cutout hover overlay: border ring + label for the hovered cutout
+    if (
+      currentTool === "cutout" &&
+      hoveredCutoutRef.current &&
+      renderer?.context
+    ) {
+      const ctx = renderer.context
+      const { cx, cy, r, cutout } = hoveredCutoutRef.current
+      const highlightColor = getCanvasColor("--highlighted")
+
+      ctx.save()
+      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
+      ctx.scale(canvasView.zoom, canvasView.zoom)
+
+      // Stroke the circle border
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.strokeStyle = highlightColor
+      ctx.lineWidth = 1.5 / canvasView.zoom
+      ctx.stroke()
+
+      // Draw label: "anchor · Xmm" just above the circle
+      const anchorLabel = cutout.anchor === "custom" ? "custom" : cutout.anchor
+      const label = `${anchorLabel} · ${cutout.diameterMm}mm`
+      // 11px fixed screen-space font (divide by zoom since we're inside the scaled ctx)
+      const fontSize = 11 / canvasView.zoom
+      ctx.font = `${fontSize}px monospace`
+      ctx.fillStyle = highlightColor
+      ctx.textAlign = "center"
+      ctx.textBaseline = "bottom"
+      // Small backdrop for legibility
+      const textMetrics = ctx.measureText(label)
+      const textW = textMetrics.width
+      const textH = fontSize
+      const labelY = cy - r - 4 / canvasView.zoom
+      ctx.globalAlpha = 0.75
+      ctx.fillStyle = getCanvasColor("--background")
+      ctx.fillRect(cx - textW / 2 - 3, labelY - textH - 2, textW + 6, textH + 4)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = highlightColor
+      ctx.fillText(label, cx, labelY)
+
+      ctx.restore()
+    }
+
     const renderTime = performance.now() - startTime
     if (renderTime > 16) {
       // Log slow frames
@@ -495,6 +676,8 @@ export const GridPaintCanvas = forwardRef<
     selection.selectionStart,
     selection.selectionEnd,
     renderSelectionRectangle,
+    selectionState.floatingPaste,
+    renderFloatingPaste,
   ])
 
   // Center canvas to fit all visible content
@@ -565,7 +748,9 @@ export const GridPaintCanvas = forwardRef<
       // Get points for the active group only (not all groups)
       const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
       const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
-      const outlinePoints = activeGroup ? activeGroup.points : getLayerPoints(activeLayer)
+      const outlinePoints = activeGroup
+        ? activeGroup.points
+        : getLayerPoints(activeLayer)
 
       // Use current visible viewport for outline rendering
       const viewport = calculateCurrentViewport()
@@ -750,19 +935,50 @@ export const GridPaintCanvas = forwardRef<
       if (currentTool === "pan") {
         setPanStart({ x: e.clientX, y: e.clientY })
       } else if (currentTool === "select") {
-        selection.startSelection(e.clientX, e.clientY, getGridCoordinates)
+        const grid = getGridCoordinates(e.clientX, e.clientY)
+        if (grid && selection.isInsideSelection(grid.x, grid.y) && selection.hasSelection) {
+          // Start a drag-to-move gesture inside the selection
+          selection.startMoveDrag(grid.x, grid.y)
+        } else {
+          // Start a new selection rectangle
+          selection.startSelection(e.clientX, e.clientY, getGridCoordinates)
+        }
       } else if (currentTool === "cutout") {
+        pushHistory($layersState.get().layers)
         handleCutoutClick(e.clientX, e.clientY, isInvertHeld)
       } else if (currentTool === "override") {
+        pushHistory($layersState.get().layers)
         handleOverrideClick(e.clientX, e.clientY, isInvertHeld)
+      } else if (currentTool === "measure") {
+        $measureState.set({
+          start: { x: e.clientX, y: e.clientY },
+          end: { x: e.clientX, y: e.clientY },
+          isDragging: true,
+        })
       } else {
-        // draw or erase
+        // draw or erase — snapshot before the stroke begins
+        pushHistory($layersState.get().layers)
         const newCoords = paintAtPosition(e.clientX, e.clientY, isInvertHeld)
         setLastPaintCoords(newCoords || null)
       }
     }
 
     const handleMouseMove = (e: MouseEvent) => {
+      // Always track the last mouse position so paste can use it
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY }
+
+      // Cutout hover hit-test runs regardless of drag state
+      if (currentTool === "cutout") {
+        const hit = getHoveredCutout(e.clientX, e.clientY)
+        const prev = hoveredCutoutRef.current
+        const prevKey = prev ? `${prev.pointKey}:${prev.index}` : null
+        const hitKey = hit ? `${hit.pointKey}:${hit.index}` : null
+        if (hitKey !== prevKey) {
+          hoveredCutoutRef.current = hit
+          render()
+        }
+      }
+
       if (isDragging) {
         const isInvertHeld = e.altKey || !!(e.buttons & 2)
 
@@ -777,12 +993,25 @@ export const GridPaintCanvas = forwardRef<
           })
           setPanStart({ x: e.clientX, y: e.clientY })
         } else if (currentTool === "select") {
-          selection.updateSelection(e.clientX, e.clientY, getGridCoordinates)
+          if (selection.isMoveDragging) {
+            // Drag-to-move: Shift = active layer only
+            selection.updateMoveDrag(e.clientX, e.clientY, getGridCoordinates, e.shiftKey)
+          } else {
+            selection.updateSelection(e.clientX, e.clientY, getGridCoordinates)
+          }
         } else if (currentTool === "cutout") {
           // No drag behavior for cutout (click-only)
         } else if (currentTool === "override") {
           // Allow painting overrides while dragging
           handleOverrideClick(e.clientX, e.clientY, isInvertHeld)
+        } else if (currentTool === "measure") {
+          const current = $measureState.get()
+          if (current.isDragging && current.start) {
+            $measureState.set({
+              ...current,
+              end: { x: e.clientX, y: e.clientY },
+            })
+          }
         } else {
           // draw or erase
           const newCoords = paintAtPosition(
@@ -799,19 +1028,34 @@ export const GridPaintCanvas = forwardRef<
     const handleMouseUp = () => {
       setIsDragging(false)
       setLastPaintCoords(null)
+      if (currentTool === "select" && selection.isMoveDragging) {
+        selection.endMoveDrag()
+      }
+      if (currentTool === "measure") {
+        const current = $measureState.get()
+        $measureState.set({ ...current, isDragging: false })
+      }
+    }
+
+    const handleMouseLeave = () => {
+      handleMouseUp()
+      if (currentTool === "cutout" && hoveredCutoutRef.current !== null) {
+        hoveredCutoutRef.current = null
+        render()
+      }
     }
 
     canvas.addEventListener("mousedown", handleMouseDown)
     canvas.addEventListener("mousemove", handleMouseMove)
     canvas.addEventListener("mouseup", handleMouseUp)
-    canvas.addEventListener("mouseleave", handleMouseUp)
+    canvas.addEventListener("mouseleave", handleMouseLeave)
     canvas.addEventListener("contextmenu", handleContextMenu)
 
     return () => {
       canvas.removeEventListener("mousedown", handleMouseDown)
       canvas.removeEventListener("mousemove", handleMouseMove)
       canvas.removeEventListener("mouseup", handleMouseUp)
-      canvas.removeEventListener("mouseleave", handleMouseUp)
+      canvas.removeEventListener("mouseleave", handleMouseLeave)
       canvas.removeEventListener("contextmenu", handleContextMenu)
     }
   }, [
@@ -825,7 +1069,15 @@ export const GridPaintCanvas = forwardRef<
     canvasView,
     selection.startSelection,
     selection.updateSelection,
+    selection.hasSelection,
+    selection.isInsideSelection,
+    selection.startMoveDrag,
+    selection.updateMoveDrag,
+    selection.endMoveDrag,
+    selection.isMoveDragging,
     getGridCoordinates,
+    getHoveredCutout,
+    render,
   ])
 
   // Wheel event handler for zoom/pan (same as original)
@@ -840,7 +1092,10 @@ export const GridPaintCanvas = forwardRef<
         // Zoom gesture
         const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
         const currentZoom = canvasView.zoom
-        const newZoom = Math.max(0.1, Math.min(5.0, currentZoom * zoomFactor))
+        const newZoom = Math.max(
+          0.005,
+          Math.min(15.0, currentZoom * zoomFactor),
+        )
 
         // Zoom towards mouse position
         const rect = canvas.getBoundingClientRect()
@@ -873,11 +1128,42 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [canvasView])
 
-  // Keyboard shortcuts for copy/paste
+  // Keyboard shortcuts for copy/paste/move
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target !== document.body) return // Only work when no input is focused
 
+      const floatingPaste = $selectionState.get().floatingPaste
+
+      // ── Floating paste takes priority when active ──────────────────────
+      if (floatingPaste) {
+        // Arrow keys move the floating paste; Shift = 10 units
+        if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault()
+          const step = e.shiftKey ? 10 : 1
+          if (e.key === "ArrowUp")    selection.moveFloatingPaste(0, -step)
+          if (e.key === "ArrowDown")  selection.moveFloatingPaste(0, step)
+          if (e.key === "ArrowLeft")  selection.moveFloatingPaste(-step, 0)
+          if (e.key === "ArrowRight") selection.moveFloatingPaste(step, 0)
+          return
+        }
+
+        // Enter bakes the floating paste
+        if (e.key === "Enter") {
+          e.preventDefault()
+          selection.bakeFloatingPaste()
+          return
+        }
+
+        // Escape cancels the floating paste
+        if (e.key === "Escape") {
+          e.preventDefault()
+          selection.cancelFloatingPaste()
+          return
+        }
+      }
+
+      // ── Copy ────────────────────────────────────────────────────────────
       if ((e.metaKey || e.ctrlKey) && e.key === "c") {
         if (currentTool === "select" && selection.hasSelection) {
           e.preventDefault()
@@ -885,21 +1171,34 @@ export const GridPaintCanvas = forwardRef<
         }
       }
 
+      // ── Paste (enters floating mode at cursor position) ─────────────────
       if ((e.metaKey || e.ctrlKey) && e.key === "v") {
         if (currentTool === "select") {
           e.preventDefault()
-          // Get current mouse position for paste location
-          const canvas = canvasRef.current
-          if (canvas) {
-            const rect = canvas.getBoundingClientRect()
-            const centerX = rect.left + rect.width / 2
-            const centerY = rect.top + rect.height / 2
-            selection.pasteSelection(centerX, centerY, getGridCoordinates)
-          }
+          const { x: mx, y: my } = lastMousePosRef.current
+          selection.pasteSelection(mx, my, getGridCoordinates)
         }
       }
 
-      // Center view to fit all content
+      // ── Arrow key move of live selection ────────────────────────────────
+      if (
+        currentTool === "select" &&
+        selection.hasSelection &&
+        !floatingPaste &&
+        (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")
+      ) {
+        e.preventDefault()
+        const step = e.altKey ? 10 : 1
+        // Shift = active layer only (inverse of delete which uses Shift for all)
+        const activeLayerOnly = e.shiftKey
+        if (e.key === "ArrowUp")    selection.moveSelection(0, -step, activeLayerOnly)
+        if (e.key === "ArrowDown")  selection.moveSelection(0, step, activeLayerOnly)
+        if (e.key === "ArrowLeft")  selection.moveSelection(-step, 0, activeLayerOnly)
+        if (e.key === "ArrowRight") selection.moveSelection(step, 0, activeLayerOnly)
+        return
+      }
+
+      // ── Center view ─────────────────────────────────────────────────────
       if (
         !e.metaKey &&
         !e.ctrlKey &&
@@ -910,6 +1209,7 @@ export const GridPaintCanvas = forwardRef<
         centerCanvasToContent()
       }
 
+      // ── Escape: clear selection ──────────────────────────────────────────
       if (e.key === "Escape") {
         if (currentTool === "select" && selection.hasSelection) {
           e.preventDefault()
@@ -917,6 +1217,7 @@ export const GridPaintCanvas = forwardRef<
         }
       }
 
+      // ── Delete / Backspace ───────────────────────────────────────────────
       if (e.key === "Delete" || e.key === "Backspace") {
         if (currentTool === "select" && selection.hasSelection) {
           e.preventDefault()
@@ -934,6 +1235,10 @@ export const GridPaintCanvas = forwardRef<
     selection.pasteSelection,
     selection.clearSelection,
     selection.deleteSelection,
+    selection.moveSelection,
+    selection.moveFloatingPaste,
+    selection.bakeFloatingPaste,
+    selection.cancelFloatingPaste,
     getGridCoordinates,
     centerCanvasToContent,
   ])
@@ -980,13 +1285,27 @@ export const GridPaintCanvas = forwardRef<
       // When the select tool is active and there is a selection, export only
       // the points within that selection. Otherwise export the full drawing.
       const selBounds =
-        currentTool === "select" && selection.hasSelection &&
-        selection.selectionStart && selection.selectionEnd
+        currentTool === "select" &&
+        selection.hasSelection &&
+        selection.selectionStart &&
+        selection.selectionEnd
           ? {
-              minX: Math.min(selection.selectionStart.x, selection.selectionEnd.x),
-              minY: Math.min(selection.selectionStart.y, selection.selectionEnd.y),
-              maxX: Math.max(selection.selectionStart.x, selection.selectionEnd.x),
-              maxY: Math.max(selection.selectionStart.y, selection.selectionEnd.y),
+              minX: Math.min(
+                selection.selectionStart.x,
+                selection.selectionEnd.x,
+              ),
+              minY: Math.min(
+                selection.selectionStart.y,
+                selection.selectionEnd.y,
+              ),
+              maxX: Math.max(
+                selection.selectionStart.x,
+                selection.selectionEnd.x,
+              ),
+              maxY: Math.max(
+                selection.selectionStart.y,
+                selection.selectionEnd.y,
+              ),
             }
           : null
 
@@ -1078,7 +1397,7 @@ export const GridPaintCanvas = forwardRef<
 
     zoomIn: () => {
       const currentZoom = canvasView.zoom
-      const newZoom = Math.min(currentZoom * 1.5, 5.0) // Cap at 5x zoom
+      const newZoom = Math.min(currentZoom * 1.5, 15.0) // Cap at 15x zoom
 
       // Zoom towards viewport center
       const viewportCenterX = window.innerWidth / 2
@@ -1099,7 +1418,7 @@ export const GridPaintCanvas = forwardRef<
 
     zoomOut: () => {
       const currentZoom = canvasView.zoom
-      const newZoom = Math.max(currentZoom / 1.5, 0.1) // Min zoom 0.1x
+      const newZoom = Math.max(currentZoom / 1.5, 0.005) // Min zoom 0.005x
 
       // Zoom towards viewport center
       const viewportCenterX = window.innerWidth / 2
@@ -1176,6 +1495,8 @@ export const GridPaintCanvas = forwardRef<
         return "cursor-grab"
       case "select":
         return "cursor-pointer"
+      case "measure":
+        return "cursor-crosshair"
       default:
         return "cursor-crosshair"
     }

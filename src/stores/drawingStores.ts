@@ -3,6 +3,7 @@ import { drawingStore } from "@/lib/storage/store"
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
 import type { InteractionGroup, PointModifications } from "@/types/gridpaint"
+import { pushHistory, clearHistory } from "@/stores/historyStore"
 
 export interface Layer {
   id: number
@@ -131,6 +132,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
       })
     }
 
+    clearHistory()
     $loadingState.set("ready")
   } catch (error) {
     console.error("Failed to initialize drawing state:", error)
@@ -163,6 +165,7 @@ export async function saveDrawingState(): Promise<void> {
 // Layer management functions
 export function addLayer(): void {
   const current = $layersState.get()
+  pushHistory(current.layers)
   const newId = Math.max(...current.layers.map((l) => l.id), 0) + 1
   const newLayer = createDefaultLayer(newId)
 
@@ -178,6 +181,7 @@ export function setActiveLayer(layerId: number | null): void {
 
 export function toggleLayerVisibility(layerId: number): void {
   const current = $layersState.get()
+  pushHistory(current.layers)
   const layers = current.layers.map((layer) =>
     layer.id === layerId ? { ...layer, isVisible: !layer.isVisible } : layer,
   )
@@ -186,6 +190,7 @@ export function toggleLayerVisibility(layerId: number): void {
 
 export function toggleLayerRenderStyle(layerId: number): void {
   const current = $layersState.get()
+  pushHistory(current.layers)
   const layers = current.layers.map((layer) =>
     layer.id === layerId
       ? {
@@ -206,6 +211,7 @@ export function createOrActivateLayer(layerId: number): void {
   if (existingLayer) {
     setActiveLayer(layerId)
   } else {
+    pushHistory(current.layers)
     const newLayer = createDefaultLayer(layerId)
     $layersState.set({
       layers: [...current.layers, newLayer],
@@ -327,6 +333,7 @@ export function clearPointModifications(layerId: number, pointKey: string): void
 }
 
 export function resetDrawing(): void {
+  pushHistory($layersState.get().layers)
   const defaultLayer = createDefaultLayer(1)
   $layersState.set({
     layers: [defaultLayer],

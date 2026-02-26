@@ -1,10 +1,10 @@
 import { atom, map } from 'nanostores'
 import type { CutoutAnchor, QuadrantState } from '@/types/gridpaint'
-import type { SelectionBounds } from '@/hooks/useSelection'
+import type { SelectionBounds, ClipboardData } from '@/hooks/useSelection'
 
 // === Tool types ===
 
-export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override"
+export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure"
 
 export const $currentTool = atom<Tool>("draw")
 
@@ -62,13 +62,26 @@ export const $cutoutToolSettings = map<CutoutToolSettings>({
 
 // === Selection state ===
 
+/** A floating paste payload: clipboard data + current offset from its origin (0,0 = paste origin) */
+export interface FloatingPaste {
+  /** The clipboard data being positioned */
+  data: ClipboardData
+  /** Current offset in grid units from the original paste origin */
+  offset: { x: number; y: number }
+  /** The grid coordinate where the paste was first initiated (used as base for rendering) */
+  origin: { x: number; y: number }
+}
+
 export interface SelectionState {
   bounds: SelectionBounds | null
+  /** When non-null, a paste is "floating" and has not yet been baked into the canvas */
+  floatingPaste: FloatingPaste | null
 }
 
 /** Reactive selection bounds — written by useSelection, read by controls/export */
 export const $selectionState = map<SelectionState>({
   bounds: null,
+  floatingPaste: null,
 })
 
 // === Override tool settings ===
@@ -79,4 +92,21 @@ export interface OverrideToolSettings {
 
 export const $overrideToolSettings = map<OverrideToolSettings>({
   shape: "full",
+})
+
+// === Measure tool state ===
+
+export interface MeasureState {
+  /** Screen-pixel start of the current measurement drag, or null when idle */
+  start: { x: number; y: number } | null
+  /** Screen-pixel end of the current measurement drag (updated live during drag) */
+  end: { x: number; y: number } | null
+  /** Whether the user is actively dragging */
+  isDragging: boolean
+}
+
+export const $measureState = map<MeasureState>({
+  start: null,
+  end: null,
+  isDragging: false,
 })

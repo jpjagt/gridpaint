@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
-import { Brush, Eraser, Hand, MousePointer, Circle, Layers } from "lucide-react"
+import { Brush, Eraser, Hand, MousePointer, Circle, Layers, Ruler } from "lucide-react"
 import { useStore } from "@nanostores/react"
-import { $currentTool, setCurrentTool, type Tool } from "@/stores/ui"
+import { $currentTool, setCurrentTool, $measureState, type Tool } from "@/stores/ui"
 
 interface ToolSelectionProps {
   currentTool?: Tool // kept for backward compat but ignored if omitted
@@ -20,9 +20,14 @@ export const ToolSelection = ({ onToolSelect }: ToolSelectionProps) => {
     { id: "select" as const, icon: MousePointer, label: "Select", shortcut: "S" },
     { id: "cutout" as const, icon: Circle, label: "Cutout", shortcut: "O" },
     { id: "override" as const, icon: Layers, label: "Override", shortcut: "V" },
+    { id: "measure" as const, icon: Ruler, label: "Measure", shortcut: "T" },
   ]
 
   const handleSelect = (tool: Tool) => {
+    // Clear any active measurement when switching away from measure tool
+    if (tool !== "measure") {
+      $measureState.set({ start: null, end: null, isDragging: false })
+    }
     setCurrentTool(tool)
     onToolSelect?.(tool)
   }

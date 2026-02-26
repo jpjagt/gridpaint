@@ -11,10 +11,13 @@ import {
   Cloud,
   Loader2,
   AlertCircle,
+  Undo2,
+  Redo2,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ModeToggle"
 import { $syncStatus, $authState } from "@/stores/authStores"
 import { $selectionState, $currentTool } from "@/stores/ui"
+import { $history, undo, redo } from "@/stores/historyStore"
 
 interface GridPaintControlsProps {
   onReset: () => void
@@ -30,8 +33,10 @@ interface GridPaintControlsProps {
   onHome: () => void
   /** Current mm per unit value */
   mmPerUnit: number
-  /** Callback when measuring bars should be shown */
-  onShowMeasuringBars: (show: boolean) => void
+  /** Whether the measuring bars overlay is currently shown */
+  showMeasuringBars: boolean
+  /** Callback to toggle the measuring bars overlay */
+  onToggleMeasuringBars: () => void
   /** Callback to open the shortcuts help modal */
   onShowShortcuts: () => void
 }
@@ -46,7 +51,8 @@ export const GridPaintControls = ({
   onNameChange,
   onHome,
   mmPerUnit,
-  onShowMeasuringBars,
+  showMeasuringBars,
+  onToggleMeasuringBars,
   onShowShortcuts,
 }: GridPaintControlsProps) => {
   const [borderWidth, setBorderWidth] = useState(2)
@@ -55,6 +61,9 @@ export const GridPaintControls = ({
   const selectionState = useStore($selectionState)
   const currentTool = useStore($currentTool)
   const hasActiveSelection = currentTool === "select" && selectionState.bounds !== null
+  const history = useStore($history)
+  const canUndoNow = history.cursor > 0
+  const canRedoNow = history.cursor < history.snapshots.length - 1
 
   const handleBorderWidthChange = (delta: number) => {
     const newWidth = Math.max(0, Math.min(10, borderWidth + delta))
@@ -107,6 +116,28 @@ export const GridPaintControls = ({
         </Button>
 
         <ModeToggle />
+
+        <Button
+          size='icon'
+          variant='ghost'
+          onClick={undo}
+          disabled={!canUndoNow}
+          title='Undo (Cmd+Z)'
+          className='w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm disabled:opacity-30'
+        >
+          <Undo2 className='w-4 h-4' />
+        </Button>
+
+        <Button
+          size='icon'
+          variant='ghost'
+          onClick={redo}
+          disabled={!canRedoNow}
+          title='Redo (Cmd+Shift+Z)'
+          className='w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm disabled:opacity-30'
+        >
+          <Redo2 className='w-4 h-4' />
+        </Button>
 
         {false && (
           <Button
@@ -173,15 +204,25 @@ export const GridPaintControls = ({
             onChange={(e) =>
               onMmPerUnitChange(parseFloat(e.target.value) || 1.0)
             }
-            onFocus={() => onShowMeasuringBars(true)}
-            onBlur={() => onShowMeasuringBars(false)}
             className='w-12 bg-muted/50 text-xs text-muted-foreground placeholder-muted border-none outline-none'
             min='0.1'
             max='100'
             step='0.1'
             title='mm per grid unit'
           />
-          <span className='text-xs text-muted-foreground'>mm</span>
+          <Button
+            type='button'
+            variant='ghost'
+            onClick={onToggleMeasuringBars}
+            title='Toggle measuring overlay (M)'
+            className={`h-auto px-0.5 py-0 text-xs rounded transition-colors ${
+              showMeasuringBars
+                ? 'text-red-400 font-semibold hover:text-red-400'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            mm
+          </Button>
         </div>
       </div>
     </>

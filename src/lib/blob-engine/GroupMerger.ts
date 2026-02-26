@@ -89,6 +89,9 @@ export class GroupMerger {
     const groups = layer.groups
     const pointMods = layer.pointModifications
 
+    // Compute the union of all group points for override-only detection
+    const allGroupPoints = getGridLayerPoints(layer)
+
     // Step 1: Generate primitives per group independently
     const allGroupPrimitives: Map<string, BlobPrimitive>[] = []
     for (const group of groups) {
@@ -106,7 +109,7 @@ export class GroupMerger {
 
     // Step 3: Apply per-point quadrant overrides
     if (pointMods && pointMods.size > 0) {
-      this.applyQuadrantOverrides(merged, pointMods, gridSize, layer.id, issues)
+      this.applyQuadrantOverrides(merged, pointMods, gridSize, layer.id, issues, allGroupPoints)
     }
 
     // Step 4: Recompute rectangle curveTypes based on merged filled state
@@ -195,6 +198,11 @@ export class GroupMerger {
   /**
    * Apply quadrant overrides from pointModifications.
    * Mutates the merged map in place.
+   *
+   * For points that only have overrides (not present in any group's points),
+   * any neighborhood-analysis-generated primitives (e.g. diagonalBridge) are
+   * cleared for that point before applying the explicit overrides. This ensures
+   * diagonal bridges only appear for proper full group points.
    */
   private applyQuadrantOverrides(
     merged: Map<string, BlobPrimitive>,
@@ -202,6 +210,7 @@ export class GroupMerger {
     gridSize: number,
     layerId: number,
     issues: ValidationIssue[],
+    groupPoints: Set<string>,
   ): void {
     for (const [pointKey, mods] of pointMods) {
       if (!mods.quadrantOverrides) continue
@@ -209,6 +218,16 @@ export class GroupMerger {
       const [x, y] = pointKey.split(",").map(Number)
       const point: GridPoint = { x, y }
       const overrides = mods.quadrantOverrides
+
+      // If this point is not a proper group point (override-only), remove any
+      // neighborhood-generated primitives (e.g. diagonalBridge) for this point
+      // before applying the explicit overrides.
+      const isOverrideOnly = !groupPoints.has(pointKey)
+      if (isOverrideOnly) {
+        for (let q = 0; q < 4; q++) {
+          merged.delete(`${x},${y}:${q}`)
+        }
+      }
 
       for (let q = 0; q < 4; q++) {
         const override = overrides[q as keyof QuadrantOverrides]

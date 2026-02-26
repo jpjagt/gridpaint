@@ -43,6 +43,12 @@ export const useSelection = () => {
     y: number
   } | null>(null)
 
+  // Track drag-to-move state
+  const [moveDragStart, setMoveDragStart] = useState<{
+    x: number
+    y: number
+  } | null>(null)
+
   /** Sync the current start/end pair to the $selectionState store */
   const syncSelectionStore = useCallback(
     (
@@ -106,6 +112,77 @@ export const useSelection = () => {
     $selectionState.setKey("bounds", null)
   }, [])
 
+  // ─── Floating paste helpers ───────────────────────────────────────────────
+
+  const hasFloatingPaste = !!$selectionState.get().floatingPaste
+
+  /**
+   * Cancel (discard) a floating paste without baking it.
+   */
+  const cancelFloatingPaste = useCallback(() => {
+    $selectionState.setKey("floatingPaste", null)
+  }, [])
+
+  /**
+   * Bake the floating paste into the canvas at its current offset.
+   */
+  const bakeFloatingPaste = useCallback(() => {
+    const fp = $selectionState.get().floatingPaste
+    if (!fp) return
+
+    const { data, origin, offset } = fp
+    const targetX = origin.x + offset.x
+    const targetY = origin.y + offset.y
+
+    let totalPointsPasted = 0
+
+    data.layers.forEach(({ layerId, groups, pointModifications }) => {
+      const layer = layersState.layers.find((l) => l.id === layerId)
+      if (!layer) return
+
+      groups.forEach((clipGroup) => {
+        const targetGroup = layer.groups.find((g) => g.id === clipGroup.id) ?? layer.groups[0]
+        if (!targetGroup) return
+
+        const newPoints = new Set<string>(targetGroup.points)
+
+        clipGroup.points.forEach((relativeKey: string) => {
+          const [relativeX, relativeY] = relativeKey.split(",").map(Number)
+          const absKey = `${targetX + relativeX},${targetY + relativeY}`
+          newPoints.add(absKey)
+          totalPointsPasted++
+        })
+
+        updateGroupPoints(layerId, newPoints, targetGroup.id)
+      })
+
+      if (pointModifications) {
+        Object.entries(pointModifications).forEach(([relativeKey, mod]) => {
+          const [relativeX, relativeY] = relativeKey.split(",").map(Number)
+          const absKey = `${targetX + relativeX},${targetY + relativeY}`
+          updatePointModifications(layerId, absKey, mod)
+        })
+      }
+    })
+
+    $selectionState.setKey("floatingPaste", null)
+    toast.success(`Placed ${totalPointsPasted} points`)
+  }, [layersState.layers])
+
+  /**
+   * Move the floating paste offset by (dx, dy) grid units.
+   */
+  const moveFloatingPaste = useCallback((dx: number, dy: number) => {
+    const fp = $selectionState.get().floatingPaste
+    if (!fp) return
+    $selectionState.setKey("floatingPaste", {
+      ...fp,
+      offset: { x: fp.offset.x + dx, y: fp.offset.y + dy },
+    })
+  }, [])
+
+  // ─── Copy ─────────────────────────────────────────────────────────────────
+
   const copySelection = useCallback(async () => {
     if (!selectionStart || !selectionEnd) {
       toast.error("No selection to copy")
@@ -124,7 +201,6 @@ export const useSelection = () => {
 
     let totalPointsCopied = 0
 
-    // Copy points from all layers, preserving group structure and modifications
     layersState.layers.forEach((layer) => {
       const clipboardGroups: ClipboardGroup[] = []
 
@@ -146,7 +222,6 @@ export const useSelection = () => {
 
       if (clipboardGroups.length === 0) return
 
-      // Copy point modifications for points within the selection, with relative keys
       const relativeModifications: Record<string, SerializedPointModifications> = {}
       if (layer.pointModifications) {
         for (let x = minX; x <= maxX; x++) {
@@ -169,7 +244,6 @@ export const useSelection = () => {
       })
     })
 
-    // Create JSON payload with schema identifier
     const jsonPayload = {
       type: "gridpaint-selection",
       version: "2.0.0",
@@ -191,6 +265,8 @@ export const useSelection = () => {
     }
   }, [selectionStart, selectionEnd, layersState.layers])
 
+  // ─── Paste (enters floating state) ────────────────────────────────────────
+
   const pasteSelection = useCallback(
     async (
       clientX: number,
@@ -200,24 +276,32 @@ export const useSelection = () => {
         clientY: number,
       ) => { x: number; y: number } | null,
     ) => {
+      // If there is already a floating paste pending, bake it first before
+      // starting a new one so we don't lose it.
+      const existing = $selectionState.get().floatingPaste
+      if (existing) {
+        bakeFloatingPaste()
+      }
+
       const targetGrid = getGridCoordinates(clientX, clientY)
       if (!targetGrid) return
 
       let clipboardDataToPaste: ClipboardData | null = null
 
-      // Try to get data from system clipboard first
-      const clipboardText = await navigator.clipboard.readText()
-      const parsed = JSON.parse(clipboardText)
+      try {
+        const clipboardText = await navigator.clipboard.readText()
+        const parsed = JSON.parse(clipboardText)
 
-      // Check if it's a valid gridpaint selection
-      if (
-        parsed.type === "gridpaint-selection" &&
-        parsed.data
-      ) {
-        clipboardDataToPaste = {
-          layers: parsed.data.layers,
-          bounds: parsed.data.bounds,
+        if (parsed.type === "gridpaint-selection" && parsed.data) {
+          clipboardDataToPaste = {
+            layers: parsed.data.layers,
+            bounds: parsed.data.bounds,
+          }
         }
+      } catch (error) {
+        console.error("Failed to read clipboard:", error)
+        toast.error("Failed to read clipboard")
+        return
       }
 
       if (!clipboardDataToPaste) {
@@ -225,44 +309,26 @@ export const useSelection = () => {
         return
       }
 
-      let totalPointsPasted = 0
-
-      // Paste to each layer that has data, preserving group structure and modifications
-      clipboardDataToPaste.layers.forEach(({ layerId, groups, pointModifications }) => {
-        const layer = layersState.layers.find((l) => l.id === layerId)
-        if (!layer) return
-
-        groups.forEach((clipGroup) => {
-          // Find matching group by id, or fall back to first group
-          const targetGroup = layer.groups.find((g) => g.id === clipGroup.id) ?? layer.groups[0]
-          if (!targetGroup) return
-
-          const newPoints = new Set<string>(targetGroup.points)
-
-          clipGroup.points.forEach((relativeKey: string) => {
-            const [relativeX, relativeY] = relativeKey.split(",").map(Number)
-            const absKey = `${targetGrid.x + relativeX},${targetGrid.y + relativeY}`
-            newPoints.add(absKey)
-            totalPointsPasted++
-          })
-
-          updateGroupPoints(layerId, newPoints, targetGroup.id)
-        })
-
-        // Restore point modifications with shifted keys
-        if (pointModifications) {
-          Object.entries(pointModifications).forEach(([relativeKey, mod]) => {
-            const [relativeX, relativeY] = relativeKey.split(",").map(Number)
-            const absKey = `${targetGrid.x + relativeX},${targetGrid.y + relativeY}`
-            updatePointModifications(layerId, absKey, mod)
-          })
-        }
+      // Count total points
+      let totalPoints = 0
+      clipboardDataToPaste.layers.forEach(({ groups }) => {
+        groups.forEach(({ points }) => { totalPoints += points.length })
       })
 
-      toast.success(`Pasted ${totalPointsPasted} points`)
+      // Enter floating paste mode — origin is the cursor grid position,
+      // offset starts at zero
+      $selectionState.setKey("floatingPaste", {
+        data: clipboardDataToPaste,
+        origin: targetGrid,
+        offset: { x: 0, y: 0 },
+      })
+
+      toast.info(`Paste ready — use arrow keys to position, Enter to place, Esc to cancel`)
     },
-    [layersState.layers],
+    [bakeFloatingPaste],
   )
+
+  // ─── Delete ───────────────────────────────────────────────────────────────
 
   const deleteSelection = useCallback(
     (deleteFromAllLayers: boolean = false) => {
@@ -295,6 +361,14 @@ export const useSelection = () => {
           }
           updateGroupPoints(layer.id, newPoints, group.id)
         })
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
+            const pointKey = `${x},${y}`
+            if (layer.pointModifications?.has(pointKey)) {
+              updatePointModifications(layer.id, pointKey, undefined)
+            }
+          }
+        }
         return deletedFromThisLayer
       }
 
@@ -302,12 +376,8 @@ export const useSelection = () => {
         layersState.layers.forEach((layer) => {
           if (deleteFromLayer(layer) > 0) layersAffected++
         })
-
-        toast.success(
-          `Deleted ${totalPointsDeleted} points from ${layersAffected} layers`,
-        )
+        toast.success(`Deleted ${totalPointsDeleted} points from ${layersAffected} layers`)
       } else {
-        // Delete from active layer only
         const activeLayer = layersState.layers.find(
           (l) => l.id === layersState.activeLayerId,
         )
@@ -319,9 +389,7 @@ export const useSelection = () => {
         deleteFromLayer(activeLayer)
 
         if (totalPointsDeleted > 0) {
-          toast.success(
-            `Deleted ${totalPointsDeleted} points from layer ${activeLayer.id}`,
-          )
+          toast.success(`Deleted ${totalPointsDeleted} points from layer ${activeLayer.id}`)
         } else {
           toast.info("No points to delete in selection")
         }
@@ -335,6 +403,149 @@ export const useSelection = () => {
     ],
   )
 
+  // ─── Move selection (live points on canvas) ───────────────────────────────
+
+  /**
+   * Move all points currently within the selection bounds by (dx, dy) grid units,
+   * then shift the selection bounds to follow.
+   *
+   * @param dx - horizontal grid units
+   * @param dy - vertical grid units
+   * @param activeLayerOnly - when true only the active layer is moved; default = all layers
+   */
+  const moveSelection = useCallback(
+    (dx: number, dy: number, activeLayerOnly: boolean = false) => {
+      if (!selectionStart || !selectionEnd) return
+
+      const minX = Math.min(selectionStart.x, selectionEnd.x)
+      const minY = Math.min(selectionStart.y, selectionEnd.y)
+      const maxX = Math.max(selectionStart.x, selectionEnd.x)
+      const maxY = Math.max(selectionStart.y, selectionEnd.y)
+
+      const moveLayer = (layer: (typeof layersState.layers)[number]) => {
+        layer.groups.forEach((group) => {
+          // Collect points inside and outside the selection
+          const inside: string[] = []
+          const outside = new Set<string>()
+
+          group.points.forEach((key) => {
+            const [x, y] = key.split(",").map(Number)
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+              inside.push(key)
+            } else {
+              outside.add(key)
+            }
+          })
+
+          if (inside.length === 0) return
+
+          // Re-add at shifted positions
+          inside.forEach((key) => {
+            const [x, y] = key.split(",").map(Number)
+            outside.add(`${x + dx},${y + dy}`)
+          })
+
+          updateGroupPoints(layer.id, outside, group.id)
+        })
+
+        // Shift point modifications within the selection
+        if (layer.pointModifications) {
+          const modsToMove: Array<{ oldKey: string; newKey: string; mod: PointModifications }> = []
+
+          for (let x = minX; x <= maxX; x++) {
+            for (let y = minY; y <= maxY; y++) {
+              const key = `${x},${y}`
+              const mod = layer.pointModifications.get(key)
+              if (mod) {
+                modsToMove.push({ oldKey: key, newKey: `${x + dx},${y + dy}`, mod })
+              }
+            }
+          }
+
+          modsToMove.forEach(({ oldKey, newKey, mod }) => {
+            updatePointModifications(layer.id, oldKey, undefined)
+            updatePointModifications(layer.id, newKey, mod)
+          })
+        }
+      }
+
+      const layersToMove = activeLayerOnly
+        ? layersState.layers.filter((l) => l.id === layersState.activeLayerId)
+        : layersState.layers
+
+      layersToMove.forEach(moveLayer)
+
+      // Shift the selection bounds to follow the moved points
+      const newStart = { x: selectionStart.x + dx, y: selectionStart.y + dy }
+      const newEnd = { x: selectionEnd.x + dx, y: selectionEnd.y + dy }
+      setSelectionStart(newStart)
+      setSelectionEnd(newEnd)
+      syncSelectionStore(newStart, newEnd)
+    },
+    [
+      selectionStart,
+      selectionEnd,
+      layersState.layers,
+      layersState.activeLayerId,
+      syncSelectionStore,
+    ],
+  )
+
+  // ─── Drag-to-move helpers ─────────────────────────────────────────────────
+
+  /**
+   * Returns true if the given grid coordinate falls inside the current selection.
+   */
+  const isInsideSelection = useCallback(
+    (gridX: number, gridY: number): boolean => {
+      if (!selectionStart || !selectionEnd) return false
+      const minX = Math.min(selectionStart.x, selectionEnd.x)
+      const minY = Math.min(selectionStart.y, selectionEnd.y)
+      const maxX = Math.max(selectionStart.x, selectionEnd.x)
+      const maxY = Math.max(selectionStart.y, selectionEnd.y)
+      return gridX >= minX && gridX <= maxX && gridY >= minY && gridY <= maxY
+    },
+    [selectionStart, selectionEnd],
+  )
+
+  /**
+   * Start a drag-to-move gesture from the given grid position.
+   */
+  const startMoveDrag = useCallback((gridX: number, gridY: number) => {
+    setMoveDragStart({ x: gridX, y: gridY })
+  }, [])
+
+  /**
+   * Update a drag-to-move gesture. Returns the delta applied (or null if none).
+   */
+  const updateMoveDrag = useCallback(
+    (
+      clientX: number,
+      clientY: number,
+      getGridCoordinates: (cx: number, cy: number) => { x: number; y: number } | null,
+      activeLayerOnly: boolean = false,
+    ) => {
+      if (!moveDragStart) return
+      const grid = getGridCoordinates(clientX, clientY)
+      if (!grid) return
+
+      const dx = grid.x - moveDragStart.x
+      const dy = grid.y - moveDragStart.y
+      if (dx === 0 && dy === 0) return
+
+      moveSelection(dx, dy, activeLayerOnly)
+      setMoveDragStart(grid)
+    },
+    [moveDragStart, moveSelection],
+  )
+
+  /**
+   * End a drag-to-move gesture.
+   */
+  const endMoveDrag = useCallback(() => {
+    setMoveDragStart(null)
+  }, [])
+
   return {
     // Selection state
     selectionStart,
@@ -347,6 +558,19 @@ export const useSelection = () => {
     copySelection,
     pasteSelection,
     deleteSelection,
+    moveSelection,
+
+    // Drag-to-move
+    isInsideSelection,
+    startMoveDrag,
+    updateMoveDrag,
+    endMoveDrag,
+    isMoveDragging: moveDragStart !== null,
+
+    // Floating paste
+    bakeFloatingPaste,
+    cancelFloatingPaste,
+    moveFloatingPaste,
 
     // Helper for checking if we have a selection
     hasSelection: !!(selectionStart && selectionEnd),

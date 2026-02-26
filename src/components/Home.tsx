@@ -13,75 +13,86 @@ import { toast } from "sonner"
 
 // Generate a simple preview thumbnail from drawing data
 function generatePreview(drawing: DrawingDocument): string {
-  const size = 120
-  const canvas = document.createElement("canvas")
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext("2d")!
+  try {
+    const size = 120
+    const canvas = document.createElement("canvas")
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext("2d")!
 
-  // Background
-  ctx.fillStyle = "#ffffff"
-  ctx.fillRect(0, 0, size, size)
+    // Background
+    ctx.fillStyle = "#ffffff"
+    ctx.fillRect(0, 0, size, size)
 
-  // Find bounds of all points
-  const allPoints: string[] = drawing.layers
-    .filter((layer) => layer.isVisible)
-    .flatMap((layer) => {
-      const pts: string[] = []
-      for (const group of layer.groups) {
-        for (const p of group.points) pts.push(p)
+    // Find bounds of all points
+    const allPoints: string[] = drawing.layers
+      .filter((layer) => layer.isVisible)
+      .flatMap((layer) => {
+        const pts: string[] = []
+        for (const group of layer.groups) {
+          for (const p of group.points) pts.push(p)
+        }
+        return pts
+      })
+
+    if (allPoints.length === 0) {
+      // Empty drawing - show grid pattern
+      ctx.strokeStyle = "#f0f0f0"
+      ctx.lineWidth = 1
+      const gridSpacing = size / 8
+      for (let i = 0; i <= 8; i++) {
+        const pos = i * gridSpacing
+        ctx.beginPath()
+        ctx.moveTo(pos, 0)
+        ctx.lineTo(pos, size)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(0, pos)
+        ctx.lineTo(size, pos)
+        ctx.stroke()
       }
-      return pts
+      return canvas.toDataURL()
+    }
+
+    const coords = allPoints.map((point) => {
+      const [x, y] = point.split(",").map(Number)
+      return { x, y }
     })
 
-  if (allPoints.length === 0) {
-    // Empty drawing - show grid pattern
-    ctx.strokeStyle = "#f0f0f0"
-    ctx.lineWidth = 1
-    const gridSpacing = size / 8
-    for (let i = 0; i <= 8; i++) {
-      const pos = i * gridSpacing
-      ctx.beginPath()
-      ctx.moveTo(pos, 0)
-      ctx.lineTo(pos, size)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.moveTo(0, pos)
-      ctx.lineTo(size, pos)
-      ctx.stroke()
+    // Use reduce instead of spread to avoid call stack overflow on large drawings
+    let minX = coords[0].x, maxX = coords[0].x
+    let minY = coords[0].y, maxY = coords[0].y
+    for (const { x, y } of coords) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
     }
+
+    const rangeX = maxX - minX || 1
+    const rangeY = maxY - minY || 1
+    const padding = 10
+    const scale = (size - padding * 2) / Math.max(rangeX, rangeY)
+
+    // Draw points
+    ctx.fillStyle = "#000000"
+    coords.forEach(({ x, y }) => {
+      const pixelX = padding + (x - minX) * scale
+      const pixelY = padding + (y - minY) * scale
+      ctx.fillRect(
+        pixelX,
+        pixelY,
+        Math.max(1, scale * 0.8),
+        Math.max(1, scale * 0.8),
+      )
+    })
+
     return canvas.toDataURL()
+  } catch (err) {
+    console.error("Failed to generate preview", err)
+    // Return a blank 1x1 transparent PNG as fallback
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
   }
-
-  const coords = allPoints.map((point) => {
-    const [x, y] = point.split(",").map(Number)
-    return { x, y }
-  })
-
-  const minX = Math.min(...coords.map((c) => c.x))
-  const maxX = Math.max(...coords.map((c) => c.x))
-  const minY = Math.min(...coords.map((c) => c.y))
-  const maxY = Math.max(...coords.map((c) => c.y))
-
-  const rangeX = maxX - minX || 1
-  const rangeY = maxY - minY || 1
-  const padding = 10
-  const scale = (size - padding * 2) / Math.max(rangeX, rangeY)
-
-  // Draw points
-  ctx.fillStyle = "#000000"
-  coords.forEach(({ x, y }) => {
-    const pixelX = padding + (x - minX) * scale
-    const pixelY = padding + (y - minY) * scale
-    ctx.fillRect(
-      pixelX,
-      pixelY,
-      Math.max(1, scale * 0.8),
-      Math.max(1, scale * 0.8),
-    )
-  })
-
-  return canvas.toDataURL()
 }
 
 /**

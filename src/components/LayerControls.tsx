@@ -12,6 +12,7 @@ import {
   nextGroup,
   type Tool,
 } from "@/stores/ui"
+import { undo, redo } from "@/stores/historyStore"
 
 interface LayerControlsProps {
   layers: Layer[]
@@ -113,11 +114,25 @@ export const LayerControls = ({
         return
       }
 
-      // Tool shortcuts: D, E, P, S, O, V
+      // Undo: Cmd+Z / Ctrl+Z
+      if (key === "z" && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+        return
+      }
+
+      // Redo: Cmd+Shift+Z / Ctrl+Shift+Z
+      if (key === "z" && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault()
+        redo()
+        return
+      }
+
+      // Tool shortcuts: D, E, P, S, O, V, T
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         const toolMap: Record<string, Tool> = {
           d: "draw", e: "erase", p: "pan", s: "select",
-          o: "cutout", v: "override",
+          o: "cutout", v: "override", t: "measure",
         }
         const lowerKey = key.toLowerCase()
         if (lowerKey in toolMap) {

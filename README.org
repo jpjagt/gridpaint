@@ -34,15 +34,18 @@ pnpm dev
 | =S= | select   | rectangle select, copy/paste/delete                   |
 | =O= | cutout   | add circular cutouts to existing points               |
 | =V= | override | paint per-quadrant shape overrides                    |
+| =T= | measure  | drag to measure distance in mm                        |
 
 tools can also be selected by clicking the toolbar at the bottom center.
 
 ** drawing
 
-| action           | effect                                             |
-|------------------+----------------------------------------------------|
-| click/drag       | paint with current tool                            |
-| alt + click/drag | invert draw/erase (temporary erase while drawing)  |
+| action              | effect                                             |
+|---------------------+----------------------------------------------------|
+| click/drag          | paint with current tool                            |
+| alt + click/drag    | invert draw/erase (temporary erase while drawing)  |
+| =cmd/ctrl= + =Z=    | undo                                               |
+| =cmd/ctrl= + =shift= + =Z= | redo                                        |
 
 ** layers
 
@@ -116,19 +119,25 @@ when the override tool is active, an options panel shows 10 shape options:
 | key/gesture                 | action                   |
 |-----------------------------+--------------------------|
 | =C=                        | center canvas to content |
+| =M=                        | toggle measuring overlay (mm grid) |
 | ctrl + scroll / pinch      | zoom toward cursor       |
 | scroll / two-finger drag   | pan                      |
 | grid size =+= / =-= buttons | change grid size       |
 
 ** copy / paste / selection
 
-| key              | action                                                      |
-|------------------+-------------------------------------------------------------|
-| cmd/ctrl + =C=   | copy selection (select tool)                                |
-| cmd/ctrl + =V=   | paste at canvas center (select tool)                        |
-| =Escape=         | clear selection                                             |
-| =Delete= / =Backspace= | delete selected points from current layer             |
-| shift + =Delete= / =Backspace= | delete selected points from all layers        |
+| key              | action                                                                          |
+|------------------+---------------------------------------------------------------------------------|
+| cmd/ctrl + =C=   | copy selection (select tool)                                                    |
+| cmd/ctrl + =V=   | paste at cursor — enters floating mode (select tool)                            |
+| arrow keys       | move selection or floating paste 1 grid unit                                    |
+| shift + arrows   | move floating paste 10 grid units; or move active layer only (live selection)   |
+| alt + arrows     | move live selection 10 grid units                                               |
+| drag inside selection | drag-to-move selected points (all layers; hold shift = active layer only) |
+| =Enter=          | place / bake floating paste                                                     |
+| =Escape=         | cancel floating paste / clear selection                                         |
+| =Delete= / =Backspace= | delete selected points from current layer                               |
+| shift + =Delete= / =Backspace= | delete selected points from all layers                          |
 
 ** other
 
@@ -139,7 +148,7 @@ when the override tool is active, an options panel shows 10 shape options:
 | download button     | top right     | export PNG + JSON + per-layer SVGs                      |
 | =?= button          | top right     | open keyboard shortcuts help modal                      |
 | dark/light mode     | top right     | toggle theme                                            |
-| mm/unit input       | bottom right  | physical scale (shows measuring bars on focus)          |
+| mm/unit input       | bottom right  | physical scale; click =mm= label or press =M= to toggle overlay |
 
 * project structure
 

@@ -34,6 +34,8 @@
 
     --radius: 0rem;
 
+    --highlighted: 24.6 95% 53.1%;
+
     /* Canvas-specific semantic colors */
     --canvas-background: 0 0% 100%;
     --canvas-grid-line: 214.3 31.8% 91.4%;
@@ -44,8 +46,8 @@
     --canvas-layer-5: 215.3 19.3% 34.5%;
     --canvas-layer-6: 215.3 25% 26.7%;
     --canvas-layer-border: 0 0% 0%;
-    --canvas-outline-active: 0 0% 0%;
-    --canvas-outline-bridge: 0 0% 0%;
+    --canvas-outline-active: var(--highlighted);
+    --canvas-outline-bridge: var(--highlighted);
   }
 
   .dark {
@@ -58,7 +60,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 210 100% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -81,8 +83,8 @@
     --canvas-background: 0 74.7% 15.5%;
     --canvas-grid-line: 217.2 32.6% 17.5%;
     --canvas-layer-border: 0 0% 100%;
-    --canvas-outline-active: 24.6 95% 53.1%;
-    --canvas-outline-bridge: 24.6 95% 53.1%;
+    --canvas-outline-active: var(--highlighted);
+    --canvas-outline-bridge: var(--highlighted);
   }
 }
 

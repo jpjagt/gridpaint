@@ -16,6 +16,7 @@ import { LayerControls } from "@/components/LayerControls"
 import { ToolSelection } from "@/components/ToolSelection"
 import { ToolOptionsPanel } from "@/components/ToolOptionsPanel"
 import { MeasuringBars } from "@/components/MeasuringBars"
+import { MeasuringTapeOverlay } from "@/components/MeasuringTapeOverlay"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
 import { useImagePaste } from "@/hooks/useImagePaste"
 import { useAuthInit } from "@/hooks/useAuthInit"
@@ -38,6 +39,19 @@ function EditorPage() {
   const drawingMeta = useStore($drawingMeta)
   // Enable paste-to-import
   useImagePaste()
+
+  // M key: toggle measuring bars overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target !== document.body) return
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.key === "m" || e.key === "M")) {
+        e.preventDefault()
+        setShowMeasuringBars((v) => !v)
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [])
 
   // Sync layer state
   useEffect(() => {
@@ -101,7 +115,8 @@ function EditorPage() {
         }}
         onHome={() => navigate("/")}
         mmPerUnit={canvasView.mmPerUnit}
-        onShowMeasuringBars={setShowMeasuringBars}
+        showMeasuringBars={showMeasuringBars}
+        onToggleMeasuringBars={() => setShowMeasuringBars((v) => !v)}
         onShowShortcuts={() => setShowShortcuts(true)}
       />
       <ShortcutsModal
@@ -111,6 +126,7 @@ function EditorPage() {
       <ToolSelection />
       <ToolOptionsPanel mmPerUnit={canvasView.mmPerUnit} />
       <MeasuringBars show={showMeasuringBars} />
+      <MeasuringTapeOverlay />
     </div>
   )
 }

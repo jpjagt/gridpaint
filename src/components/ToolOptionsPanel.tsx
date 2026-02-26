@@ -4,6 +4,7 @@ import {
   $currentTool,
   $cutoutToolSettings,
   $overrideToolSettings,
+  $selectionState,
 } from "@/stores/ui"
 import type { CutoutAnchor, QuadrantState } from "@/types/gridpaint"
 import { Button } from "@/components/ui/button"
@@ -117,22 +118,52 @@ export const ToolOptionsPanel = ({ mmPerUnit }: ToolOptionsPanelProps) => {
   const currentTool = useStore($currentTool)
   const cutoutSettings = useStore($cutoutToolSettings)
   const overrideSettings = useStore($overrideToolSettings)
+  const selectionState = useStore($selectionState)
 
-  if (currentTool !== "cutout" && currentTool !== "override") {
+  const hasFloatingPaste = !!selectionState.floatingPaste
+
+  if (currentTool !== "cutout" && currentTool !== "override" && !hasFloatingPaste) {
     return null
   }
 
   return (
     <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-background/90 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg z-10">
-      {currentTool === "cutout" && (
+      {hasFloatingPaste && (
+        <FloatingPasteHint />
+      )}
+      {!hasFloatingPaste && currentTool === "cutout" && (
         <CutoutOptions
           settings={cutoutSettings}
           mmPerUnit={mmPerUnit}
         />
       )}
-      {currentTool === "override" && (
+      {!hasFloatingPaste && currentTool === "override" && (
         <OverrideOptions settings={overrideSettings} />
       )}
+    </div>
+  )
+}
+
+function FloatingPasteHint() {
+  return (
+    <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
+      <span className="flex items-center gap-1">
+        <kbd className="px-1 py-0.5 bg-muted border border-border rounded text-foreground">↑↓←→</kbd>
+        <span>move</span>
+      </span>
+      <span className="flex items-center gap-1">
+        <kbd className="px-1 py-0.5 bg-muted border border-border rounded text-foreground">Shift</kbd>
+        <span>+ arrows = ×10</span>
+      </span>
+      <span className="w-px self-stretch bg-border" />
+      <span className="flex items-center gap-1">
+        <kbd className="px-1 py-0.5 bg-muted border border-border rounded text-foreground">Enter</kbd>
+        <span>place</span>
+      </span>
+      <span className="flex items-center gap-1">
+        <kbd className="px-1 py-0.5 bg-muted border border-border rounded text-foreground">Esc</kbd>
+        <span>cancel</span>
+      </span>
     </div>
   )
 }
