@@ -136,6 +136,8 @@ export interface ExportRect {
   maxY: number
   /** How many copies to include in the export layout (default 1) */
   quantity: number
+  /** Optional label for this rect (used in filenames and the BOM clipboard) */
+  name?: string
 }
 
 // === Validation ===

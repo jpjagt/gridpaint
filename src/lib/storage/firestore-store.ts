@@ -187,6 +187,9 @@ export class FirestoreDrawingStore implements DrawingStore {
         mmPerUnit: drawingDoc.mmPerUnit,
         ownerId: this.userId,
         writeToken: this.writeToken,
+        ...(drawingDoc.exportRects && drawingDoc.exportRects.length > 0
+          ? { exportRects: drawingDoc.exportRects }
+          : {}),
         layers: drawingDoc.layers.map((layer): LayerData => {
           const serialized: LayerData = {
             id: layer.id,

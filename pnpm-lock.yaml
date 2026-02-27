@@ -32,6 +32,9 @@ importers:
       clsx:
         specifier: ^2.1.0
         version: 2.1.1
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
       firebase:
         specifier: ^12.9.0
         version: 12.9.0

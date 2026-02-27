@@ -14,7 +14,9 @@ import {
   exportExportRectsSvg,
   type ExportMode,
 } from "@/lib/export/exportRectsSvg"
+import { exportSeparateZip } from "@/lib/export/exportZip"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
+import { Clipboard } from "lucide-react"
 
 interface ToolOptionsPanelProps {
   mmPerUnit: number
@@ -254,7 +256,19 @@ function ExportOptions({
   onClear?: () => void
 }) {
   const [mode, setMode] = useState<ExportMode>("combined")
+  const [copied, setCopied] = useState(false)
   const hasRects = exportRects.length > 0
+  const namedRects = exportRects.filter((r) => r.name)
+
+  const handleCopyBom = () => {
+    const text = namedRects
+      .map((r) => `- ${r.name}: x${r.quantity}`)
+      .join("\n")
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
 
   return (
     <div className='flex items-center gap-3'>
@@ -285,20 +299,42 @@ function ExportOptions({
         variant='default'
         disabled={!hasRects}
         onClick={() => {
-          exportExportRectsSvg(
-            exportRects,
-            layers,
-            canvasView.gridSize,
-            canvasView.borderWidth,
-            drawingName,
-            canvasView.mmPerUnit,
-            mode,
-          )
+          if (mode === "separate") {
+            exportSeparateZip(
+              exportRects,
+              layers,
+              canvasView,
+              drawingName ?? "",
+            )
+          } else {
+            exportExportRectsSvg(
+              exportRects,
+              layers,
+              canvasView.gridSize,
+              canvasView.borderWidth,
+              drawingName,
+              canvasView.mmPerUnit,
+              mode,
+            )
+          }
         }}
         className='h-7 text-xs font-mono'
       >
         Export{hasRects ? ` (${exportRects.length})` : ""}
       </Button>
+
+      {/* Copy BOM to clipboard */}
+      {namedRects.length > 0 && (
+        <Button
+          size='icon'
+          variant='ghost'
+          onClick={handleCopyBom}
+          className='h-7 w-7'
+          title='Copy bill of materials to clipboard'
+        >
+          <Clipboard className={cn("w-3.5 h-3.5", copied && "text-green-500")} />
+        </Button>
+      )}
 
       {/* Clear all */}
       {hasRects && (

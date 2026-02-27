@@ -5,6 +5,7 @@ import {
   $drawingMeta,
   $canvasView,
   $layersState,
+  $exportRects,
   initializeDrawingState,
   saveDrawingState,
   type LoadingState,
@@ -15,6 +16,7 @@ function useDrawingState(drawingId: string) {
   const drawingMeta = useStore($drawingMeta)
   const canvasView = useStore($canvasView)
   const layersState = useStore($layersState)
+  const exportRects = useStore($exportRects)
   const initRef = useRef(false)
   const persistenceEnabledRef = useRef(false)
 
@@ -38,7 +40,7 @@ function useDrawingState(drawingId: string) {
 
       return () => clearTimeout(timeoutId)
     }
-  }, [loadingState, drawingMeta.name, canvasView, layersState])
+  }, [loadingState, drawingMeta.name, canvasView, layersState, exportRects])
 
   return {
     loadingState,

@@ -124,6 +124,13 @@ export const useExportRects = () => {
     )
   }, [])
 
+  /** Update the name of a specific rect */
+  const setName = useCallback((id: string, name: string) => {
+    $exportRects.set(
+      $exportRects.get().map((r) => (r.id === id ? { ...r, name: name || undefined } : r)),
+    )
+  }, [])
+
   /** Remove all export rects */
   const clearAll = useCallback(() => {
     $exportRects.set([])
@@ -148,6 +155,7 @@ export const useExportRects = () => {
     deleteById,
     getHitRect,
     setQuantity,
+    setName,
     clearAll,
   }
 }

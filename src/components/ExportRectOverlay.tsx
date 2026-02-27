@@ -12,6 +12,7 @@ import type { ExportRect } from "@/types/gridpaint"
 interface ExportRectOverlayProps {
   canvasView: CanvasViewState
   onQuantityChange: (id: string, quantity: number) => void
+  onNameChange: (id: string, name: string) => void
   onDelete: (id: string) => void
   visible: boolean
 }
@@ -32,11 +33,13 @@ function QuantityInput({
   rect,
   canvasView,
   onQuantityChange,
+  onNameChange,
   onDelete,
 }: {
   rect: ExportRect
   canvasView: CanvasViewState
   onQuantityChange: (id: string, quantity: number) => void
+  onNameChange: (id: string, name: string) => void
   onDelete: (id: string) => void
 }) {
   // Position at the bottom-right corner of the rect (just inside)
@@ -44,28 +47,15 @@ function QuantityInput({
 
   // Offset inward so it stays visually inside the rect
   const offsetPx = 4
-  const inputWidth = 44
-
-  const handleDecrement = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (rect.quantity > 1) onQuantityChange(rect.id, rect.quantity - 1)
-  }
-
-  const handleIncrement = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onQuantityChange(rect.id, rect.quantity + 1)
-  }
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onDelete(rect.id)
-  }
+  const quantityInputWidth = 44
+  // rough width: delete(16) + decrement(16) + quantity(36) + increment(16) + name(~80) + gaps
+  const totalWidth = 16 + 16 + 36 + 16 + 84 + 16
 
   return (
     <div
       style={{
         position: "fixed",
-        left: bottomRight.x - inputWidth - offsetPx - 52,
+        left: bottomRight.x - totalWidth - offsetPx,
         top: bottomRight.y - 24 - offsetPx,
         pointerEvents: "auto",
         zIndex: 20,
@@ -74,7 +64,7 @@ function QuantityInput({
       <div className='flex items-center gap-0.5 bg-background/90 backdrop-blur-sm border border-blue-400/60 rounded px-1 py-0.5'>
         <button
           type='button'
-          onClick={handleDelete}
+          onClick={(e) => { e.stopPropagation(); onDelete(rect.id) }}
           onMouseDown={(e) => e.stopPropagation()}
           className='text-red-400/60 hover:text-red-400 leading-none w-4 text-center select-none transition-colors'
           tabIndex={-1}
@@ -84,7 +74,7 @@ function QuantityInput({
         </button>
         <button
           type='button'
-          onClick={handleDecrement}
+          onClick={(e) => { e.stopPropagation(); if (rect.quantity > 1) onQuantityChange(rect.id, rect.quantity - 1) }}
           onMouseDown={(e) => e.stopPropagation()}
           className='text-xs text-blue-400/70 hover:text-blue-400 leading-none w-4 text-center select-none transition-colors'
           tabIndex={-1}
@@ -109,13 +99,23 @@ function QuantityInput({
         />
         <button
           type='button'
-          onClick={handleIncrement}
+          onClick={(e) => { e.stopPropagation(); onQuantityChange(rect.id, rect.quantity + 1) }}
           onMouseDown={(e) => e.stopPropagation()}
           className='text-xs text-blue-400/70 hover:text-blue-400 leading-none w-4 text-center select-none transition-colors'
           tabIndex={-1}
         >
           +
         </button>
+        <div className='w-px self-stretch bg-blue-400/30 mx-0.5' />
+        <input
+          type='text'
+          placeholder='name'
+          value={rect.name ?? ""}
+          onChange={(e) => onNameChange(rect.id, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className='w-20 bg-transparent text-xs text-foreground font-mono outline-none placeholder:text-muted-foreground/40'
+        />
       </div>
     </div>
   )
@@ -124,6 +124,7 @@ function QuantityInput({
 export function ExportRectOverlay({
   canvasView,
   onQuantityChange,
+  onNameChange,
   onDelete,
   visible,
 }: ExportRectOverlayProps) {
@@ -139,6 +140,7 @@ export function ExportRectOverlay({
             rect={rect}
             canvasView={canvasView}
             onQuantityChange={onQuantityChange}
+            onNameChange={onNameChange}
             onDelete={onDelete}
           />
         </div>

@@ -20,6 +20,7 @@ import {
   DEFAULT_SVG_STYLE,
 } from "@/lib/export/svgUtils"
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
+import type { ExportFile } from "@/lib/export/exportRectsDxf"
 
 export type ExportMode = "separate" | "combined"
 
@@ -63,10 +64,50 @@ function computeLayerSvgDimensions(
 ): { minX: number; minY: number; maxX: number; maxY: number } | null {
   const gridLayer = convertLayerToGridLayer(clippedLayer)
   const engine = new BlobEngine({ enableCaching: false })
-  const geometry = engine.generateLayerGeometry(gridLayer, gridSize, borderWidth)
+  const geometry = engine.generateLayerGeometry(
+    gridLayer,
+    gridSize,
+    borderWidth,
+  )
   if (geometry.primitives.length === 0) return null
   const { min, max } = geometry.boundingBox
   return { minX: min.x, minY: min.y, maxX: max.x, maxY: max.y }
+}
+
+/**
+ * Build SVG file descriptors for all (rect × layer) combinations (separate mode).
+ * Returns { filename, content }[] without triggering any downloads.
+ */
+export function buildSvgFiles(
+  exportRects: ExportRect[],
+  layers: Layer[],
+  gridSize: number,
+  borderWidth: number,
+  drawingName: string,
+  mmPerUnit: number,
+): ExportFile[] {
+  const visibleLayers = layers.filter((l) => l.isVisible)
+  const files: ExportFile[] = []
+
+  exportRects.forEach((rect, rectIdx) => {
+    const clippedLayers = clipLayersToSelection(visibleLayers, rect)
+    clippedLayers.forEach((layer) => {
+      const gridLayer = convertLayerToGridLayer(layer)
+      const svg = generateSingleLayerSvg(
+        gridLayer,
+        gridSize,
+        borderWidth,
+        DEFAULT_SVG_STYLE,
+        false,
+        mmPerUnit,
+      )
+      const rectLabel = rect.name ? rect.name : `rect${rectIdx + 1}`
+      const filename = `${drawingName || "gridpaint"} - ${rectLabel} - layer-${layer.id}.x${rect.quantity}.svg`
+      files.push({ filename, content: svg })
+    })
+  })
+
+  return files
 }
 
 export function exportExportRectsSvg(
@@ -96,11 +137,11 @@ export function exportExportRectsSvg(
           false,
           mmPerUnit,
         )
-        for (let q = 0; q < rect.quantity; q++) {
-          const filename = `${drawingName || "gridpaint"}-rect${rectIdx + 1}-layer${layer.id}${rect.quantity > 1 ? `-copy${q + 1}` : ""}.svg`
-          setTimeout(() => downloadSvg(svg, filename), downloadIndex * 100)
-          downloadIndex++
-        }
+
+        const rectLabel = rect.name ? rect.name : `rect${rectIdx + 1}`
+        const filename = `${drawingName || "gridpaint"} - ${rectLabel} - layer-${layer.id}.x${rect.quantity}.svg`
+        setTimeout(() => downloadSvg(svg, filename), downloadIndex * 100)
+        downloadIndex++
       })
     })
     return
@@ -109,7 +150,7 @@ export function exportExportRectsSvg(
   // Combined mode — build a single SVG with items laid out in rows
   // Gap constants in subgrid units (gridSize subgrid = 2 subgrid units per grid cell)
   const GAP_BETWEEN_COPIES = 2 // subgrid units between copies in a row
-  const GAP_BETWEEN_ROWS = 4   // subgrid units between rows
+  const GAP_BETWEEN_ROWS = 4 // subgrid units between rows
 
   const items: ExportItem[] = []
 

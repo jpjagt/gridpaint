@@ -1580,6 +1580,7 @@ export const GridPaintCanvas = forwardRef<
       <ExportRectOverlay
         canvasView={canvasView}
         onQuantityChange={exportRectsHook.setQuantity}
+        onNameChange={exportRectsHook.setName}
         onDelete={exportRectsHook.deleteById}
         visible={currentTool === "export"}
       />
