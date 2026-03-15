@@ -17,6 +17,7 @@ import {
 import { exportSeparateZip } from "@/lib/export/exportZip"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import { Clipboard } from "lucide-react"
+import { ExportPreviewModal } from "@/components/ExportPreviewModal"
 
 interface ToolOptionsPanelProps {
   mmPerUnit: number
@@ -255,15 +256,14 @@ function ExportOptions({
   drawingName: string
   onClear?: () => void
 }) {
-  const [mode, setMode] = useState<ExportMode>("combined")
+  const [mode, setMode] = useState<ExportMode>("separate")
   const [copied, setCopied] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const hasRects = exportRects.length > 0
   const namedRects = exportRects.filter((r) => r.name)
 
   const handleCopyBom = () => {
-    const text = namedRects
-      .map((r) => `- ${r.name}: x${r.quantity}`)
-      .join("\n")
+    const text = namedRects.map((r) => `- ${r.name}: x${r.quantity}`).join("\n")
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
@@ -271,83 +271,107 @@ function ExportOptions({
   }
 
   return (
-    <div className='flex items-center gap-3'>
-      {/* Mode toggle */}
-      <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
-        {(["combined", "separate"] as ExportMode[]).map((m) => (
-          <button
-            key={m}
-            type='button'
-            onClick={() => setMode(m)}
-            className={cn(
-              "text-xs font-mono px-2 py-1 transition-colors",
-              mode === m
-                ? "bg-foreground text-background"
-                : "bg-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {m === "separate" ? "separate files" : "combined SVG"}
-          </button>
-        ))}
-      </div>
+    <>
+      <div className='flex items-center gap-3'>
+        {/* Mode toggle */}
+        <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+          {(["separate", "combined"] as ExportMode[]).map((m) => (
+            <button
+              key={m}
+              type='button'
+              onClick={() => setMode(m)}
+              className={cn(
+                "text-xs font-mono px-2 py-1 transition-colors",
+                mode === m
+                  ? "bg-foreground text-background"
+                  : "bg-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {m === "separate" ? "separate files" : "combined SVG"}
+            </button>
+          ))}
+        </div>
 
-      <div className='w-px h-5 bg-border' />
+        <div className='w-px h-5 bg-border' />
 
-      {/* Export button */}
-      <Button
-        size='sm'
-        variant='default'
-        disabled={!hasRects}
-        onClick={() => {
-          if (mode === "separate") {
-            exportSeparateZip(
-              exportRects,
-              layers,
-              canvasView,
-              drawingName ?? "",
-            )
-          } else {
-            exportExportRectsSvg(
-              exportRects,
-              layers,
-              canvasView.gridSize,
-              canvasView.borderWidth,
-              drawingName,
-              canvasView.mmPerUnit,
-              mode,
-            )
-          }
-        }}
-        className='h-7 text-xs font-mono'
-      >
-        Export{hasRects ? ` (${exportRects.length})` : ""}
-      </Button>
-
-      {/* Copy BOM to clipboard */}
-      {namedRects.length > 0 && (
-        <Button
-          size='icon'
-          variant='ghost'
-          onClick={handleCopyBom}
-          className='h-7 w-7'
-          title='Copy bill of materials to clipboard'
-        >
-          <Clipboard className={cn("w-3.5 h-3.5", copied && "text-green-500")} />
-        </Button>
-      )}
-
-      {/* Clear all */}
-      {hasRects && (
+        {/* Preview button */}
         <Button
           size='sm'
-          variant='ghost'
-          onClick={onClear}
-          className='h-7 text-xs font-mono text-muted-foreground'
+          variant='outline'
+          disabled={!hasRects}
+          onClick={() => setPreviewOpen(true)}
+          className='h-7 text-xs font-mono'
         >
-          Clear all
+          Preview
         </Button>
-      )}
-    </div>
+
+        {/* Export button */}
+        <Button
+          size='sm'
+          variant='default'
+          disabled={!hasRects}
+          onClick={() => {
+            if (mode === "separate") {
+              exportSeparateZip(
+                exportRects,
+                layers,
+                canvasView,
+                drawingName ?? "",
+              )
+            } else {
+              exportExportRectsSvg(
+                exportRects,
+                layers,
+                canvasView.gridSize,
+                canvasView.borderWidth,
+                drawingName,
+                canvasView.mmPerUnit,
+                mode,
+              )
+            }
+          }}
+          className='h-7 text-xs font-mono'
+        >
+          Export{hasRects ? ` (${exportRects.length})` : ""}
+        </Button>
+
+        {/* Copy BOM to clipboard */}
+        {namedRects.length > 0 && (
+          <Button
+            size='icon'
+            variant='ghost'
+            onClick={handleCopyBom}
+            className='h-7 w-7'
+            title='Copy bill of materials to clipboard'
+          >
+            <Clipboard
+              className={cn("w-3.5 h-3.5", copied && "text-green-500")}
+            />
+          </Button>
+        )}
+
+        {/* Clear all */}
+        {hasRects && (
+          <Button
+            size='sm'
+            variant='ghost'
+            onClick={onClear}
+            className='h-7 text-xs font-mono text-muted-foreground'
+          >
+            Clear all
+          </Button>
+        )}
+      </div>
+
+      <ExportPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        exportRects={exportRects}
+        layers={layers}
+        canvasView={canvasView}
+        drawingName={drawingName}
+      />
+    </>
   )
 }
 

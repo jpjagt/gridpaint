@@ -19,9 +19,11 @@ import {
   convertLayerToGridLayer,
   DEFAULT_SVG_STYLE,
 } from "@/lib/export/svgUtils"
+import type { SvgRenderOptions } from "@/lib/export/svgUtils"
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import type { ExportFile } from "@/lib/export/exportRectsDxf"
 
+export type { SvgRenderOptions as SvgPreviewOptions }
 export type ExportMode = "separate" | "combined"
 
 interface ExportItem {
@@ -77,6 +79,7 @@ function computeLayerSvgDimensions(
 /**
  * Build SVG file descriptors for all (rect × layer) combinations (separate mode).
  * Returns { filename, content }[] without triggering any downloads.
+ * Pass `style` to override the default SVG render options (e.g. thinner stroke for previews).
  */
 export function buildSvgFiles(
   exportRects: ExportRect[],
@@ -85,6 +88,7 @@ export function buildSvgFiles(
   borderWidth: number,
   drawingName: string,
   mmPerUnit: number,
+  style: SvgRenderOptions = DEFAULT_SVG_STYLE,
 ): ExportFile[] {
   const visibleLayers = layers.filter((l) => l.isVisible)
   const files: ExportFile[] = []
@@ -97,7 +101,7 @@ export function buildSvgFiles(
         gridLayer,
         gridSize,
         borderWidth,
-        DEFAULT_SVG_STYLE,
+        style,
         false,
         mmPerUnit,
       )
