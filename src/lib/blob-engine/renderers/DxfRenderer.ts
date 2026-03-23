@@ -64,10 +64,24 @@ interface ArcEdge {
   kind: "arc"
   a: Pt
   b: Pt
+  /**
+   * The outer corner of the quadrant box.  Used for edge dedup keys and
+   * as the base for computing the true geometric center at tessellation time.
+   * For concave (diagonalBridge) arcs this IS the geometric center.
+   * For convex (roundedCorner) arcs, reflect across the chord midpoint
+   * to get the geometric center: trueCenter = a + b − center.
+   */
   center: Pt
   /** SVG sweep-flag convention: 1=CW (screen y-down), 0=CCW */
   sweep: 0 | 1
-  /** true = roundedCorner (bulges outward/convex); false = diagonalBridge (concave) */
+  /**
+   * Whether the stored `center` needs reflection to obtain the true
+   * geometric center of the arc.  true for roundedCorner (convex),
+   * false for diagonalBridge (concave).
+   *
+   * This is a property of the edge's origin primitive and does NOT
+   * change when the edge is reversed during path stitching.
+   */
   convex: boolean
 }
 
@@ -385,13 +399,17 @@ function stitchEdgesIntoPaths(edges: Edge[]): Edge[][] {
             if (edge.kind === "line") {
               oriented = { kind: "line", a: edge.b, b: edge.a }
             } else {
+              // Swap endpoints, flip sweep direction.  `convex` is NOT
+              // flipped — it indicates whether `center` is the geometric
+              // center (false) or needs reflection (true), which is a
+              // property of the original primitive, not the traversal order.
               oriented = {
                 kind: "arc",
                 a: edge.b,
                 b: edge.a,
                 center: edge.center,
                 sweep: (edge.sweep ^ 1) as 0 | 1,
-                convex: !edge.convex,
+                convex: edge.convex,
               }
             }
           }
@@ -546,12 +564,15 @@ function edgeLoopToLwpolyline(
 
   const lines: string[] = []
 
+  // Vertex count includes the explicit closing vertex (first point repeated).
+  const vertexCount = path.length + 1
+
   lines.push("0\nLWPOLYLINE")
   lines.push("8\n" + layerName)
   // 70: flag bit 1 = closed
   lines.push("70\n1")
-  // 90: vertex count
-  lines.push("90\n" + path.length)
+  // 90: vertex count (path vertices + explicit closing vertex)
+  lines.push("90\n" + vertexCount)
 
   for (const edge of path) {
     const x = toMmX(edge.a.x2, originX2, mmPerUnit)
@@ -572,6 +593,15 @@ function edgeLoopToLwpolyline(
       lines.push("42\n0")
     }
   }
+
+  // Explicit closing vertex: repeat the first point so non-compliant viewers
+  // that ignore the closed flag (70=1) still draw the final segment.
+  const firstEdge = path[0]
+  lines.push("10\n" + fmtMm(toMmX(firstEdge.a.x2, originX2, mmPerUnit)))
+  lines.push(
+    "20\n" + fmtMm(toMmY(firstEdge.a.y2, originY2, mmPerUnit, bboxHeightMm)),
+  )
+  lines.push("42\n0")
 
   return lines.join("\n")
 }
@@ -615,23 +645,16 @@ function flattenPathToPoints(
     pts.push(ptToMm(edge.a))
 
     if (edge.kind === "arc") {
-      // For convex arcs, the stored center is the outer corner (opposite side of
-      // the chord from the true circle center). Reflect it across the chord midpoint
-      // to get the actual center of curvature.
-      let arcCenter = edge.center
-      if (edge.convex) {
-        arcCenter = {
-          x2: edge.a.x2 + edge.b.x2 - edge.center.x2,
-          y2: edge.a.y2 + edge.b.y2 - edge.center.y2,
-        }
+      // For arcs, the stored center is the outer corner (opposite
+      // side of the chord from the true circle center).  Reflect it across
+      // the chord midpoint to get the actual center of curvature.
+      const arcCenter = {
+        x2: edge.a.x2 + edge.b.x2 - edge.center.x2,
+        y2: edge.a.y2 + edge.b.y2 - edge.center.y2,
       }
-      const interp = tessellateArc(
-        edge.a,
-        edge.b,
-        arcCenter,
-        edge.sweep === 0,
-        radiusMm,
-      )
+      const sweepCW = edge.sweep === 0
+
+      const interp = tessellateArc(edge.a, edge.b, arcCenter, sweepCW, radiusMm)
       for (const p of interp) {
         pts.push(sgToMm(p))
       }
@@ -685,6 +708,15 @@ function edgeLoopToLegacyPolyline(
     lines.push("30\n0")
     lines.push("42\n0") // bulge = 0 (straight segment)
   }
+
+  // Explicit closing vertex: repeat the first point so non-compliant viewers
+  // that ignore the closed flag (70=1) still draw the final segment.
+  lines.push("0\nVERTEX")
+  lines.push("8\n" + layerName)
+  lines.push("10\n" + fmtMm(pts[0].x))
+  lines.push("20\n" + fmtMm(pts[0].y))
+  lines.push("30\n0")
+  lines.push("42\n0")
 
   lines.push("0\nSEQEND")
   lines.push("8\n" + layerName)
