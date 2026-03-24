@@ -131,6 +131,13 @@ export const useExportRects = () => {
     )
   }, [])
 
+  /** Update the custom mm per unit of a specific rect */
+  const setCustomMmPerUnit = useCallback((id: string, value: number | undefined) => {
+    $exportRects.set(
+      $exportRects.get().map((r) => (r.id === id ? { ...r, customMmPerUnit: value } : r)),
+    )
+  }, [])
+
   /** Remove all export rects */
   const clearAll = useCallback(() => {
     $exportRects.set([])
@@ -156,6 +163,7 @@ export const useExportRects = () => {
     getHitRect,
     setQuantity,
     setName,
+    setCustomMmPerUnit,
     clearAll,
   }
 }

@@ -138,6 +138,8 @@ export interface ExportRect {
   quantity: number
   /** Optional label for this rect (used in filenames and the BOM clipboard) */
   name?: string
+  /** Optional override for mm per unit. Undefined/0 means use global canvasView.mmPerUnit */
+  customMmPerUnit?: number
 }
 
 // === Validation ===

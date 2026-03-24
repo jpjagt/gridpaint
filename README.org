@@ -79,12 +79,20 @@ union. shared internal edges between groups are eliminated in SVG export.
 
 when the cutout tool is active, an options panel appears above the toolbar:
 
-- *5 anchor positions*: center, SE, SW, NW, NE (position relative to the grid point)
+- *anchor positions*: 3×3 grid (center, N, NE, E, SE, S, SW, W, NW) plus custom offset
   - keyboard shortcuts: =Q= (center), =X= (SE), =Z= (SW), =A= (NW), =W= (NE)
-- *radius input*: in millimeters (converted to grid units using the drawing's mm/unit scale)
-- *click* on an existing point to add a cutout
-- *alt+click* on a point to clear all cutouts on that point
-- multiple cutouts per point are supported
+- *diameter input*: in millimeters (converted to grid units using the drawing's mm/unit scale)
+- *mode toggle*: single or rivet
+  - *single*: add cutout to selected layer(s)
+  - *rivet*: add cutouts to all layers with the point; top/bottom layers get scaled diameter
+- *rivet scale*: percentage for top/bottom layer diameter (only visible in rivet mode)
+
+| action              | effect                                              |
+|---------------------+-----------------------------------------------------|
+| click               | add cutout to active layer                          |
+| shift + click       | add cutout to all layers with that point            |
+| alt + click         | remove hovered cutout from active layer             |
+| alt + shift + click | clear all cutouts at point from all layers          |
 
 cutouts render as transparent holes on canvas (destination-out compositing)
 and as separate CCW-wound circular paths in SVG export.
@@ -132,9 +140,9 @@ when the override tool is active, an options panel shows 10 shape options:
 | cmd/ctrl + =C=   | copy selection (select tool)                                                    |
 | cmd/ctrl + =V=   | paste at cursor — enters floating mode (select tool)                            |
 | arrow keys       | lift selection into floating mode and nudge 1 grid unit; or move floating paste 1 grid unit |
-| shift + arrows   | lift/move active layer only (selection); or move floating paste 10 grid units               |
+| shift + arrows   | lift/move all layers (selection); or move floating paste 10 grid units               |
 | alt + arrows     | lift and nudge 10 grid units                                                                |
-| drag inside selection | lift and drag selected points (all layers; hold shift = active layer only); bakes on release |
+| drag inside selection | lift and drag selected points (active layer only; hold shift = all layers); bakes on release |
 | =Enter=          | place / bake floating paste                                                     |
 | =Escape=         | cancel floating paste / clear selection                                         |
 | =Delete= / =Backspace= | delete selected points from current layer                               |

@@ -52,12 +52,16 @@ export interface CutoutToolSettings {
   anchor: CutoutAnchor
   diameterMm: number // diameter in mm, converted to grid units using mmPerUnit
   customOffset: { x: number; y: number }
+  mode: "single" | "rivet"
+  rivetScalePercent: number
 }
 
 export const $cutoutToolSettings = map<CutoutToolSettings>({
   anchor: "center",
   diameterMm: 2.0,
   customOffset: { x: 0, y: 0 },
+  mode: "single",
+  rivetScalePercent: 140,
 })
 
 // === Selection state ===

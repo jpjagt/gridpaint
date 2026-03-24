@@ -537,192 +537,16 @@ function toMmY(
 }
 
 // ---------------------------------------------------------------------------
-// LWPOLYLINE generation (AC1015 mode)
-//
+// Constants used by the entity emitters in generateLayerDxfEntities
+// ---------------------------------------------------------------------------
+
 // LWPOLYLINE bulge encoding:
 //   bulge = tan(θ/4)  where θ is the central angle of the arc.
 //   For quarter-circles: θ = π/2, so bulge = tan(π/8) ≈ 0.41421356.
 //   Sign convention (DXF uses y-down screen space, same as subgrid):
 //     positive bulge → CCW arc in that space (= SVG sweep 0)
 //     negative bulge → CW arc  in that space (= SVG sweep 1)
-// ---------------------------------------------------------------------------
-
 const QUARTER_CIRCLE_BULGE = Math.tan(Math.PI / 8) // ≈ 0.41421356
-
-/**
- * Emit one closed LWPOLYLINE from an ordered Edge[] loop.
- */
-function edgeLoopToLwpolyline(
-  path: Edge[],
-  mmPerUnit: number,
-  layerName: string,
-  originX2: number,
-  originY2: number,
-  bboxHeightMm: number,
-): string {
-  if (path.length === 0) return ""
-
-  const lines: string[] = []
-
-  // Vertex count includes the explicit closing vertex (first point repeated).
-  const vertexCount = path.length + 1
-
-  lines.push("0\nLWPOLYLINE")
-  lines.push("8\n" + layerName)
-  // 70: flag bit 1 = closed
-  lines.push("70\n1")
-  // 90: vertex count (path vertices + explicit closing vertex)
-  lines.push("90\n" + vertexCount)
-
-  for (const edge of path) {
-    const x = toMmX(edge.a.x2, originX2, mmPerUnit)
-    const y = toMmY(edge.a.y2, originY2, mmPerUnit, bboxHeightMm)
-    lines.push("10\n" + fmtMm(x))
-    lines.push("20\n" + fmtMm(y))
-
-    if (edge.kind === "arc") {
-      // Coordinates are output in DXF Y-up space (toMmY flips Y).
-      // A CW arc in screen Y-down space becomes CCW in DXF Y-up space.
-      // DXF bulge sign convention (Y-up):
-      //   positive bulge → CCW arc → SVG sweep=1 (CW in Y-down)
-      //   negative bulge → CW arc  → SVG sweep=0 (CCW in Y-down)
-      const bulge =
-        edge.sweep === 1 ? QUARTER_CIRCLE_BULGE : -QUARTER_CIRCLE_BULGE
-      lines.push("42\n" + fmtMm(bulge))
-    } else {
-      lines.push("42\n0")
-    }
-  }
-
-  // Explicit closing vertex: repeat the first point so non-compliant viewers
-  // that ignore the closed flag (70=1) still draw the final segment.
-  const firstEdge = path[0]
-  lines.push("10\n" + fmtMm(toMmX(firstEdge.a.x2, originX2, mmPerUnit)))
-  lines.push(
-    "20\n" + fmtMm(toMmY(firstEdge.a.y2, originY2, mmPerUnit, bboxHeightMm)),
-  )
-  lines.push("42\n0")
-
-  return lines.join("\n")
-}
-
-// ---------------------------------------------------------------------------
-// POLYLINE / VERTEX / SEQEND generation (AC1009 legacy mode)
-// ---------------------------------------------------------------------------
-
-/**
- * Flatten an Edge[] loop into a list of (x, y) mm coordinates by tessellating
- * all arc edges into straight-line segments.
- */
-function flattenPathToPoints(
-  path: Edge[],
-  mmPerUnit: number,
-  originX2: number,
-  originY2: number,
-  bboxHeightMm: number,
-): Array<{ x: number; y: number }> {
-  // Quarter-circle radius in mm: the quadrant half-size is 0.5 subgrid units.
-  const radiusMm = 0.5 * mmPerUnit
-
-  const pts: Array<{ x: number; y: number }> = []
-
-  // Convert a Pt (x2/y2 integers) to mm output space.
-  const ptToMm = (p: Pt) => ({
-    x: toMmX(p.x2, originX2, mmPerUnit),
-    y: toMmY(p.y2, originY2, mmPerUnit, bboxHeightMm),
-  })
-
-  // Convert a float subgrid {x, y} to mm output space.
-  const sgToMm = (p: { x: number; y: number }) => ({
-    x: (p.x - originX2 / 2) * mmPerUnit,
-    y: bboxHeightMm - (p.y - originY2 / 2) * mmPerUnit,
-  })
-
-  for (const edge of path) {
-    // Emit the start vertex of this edge.
-    // For a closed polyline, each edge's .b == the next edge's .a, so we
-    // never emit .b — the closed-flag handles the last→first link.
-    pts.push(ptToMm(edge.a))
-
-    if (edge.kind === "arc") {
-      // For arcs, the stored center is the outer corner (opposite
-      // side of the chord from the true circle center).  Reflect it across
-      // the chord midpoint to get the actual center of curvature.
-      const arcCenter = {
-        x2: edge.a.x2 + edge.b.x2 - edge.center.x2,
-        y2: edge.a.y2 + edge.b.y2 - edge.center.y2,
-      }
-      const sweepCW = edge.sweep === 0
-
-      const interp = tessellateArc(edge.a, edge.b, arcCenter, sweepCW, radiusMm)
-      for (const p of interp) {
-        pts.push(sgToMm(p))
-      }
-    }
-  }
-
-  return pts
-}
-
-/**
- * Emit one closed POLYLINE entity (AC1009 style) from an ordered Edge[] loop.
- * All arcs are tessellated into straight-line vertices (bulge = 0).
- */
-function edgeLoopToLegacyPolyline(
-  path: Edge[],
-  mmPerUnit: number,
-  layerName: string,
-  originX2: number,
-  originY2: number,
-  bboxHeightMm: number,
-): string {
-  if (path.length === 0) return ""
-
-  const pts = flattenPathToPoints(
-    path,
-    mmPerUnit,
-    originX2,
-    originY2,
-    bboxHeightMm,
-  )
-  if (pts.length === 0) return ""
-
-  const lines: string[] = []
-
-  // POLYLINE header
-  lines.push("0\nPOLYLINE")
-  lines.push("8\n" + layerName)
-  lines.push("66\n1") // vertices-follow flag
-  lines.push("70\n1") // closed polyline
-  // Dummy elevation vertex (required by AC1009)
-  lines.push("10\n0")
-  lines.push("20\n0")
-  lines.push("30\n0")
-
-  // VERTEX records
-  for (const p of pts) {
-    lines.push("0\nVERTEX")
-    lines.push("8\n" + layerName)
-    lines.push("10\n" + fmtMm(p.x))
-    lines.push("20\n" + fmtMm(p.y))
-    lines.push("30\n0")
-    lines.push("42\n0") // bulge = 0 (straight segment)
-  }
-
-  // Explicit closing vertex: repeat the first point so non-compliant viewers
-  // that ignore the closed flag (70=1) still draw the final segment.
-  lines.push("0\nVERTEX")
-  lines.push("8\n" + layerName)
-  lines.push("10\n" + fmtMm(pts[0].x))
-  lines.push("20\n" + fmtMm(pts[0].y))
-  lines.push("30\n0")
-  lines.push("42\n0")
-
-  lines.push("0\nSEQEND")
-  lines.push("8\n" + layerName)
-
-  return lines.join("\n")
-}
 
 // ---------------------------------------------------------------------------
 // Cutout circle generation
@@ -740,6 +564,8 @@ function generateCutoutLwpolylines(
   originX2: number,
   originY2: number,
   bboxHeightMm: number,
+  offsetXMm: number = 0,
+  offsetYMm: number = 0,
 ): string[] {
   if (!pointModifications) return []
 
@@ -758,11 +584,13 @@ function generateCutoutLwpolylines(
       // Translate same as polyline vertices: subtract origin, flip Y, convert to mm
       const cx =
         (px + anchorOffset.x + (cutout.offset?.x ?? 0) - originX2 / 2) *
-        mmPerUnit
+          mmPerUnit +
+        offsetXMm
       const cy =
         bboxHeightMm -
         (py + anchorOffset.y + (cutout.offset?.y ?? 0) - originY2 / 2) *
-          mmPerUnit
+          mmPerUnit +
+        offsetYMm
       const r = cutout.diameterMm / 2
 
       // Two-vertex closed LWPOLYLINE circle using bulge=1 (semicircle).
@@ -799,6 +627,8 @@ function generateCutoutLegacyPolylines(
   originX2: number,
   originY2: number,
   bboxHeightMm: number,
+  offsetXMm: number = 0,
+  offsetYMm: number = 0,
 ): string[] {
   if (!pointModifications) return []
 
@@ -816,12 +646,14 @@ function generateCutoutLegacyPolylines(
           : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
       const cx =
         (px + anchorOffset.x + (cutout.offset?.x ?? 0) - originX2 / 2) *
-        mmPerUnit
+          mmPerUnit +
+        offsetXMm
       // Flip Y: DXF uses Y-up coordinate system
       const cy =
         bboxHeightMm -
         (py + anchorOffset.y + (cutout.offset?.y ?? 0) - originY2 / 2) *
-          mmPerUnit
+          mmPerUnit +
+        offsetYMm
       const r = cutout.diameterMm / 2
 
       // Full circle: 4 quarter-circles, each tessellated.
@@ -954,6 +786,202 @@ EOF`
 // Public API
 // ---------------------------------------------------------------------------
 
+export interface DxfLayerEntities {
+  /** Raw DXF entity strings (POLYLINE/LWPOLYLINE blocks, no header/footer). */
+  entities: string[]
+  /** DXF layer names used (e.g. ["layer-1", "CUTOUTS"]). */
+  layerNames: string[]
+  /** Physical bounding box of this item in mm, in DXF Y-up space. */
+  bbox: BoundingBoxMm
+}
+
+/**
+ * Generate entity strings for a single layer, translated so its bounding-box
+ * origin maps to (offsetXMm, offsetYMm) in the output DXF coordinate space.
+ *
+ * This lower-level function is used by both generateLayerDxf() (single-item
+ * document) and the combined-DXF builder (multi-item, each at a different
+ * offset).
+ *
+ * @param geometry    BlobGeometry from BlobEngine
+ * @param layer       GridLayer (for cutout pointModifications)
+ * @param mmPerUnit   Millimetres per subgrid unit
+ * @param layerName   DXF layer name (e.g. "layer-1")
+ * @param offsetXMm   X offset in mm for the item's origin (default 0)
+ * @param offsetYMm   Y offset in mm for the item's origin (default 0)
+ */
+export function generateLayerDxfEntities(
+  geometry: BlobGeometry,
+  layer: GridLayer | undefined,
+  mmPerUnit: number,
+  layerName: string = "0",
+  offsetXMm: number = 0,
+  offsetYMm: number = 0,
+): DxfLayerEntities | null {
+  if (geometry.primitives.length === 0) return null
+
+  // Step 1: collect edges
+  const allEdges: Edge[] = []
+  for (const primitive of geometry.primitives) {
+    allEdges.push(...primitiveToEdges(primitive))
+  }
+
+  // Step 2: deduplicate
+  const boundaryEdges = deduplicateEdges(allEdges)
+
+  // Step 3: stitch into closed loops
+  const paths = stitchEdgesIntoPaths(boundaryEdges)
+
+  // Compute bounding box origin from geometry (in 2× subgrid integers).
+  // All coordinates are translated so the item's bbox min lands at
+  // (offsetXMm, offsetYMm) in the output space.
+  const originX2 = Math.round(geometry.boundingBox.min.x * 2)
+  const originY2 = Math.round(geometry.boundingBox.min.y * 2)
+
+  const bboxWidthMm =
+    (geometry.boundingBox.max.x - geometry.boundingBox.min.x) * mmPerUnit
+  const bboxHeightMm =
+    (geometry.boundingBox.max.y - geometry.boundingBox.min.y) * mmPerUnit
+
+  // Wrap the coordinate helpers to apply the mm offset.
+  // DXF Y-up: the bbox min (originY2) maps to bboxHeightMm + offsetYMm,
+  // and the bbox max maps to offsetYMm (Y is flipped).
+  const toX = (x2: number) => toMmX(x2, originX2, mmPerUnit) + offsetXMm
+  const toY = (y2: number) =>
+    toMmY(y2, originY2, mmPerUnit, bboxHeightMm) + offsetYMm
+
+  // Re-implement the emit helpers with offset-aware coordinate functions.
+  // We do this inline to avoid changing the existing helper signatures.
+
+  const emitLwpolyline = (path: Edge[]): string => {
+    if (path.length === 0) return ""
+    const lines: string[] = []
+    lines.push("0\nLWPOLYLINE")
+    lines.push("8\n" + layerName)
+    lines.push("70\n1")
+    lines.push("90\n" + (path.length + 1))
+    for (const edge of path) {
+      lines.push("10\n" + fmtMm(toX(edge.a.x2)))
+      lines.push("20\n" + fmtMm(toY(edge.a.y2)))
+      if (edge.kind === "arc") {
+        const bulge =
+          edge.sweep === 1 ? QUARTER_CIRCLE_BULGE : -QUARTER_CIRCLE_BULGE
+        lines.push("42\n" + fmtMm(bulge))
+      } else {
+        lines.push("42\n0")
+      }
+    }
+    const first = path[0]
+    lines.push("10\n" + fmtMm(toX(first.a.x2)))
+    lines.push("20\n" + fmtMm(toY(first.a.y2)))
+    lines.push("42\n0")
+    return lines.join("\n")
+  }
+
+  const emitLegacyPolyline = (path: Edge[]): string => {
+    if (path.length === 0) return ""
+    const radiusMm = 0.5 * mmPerUnit
+    const ptToMmOffset = (p: Pt) => ({ x: toX(p.x2), y: toY(p.y2) })
+    const sgToMmOffset = (p: { x: number; y: number }) => ({
+      x: (p.x - originX2 / 2) * mmPerUnit + offsetXMm,
+      y: bboxHeightMm - (p.y - originY2 / 2) * mmPerUnit + offsetYMm,
+    })
+    const pts: Array<{ x: number; y: number }> = []
+    for (const edge of path) {
+      pts.push(ptToMmOffset(edge.a))
+      if (edge.kind === "arc") {
+        const arcCenter = {
+          x2: edge.a.x2 + edge.b.x2 - edge.center.x2,
+          y2: edge.a.y2 + edge.b.y2 - edge.center.y2,
+        }
+        const sweepCW = edge.sweep === 0
+        const interp = tessellateArc(
+          edge.a,
+          edge.b,
+          arcCenter,
+          sweepCW,
+          radiusMm,
+        )
+        for (const p of interp) pts.push(sgToMmOffset(p))
+      }
+    }
+    if (pts.length === 0) return ""
+    const lines: string[] = []
+    lines.push("0\nPOLYLINE")
+    lines.push("8\n" + layerName)
+    lines.push("66\n1")
+    lines.push("70\n1")
+    lines.push("10\n0")
+    lines.push("20\n0")
+    lines.push("30\n0")
+    for (const p of pts) {
+      lines.push("0\nVERTEX")
+      lines.push("8\n" + layerName)
+      lines.push("10\n" + fmtMm(p.x))
+      lines.push("20\n" + fmtMm(p.y))
+      lines.push("30\n0")
+      lines.push("42\n0")
+    }
+    lines.push("0\nVERTEX")
+    lines.push("8\n" + layerName)
+    lines.push("10\n" + fmtMm(pts[0].x))
+    lines.push("20\n" + fmtMm(pts[0].y))
+    lines.push("30\n0")
+    lines.push("42\n0")
+    lines.push("0\nSEQEND")
+    lines.push("8\n" + layerName)
+    return lines.join("\n")
+  }
+
+  // Step 4: emit polyline entities
+  let polylines: string[]
+  let cutoutPolylines: string[]
+
+  if (USE_LEGACY_POLYLINE) {
+    polylines = paths.map(emitLegacyPolyline)
+    cutoutPolylines = layer
+      ? generateCutoutLegacyPolylines(
+          layer.pointModifications,
+          mmPerUnit,
+          originX2,
+          originY2,
+          bboxHeightMm,
+          offsetXMm,
+          offsetYMm,
+        )
+      : []
+  } else {
+    polylines = paths.map(emitLwpolyline)
+    cutoutPolylines = layer
+      ? generateCutoutLwpolylines(
+          layer.pointModifications,
+          mmPerUnit,
+          originX2,
+          originY2,
+          bboxHeightMm,
+          offsetXMm,
+          offsetYMm,
+        )
+      : []
+  }
+
+  const layerNames = [layerName]
+  if (cutoutPolylines.length > 0) layerNames.push("CUTOUTS")
+
+  const bbox: BoundingBoxMm = {
+    minX: offsetXMm,
+    minY: offsetYMm,
+    maxX: offsetXMm + bboxWidthMm,
+    maxY: offsetYMm + bboxHeightMm,
+  }
+
+  return {
+    entities: [...polylines, ...cutoutPolylines].filter(Boolean),
+    layerNames,
+    bbox,
+  }
+}
+
 /**
  * Generate a complete DXF document string for a single layer.
  *
@@ -968,93 +996,12 @@ export function generateLayerDxf(
   mmPerUnit: number,
   layerName: string = "0",
 ): string {
-  if (geometry.primitives.length === 0) return ""
-
-  // Step 1: collect edges
-  const allEdges: Edge[] = []
-  for (const primitive of geometry.primitives) {
-    allEdges.push(...primitiveToEdges(primitive))
-  }
-
-  // Step 2: deduplicate
-  const boundaryEdges = deduplicateEdges(allEdges)
-
-  // Step 3: stitch into closed loops
-  const paths = stitchEdgesIntoPaths(boundaryEdges)
-
-  // Compute bounding box origin from geometry (in 2× subgrid integers)
-  // so we can translate all coordinates to start at (0, 0).
-  const originX2 = Math.round(geometry.boundingBox.min.x * 2)
-  const originY2 = Math.round(geometry.boundingBox.min.y * 2)
-
-  // Physical bounding box in mm (after origin translation → starts at 0,0)
-  const bboxWidthMm =
-    (geometry.boundingBox.max.x - geometry.boundingBox.min.x) * mmPerUnit
-  const bboxHeightMm =
-    (geometry.boundingBox.max.y - geometry.boundingBox.min.y) * mmPerUnit
-  const bbox: BoundingBoxMm = {
-    minX: 0,
-    minY: 0,
-    maxX: bboxWidthMm,
-    maxY: bboxHeightMm,
-  }
-
-  // Step 4: emit polyline entities
-  let polylines: string[]
-  let cutoutPolylines: string[]
-
-  if (USE_LEGACY_POLYLINE) {
-    // AC1009: tessellated POLYLINE/VERTEX/SEQEND, no bulge
-    polylines = paths.map((path) =>
-      edgeLoopToLegacyPolyline(
-        path,
-        mmPerUnit,
-        layerName,
-        originX2,
-        originY2,
-        bboxHeightMm,
-      ),
-    )
-    cutoutPolylines = layer
-      ? generateCutoutLegacyPolylines(
-          layer.pointModifications,
-          mmPerUnit,
-          originX2,
-          originY2,
-          bboxHeightMm,
-        )
-      : []
-  } else {
-    // AC1015: LWPOLYLINE with bulge-encoded arcs
-    polylines = paths.map((path) =>
-      edgeLoopToLwpolyline(
-        path,
-        mmPerUnit,
-        layerName,
-        originX2,
-        originY2,
-        bboxHeightMm,
-      ),
-    )
-    cutoutPolylines = layer
-      ? generateCutoutLwpolylines(
-          layer.pointModifications,
-          mmPerUnit,
-          originX2,
-          originY2,
-          bboxHeightMm,
-        )
-      : []
-  }
-
-  const usedLayerNames = [layerName]
-  if (cutoutPolylines.length > 0) usedLayerNames.push("CUTOUTS")
-
-  const entities = [...polylines, ...cutoutPolylines].filter(Boolean).join("\n")
+  const result = generateLayerDxfEntities(geometry, layer, mmPerUnit, layerName)
+  if (!result) return ""
 
   return [
-    buildDxfHeader(usedLayerNames, bbox, USE_LEGACY_POLYLINE),
-    entities,
+    buildDxfHeader(result.layerNames, result.bbox, USE_LEGACY_POLYLINE),
+    result.entities.join("\n"),
     buildDxfFooter(),
   ].join("\n")
 }

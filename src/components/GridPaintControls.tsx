@@ -204,9 +204,12 @@ export const GridPaintControls = ({
             onChange={(e) =>
               onMmPerUnitChange(parseFloat(e.target.value) || 1.0)
             }
+            onBlur={(e) => {
+              const val = parseFloat(e.target.value)
+              const clamped = Math.max(0.1, Math.min(100, isNaN(val) ? 1.0 : val))
+              onMmPerUnitChange(clamped)
+            }}
             className='w-12 bg-muted/50 text-xs text-muted-foreground placeholder-muted border-none outline-none'
-            min='0.1'
-            max='100'
             step='0.1'
             title='mm per grid unit'
           />

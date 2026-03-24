@@ -91,14 +91,26 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys={["cmd/ctrl", "C"]} description="Copy selection (select tool)" />
             <KbdRow keys={["cmd/ctrl", "V"]} description="Paste at cursor — enters floating mode (select tool)" />
             <KbdRow keys="↑ ↓ ← →" description="Lift selection into floating mode and nudge 1 grid unit; or move floating paste 1 grid unit" />
-            <KbdRow keys={["shift", "↑ ↓ ← →"]} description="Lift/move active layer only (selection); or move floating paste 10 grid units" />
+            <KbdRow keys={["shift", "↑ ↓ ← →"]} description="Lift/move all layers (selection); or move floating paste 10 grid units" />
             <KbdRow keys={["alt", "↑ ↓ ← →"]} description="Lift and nudge 10 grid units" />
-            <KbdRow keys="drag inside selection" description="Lift and drag selected points (all layers); bakes on release" />
-            <KbdRow keys={["shift", "drag"]} description="Lift and drag active layer only; bakes on release" />
+            <KbdRow keys="drag inside selection" description="Lift and drag selected points (active layer only); bakes on release" />
+            <KbdRow keys={["shift", "drag"]} description="Lift and drag all layers; bakes on release" />
             <KbdRow keys="Enter" description="Place / bake floating paste" />
             <KbdRow keys="Escape" description="Cancel floating paste / clear selection" />
             <KbdRow keys={["Delete", "/ Backspace"]} description="Delete selected points from current layer" />
             <KbdRow keys={["shift", "Delete"]} description="Delete selected points from all layers" />
+          </Section>
+
+          <Section title="Cutout Tool (O)">
+            <KbdRow keys="Q" description="Anchor: center" />
+            <KbdRow keys="X" description="Anchor: SE" />
+            <KbdRow keys="Z" description="Anchor: SW" />
+            <KbdRow keys="A" description="Anchor: NW" />
+            <KbdRow keys="W" description="Anchor: NE" />
+            <KbdRow keys="click" description="Add cutout to active layer" />
+            <KbdRow keys={["shift", "click"]} description="Add cutout to all layers with point" />
+            <KbdRow keys={["alt", "click"]} description="Remove hovered cutout from active layer" />
+            <KbdRow keys={["alt", "shift", "click"]} description="Clear all cutouts at point from all layers" />
           </Section>
 
           <Section title="Cutout Tool (O)">

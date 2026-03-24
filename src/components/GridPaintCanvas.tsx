@@ -35,6 +35,8 @@ import type {
 // Existing imports for compatibility
 import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
 import { clipLayersToSelection } from "@/lib/gridpaint/selectionUtils"
+import { getLayersWithPoint } from "@/lib/gridpaint/layerUtils"
+import { createRivetCutouts } from "@/lib/gridpaint/cutoutUtils"
 import { showActiveLayerOutline } from "@/stores/ui"
 import useDrawingState from "@/hooks/useDrawingState"
 import {
@@ -61,8 +63,28 @@ import {
   addGroupToActiveLayer,
   resetDrawing,
 } from "@/stores/drawingStores"
-import type { CircularCutout, PointModifications } from "@/types/gridpaint"
+import type { CircularCutout, PointModifications, CutoutAnchor } from "@/types/gridpaint"
 import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
+
+const CUTOUT_DUPLICATE_TOLERANCE_MM = 0.1
+
+function isDuplicateCutout(
+  existing: CircularCutout[],
+  anchor: CutoutAnchor,
+  diameterMm: number,
+  customOffset?: { x: number; y: number },
+): boolean {
+  return existing.some((c) => {
+    if (Math.abs(c.diameterMm - diameterMm) > CUTOUT_DUPLICATE_TOLERANCE_MM) return false
+    if (c.anchor !== anchor) return false
+    if (anchor === "custom") {
+      const cOff = c.customOffset ?? { x: 0, y: 0 }
+      const nOff = customOffset ?? { x: 0, y: 0 }
+      return Math.abs(cOff.x - nOff.x) < 0.01 && Math.abs(cOff.y - nOff.y) < 0.01
+    }
+    return true
+  })
+}
 
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
@@ -402,9 +424,45 @@ export const GridPaintCanvas = forwardRef<
 
   /** Handle cutout tool click: add cutout to a point, or alt+click-on-cutout to remove it */
   const handleCutoutClick = useCallback(
-    (clientX: number, clientY: number, isAltHeld: boolean) => {
+    (clientX: number, clientY: number, isAltHeld: boolean, isShiftHeld: boolean) => {
+      // Alt+Shift: clear all cutouts at point from all layers
+      if (isAltHeld && isShiftHeld) {
+        const hovered = hoveredCutoutRef.current
+        if (!hovered) return
+
+        const { layers } = $layersState.get()
+        const layersWithPoint = getLayersWithPoint(hovered.pointKey, layers)
+
+        layersWithPoint.forEach((layer) => {
+          const existingMods = layer.pointModifications?.get(hovered.pointKey)
+          if (!existingMods?.cutouts) return
+
+          const newMods: PointModifications = { ...existingMods }
+          delete newMods.cutouts
+
+          const hasAnything =
+            newMods.quadrantOverrides &&
+            Object.keys(newMods.quadrantOverrides).length > 0
+          updatePointModifications(
+            layer.id,
+            hovered.pointKey,
+            hasAnything ? newMods : undefined,
+          )
+
+          const [hx, hy] = hovered.pointKey.split(",").map(Number)
+          blobEngine.invalidateLayer(layer.id, {
+            minX: hx - 1,
+            minY: hy - 1,
+            maxX: hx + 1,
+            maxY: hy + 1,
+          })
+        })
+        hoveredCutoutRef.current = null
+        return
+      }
+
+      // Alt (no Shift): remove hovered cutout from active layer only
       if (isAltHeld) {
-        // Alt+click: only remove the specific hovered cutout; do nothing if none hovered
         const hovered = hoveredCutoutRef.current
         if (!hovered) return
 
@@ -438,7 +496,6 @@ export const GridPaintCanvas = forwardRef<
           hasAnything ? newMods : undefined,
         )
 
-        // Clear hover state since we just removed the cutout
         hoveredCutoutRef.current = null
 
         const [hx, hy] = hovered.pointKey.split(",").map(Number)
@@ -458,40 +515,78 @@ export const GridPaintCanvas = forwardRef<
       const { activeLayerId, layers } = currentLayersState
       if (activeLayerId === null) return
 
-      const activeLayer = layers.find((l) => l.id === activeLayerId)
-      if (!activeLayer) return
-
       const pointKey = `${coords.x},${coords.y}`
+      const { anchor, diameterMm, customOffset, mode, rivetScalePercent } = cutoutSettings
 
-      // Only allow cutouts on existing points
-      const allPoints = getLayerPoints(activeLayer)
-      if (!allPoints.has(pointKey)) return
+      // Rivet mode: always apply to all layers with point
+      if (mode === "rivet") {
+        const rivetCutouts = createRivetCutouts(
+          pointKey,
+          anchor,
+          diameterMm,
+          rivetScalePercent,
+          customOffset,
+          layers,
+        )
 
-      const existingMods = activeLayer.pointModifications?.get(pointKey)
+        rivetCutouts.forEach((cutout, layerId) => {
+          const layer = layers.find((l) => l.id === layerId)
+          if (!layer) return
 
-      // Add a cutout with current settings (store diameterMm as primary value;
-      // renderers convert to grid units at draw time using mmPerUnit)
-      const { anchor, diameterMm, customOffset } = cutoutSettings
+          const allPoints = getLayerPoints(layer)
+          if (!allPoints.has(pointKey)) return
 
-      const newCutout: CircularCutout = {
-        anchor,
-        diameterMm,
-        ...(anchor === "custom" ? { customOffset } : {}),
+          const existingMods = layer.pointModifications?.get(pointKey)
+          const existingCutouts = existingMods?.cutouts || []
+          if (isDuplicateCutout(existingCutouts, cutout.anchor, cutout.diameterMm, cutout.customOffset)) return
+
+          const newMods: PointModifications = {
+            ...existingMods,
+            cutouts: [...existingCutouts, cutout],
+          }
+          updatePointModifications(layerId, pointKey, newMods)
+
+          blobEngine.invalidateLayer(layerId, {
+            minX: coords.x - 1,
+            minY: coords.y - 1,
+            maxX: coords.x + 1,
+            maxY: coords.y + 1,
+          })
+        })
+        return
       }
 
-      const existingCutouts = existingMods?.cutouts || []
-      const newMods: PointModifications = {
-        ...existingMods,
-        cutouts: [...existingCutouts, newCutout],
-      }
-      updatePointModifications(activeLayerId, pointKey, newMods)
+      // Single mode: determine target layers based on Shift
+      const targetLayers = isShiftHeld
+        ? getLayersWithPoint(pointKey, layers)
+        : layers.filter((l) => l.id === activeLayerId)
 
-      // Invalidate cache
-      blobEngine.invalidateLayer(activeLayerId, {
-        minX: coords.x - 1,
-        minY: coords.y - 1,
-        maxX: coords.x + 1,
-        maxY: coords.y + 1,
+      targetLayers.forEach((layer) => {
+        const allPoints = getLayerPoints(layer)
+        if (!allPoints.has(pointKey)) return
+
+        const existingMods = layer.pointModifications?.get(pointKey)
+        const existingCutouts = existingMods?.cutouts || []
+        if (isDuplicateCutout(existingCutouts, anchor, diameterMm, customOffset)) return
+
+        const newCutout: CircularCutout = {
+          anchor,
+          diameterMm,
+          ...(anchor === "custom" ? { customOffset } : {}),
+        }
+
+        const newMods: PointModifications = {
+          ...existingMods,
+          cutouts: [...existingCutouts, newCutout],
+        }
+        updatePointModifications(layer.id, pointKey, newMods)
+
+        blobEngine.invalidateLayer(layer.id, {
+          minX: coords.x - 1,
+          minY: coords.y - 1,
+          maxX: coords.x + 1,
+          maxY: coords.y + 1,
+        })
       })
     },
     [getGridCoordinates, cutoutSettings, blobEngine],
@@ -969,8 +1064,8 @@ export const GridPaintCanvas = forwardRef<
           moveDragStartRef.current = grid
         } else if (grid && selection.isInsideSelection(grid.x, grid.y) && selection.hasSelection) {
           // Lift the selection into floating state, then start drag.
-          // Shift = active layer only.
-          selection.liftSelection(e.shiftKey)
+          // Shift = all layers, no shift = active layer only.
+          selection.liftSelection(!e.shiftKey)
           moveDragStartRef.current = grid
         } else {
           // Start a new selection rectangle
@@ -979,7 +1074,7 @@ export const GridPaintCanvas = forwardRef<
         }
       } else if (currentTool === "cutout") {
         pushHistory($layersState.get().layers)
-        handleCutoutClick(e.clientX, e.clientY, isInvertHeld)
+        handleCutoutClick(e.clientX, e.clientY, isInvertHeld, e.shiftKey)
       } else if (currentTool === "override") {
         pushHistory($layersState.get().layers)
         handleOverrideClick(e.clientX, e.clientY, isInvertHeld)
@@ -990,16 +1085,7 @@ export const GridPaintCanvas = forwardRef<
           isDragging: true,
         })
       } else if (currentTool === "export") {
-        if (e.altKey) {
-          // Alt+click: delete the rect under the cursor
-          const grid = getGridCoordinates(e.clientX, e.clientY)
-          if (grid) {
-            const hit = exportRectsHook.getHitRect(grid.x, grid.y)
-            if (hit) exportRectsHook.deleteById(hit.id)
-          }
-        } else {
-          exportRectsHook.startDraw(e.clientX, e.clientY, getGridCoordinates)
-        }
+        exportRectsHook.startDraw(e.clientX, e.clientY, getGridCoordinates)
       } else {
         // draw or erase — snapshot before the stroke begins
         pushHistory($layersState.get().layers)
@@ -1251,8 +1337,8 @@ export const GridPaintCanvas = forwardRef<
         (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")
       ) {
         e.preventDefault()
-        // Shift = active layer only; Alt = 10-unit step
-        const activeLayerOnly = e.shiftKey
+        // Shift = all layers; no shift = active layer only. Alt = 10-unit step
+        const activeLayerOnly = !e.shiftKey
         const step = e.altKey ? 10 : 1
         // Lift into floating state (clears selection bounds)
         selection.liftSelection(activeLayerOnly)
@@ -1582,6 +1668,7 @@ export const GridPaintCanvas = forwardRef<
         onQuantityChange={exportRectsHook.setQuantity}
         onNameChange={exportRectsHook.setName}
         onDelete={exportRectsHook.deleteById}
+        onCustomMmPerUnitChange={exportRectsHook.setCustomMmPerUnit}
         visible={currentTool === "export"}
       />
     </div>

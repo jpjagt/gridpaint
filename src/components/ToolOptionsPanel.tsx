@@ -15,6 +15,7 @@ import {
   type ExportMode,
 } from "@/lib/export/exportRectsSvg"
 import { exportSeparateZip } from "@/lib/export/exportZip"
+import { exportCombinedDxf } from "@/lib/export/exportRectsDxf"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import { Clipboard } from "lucide-react"
 import { ExportPreviewModal } from "@/components/ExportPreviewModal"
@@ -275,7 +276,13 @@ function ExportOptions({
       <div className='flex items-center gap-3'>
         {/* Mode toggle */}
         <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
-          {(["separate", "combined"] as ExportMode[]).map((m) => (
+          {(
+            [
+              ["separate", "separate files"],
+              ["combined", "combined SVG"],
+              ["combined-dxf", "combined DXF"],
+            ] as [ExportMode, string][]
+          ).map(([m, label]) => (
             <button
               key={m}
               type='button'
@@ -287,7 +294,7 @@ function ExportOptions({
                   : "bg-transparent text-muted-foreground hover:text-foreground",
               )}
             >
-              {m === "separate" ? "separate files" : "combined SVG"}
+              {label}
             </button>
           ))}
         </div>
@@ -317,6 +324,15 @@ function ExportOptions({
                 layers,
                 canvasView,
                 drawingName ?? "",
+              )
+            } else if (mode === "combined-dxf") {
+              exportCombinedDxf(
+                exportRects,
+                layers,
+                canvasView.gridSize,
+                canvasView.borderWidth,
+                drawingName ?? "",
+                canvasView.mmPerUnit,
               )
             } else {
               exportExportRectsSvg(
@@ -415,6 +431,8 @@ function CutoutOptions({
     anchor: CutoutAnchor
     diameterMm: number
     customOffset: { x: number; y: number }
+    mode: "single" | "rivet"
+    rivetScalePercent: number
   }
   mmPerUnit: number
 }) {
@@ -496,12 +514,16 @@ function CutoutOptions({
             value={settings.diameterMm}
             onChange={(e) => {
               const val = parseFloat(e.target.value)
-              if (!isNaN(val) && val > 0) {
+              if (!isNaN(val)) {
                 $cutoutToolSettings.setKey("diameterMm", val)
               }
             }}
+            onBlur={(e) => {
+              const val = parseFloat(e.target.value)
+              const clamped = Math.max(0.1, isNaN(val) ? 1 : val)
+              $cutoutToolSettings.setKey("diameterMm", clamped)
+            }}
             className='w-16 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-1 font-mono'
-            min='0.1'
             step='0.1'
           />
           <span className='text-xs text-muted-foreground font-mono'>mm</span>
@@ -510,6 +532,65 @@ function CutoutOptions({
           {(settings.diameterMm / mmPerUnit).toFixed(2)} gu
         </span>
       </div>
+
+      <div className='w-px self-stretch bg-border' />
+
+      {/* Mode toggle */}
+      <div className='flex flex-col gap-1'>
+        <span className='text-xs text-muted-foreground font-mono leading-none mb-0.5'>
+          mode
+        </span>
+        <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+          {(["single", "rivet"] as const).map((m) => (
+            <button
+              key={m}
+              type='button'
+              onClick={() => $cutoutToolSettings.setKey("mode", m)}
+              className={cn(
+                "text-xs font-mono px-2 py-1 transition-colors",
+                settings.mode === m
+                  ? "bg-foreground text-background"
+                  : "bg-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Rivet scale - only show when mode === "rivet" */}
+      {settings.mode === "rivet" && (
+        <>
+          <div className='w-px self-stretch bg-border' />
+
+          <div className='flex flex-col gap-1'>
+            <span className='text-xs text-muted-foreground font-mono leading-none mb-0.5'>
+              top/bottom scale
+            </span>
+            <div className='flex items-center gap-1'>
+              <input
+                type='number'
+                value={settings.rivetScalePercent}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value)
+                  if (!isNaN(val)) {
+                    $cutoutToolSettings.setKey("rivetScalePercent", val)
+                  }
+                }}
+                onBlur={(e) => {
+                  const val = parseFloat(e.target.value)
+                  const clamped = Math.max(100, isNaN(val) ? 100 : val)
+                  $cutoutToolSettings.setKey("rivetScalePercent", clamped)
+                }}
+                className='w-14 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-1 font-mono'
+                step='5'
+              />
+              <span className='text-xs text-muted-foreground font-mono'>%</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

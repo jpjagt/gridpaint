@@ -24,15 +24,15 @@ import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import type { ExportFile } from "@/lib/export/exportRectsDxf"
 
 export type { SvgRenderOptions as SvgPreviewOptions }
-export type ExportMode = "separate" | "combined"
+export type ExportMode = "separate" | "combined" | "combined-dxf"
 
 interface ExportItem {
   rectIndex: number
   layerId: number
   quantity: number
-  /** Width of the tile in subgrid units (bbox width + padding) */
+  /** Width of the tile in subgrid units (bbox width + padding), after scaling */
   svgWidth: number
-  /** Height of the tile in subgrid units (bbox height + padding) */
+  /** Height of the tile in subgrid units (bbox height + padding), after scaling */
   svgHeight: number
   /**
    * Translation to apply to each copy so that the raw path coordinates
@@ -43,6 +43,8 @@ interface ExportItem {
   normTy: number
   /** The <g>...</g> content string for embedding in a combined SVG */
   content: string
+  /** Scale factor for custom mmPerUnit (customMmPerUnit / globalMmPerUnit) */
+  scale: number
 }
 
 function downloadSvg(svg: string, filename: string) {
@@ -94,6 +96,7 @@ export function buildSvgFiles(
   const files: ExportFile[] = []
 
   exportRects.forEach((rect, rectIdx) => {
+    const effectiveMmPerUnit = rect.customMmPerUnit || mmPerUnit
     const clippedLayers = clipLayersToSelection(visibleLayers, rect)
     clippedLayers.forEach((layer) => {
       const gridLayer = convertLayerToGridLayer(layer)
@@ -103,7 +106,7 @@ export function buildSvgFiles(
         borderWidth,
         style,
         false,
-        mmPerUnit,
+        effectiveMmPerUnit,
       )
       const rectLabel = rect.name ? rect.name : `rect${rectIdx + 1}`
       const filename = `${drawingName || "gridpaint"} - ${rectLabel} - layer-${layer.id}.x${rect.quantity}.svg`
@@ -130,6 +133,7 @@ export function exportExportRectsSvg(
   if (mode === "separate") {
     let downloadIndex = 0
     exportRects.forEach((rect, rectIdx) => {
+      const effectiveMmPerUnit = rect.customMmPerUnit || mmPerUnit
       const clippedLayers = clipLayersToSelection(visibleLayers, rect)
       clippedLayers.forEach((layer) => {
         const gridLayer = convertLayerToGridLayer(layer)
@@ -139,7 +143,7 @@ export function exportExportRectsSvg(
           borderWidth,
           DEFAULT_SVG_STYLE,
           false,
-          mmPerUnit,
+          effectiveMmPerUnit,
         )
 
         const rectLabel = rect.name ? rect.name : `rect${rectIdx + 1}`
@@ -159,6 +163,8 @@ export function exportExportRectsSvg(
   const items: ExportItem[] = []
 
   exportRects.forEach((rect, rectIdx) => {
+    const effectiveMmPerUnit = rect.customMmPerUnit || mmPerUnit
+    const scale = effectiveMmPerUnit / mmPerUnit
     const clippedLayers = clipLayersToSelection(visibleLayers, rect)
     clippedLayers.forEach((layer) => {
       const gridLayer = convertLayerToGridLayer(layer)
@@ -166,20 +172,20 @@ export function exportExportRectsSvg(
       if (!bbox) return
 
       const padding = 1 // 1 subgrid unit padding on each side
-      const svgWidth = bbox.maxX - bbox.minX + 2 * padding
-      const svgHeight = bbox.maxY - bbox.minY + 2 * padding
+      const svgWidth = (bbox.maxX - bbox.minX + 2 * padding) * scale
+      const svgHeight = (bbox.maxY - bbox.minY + 2 * padding) * scale
 
       const content = generateLayerSvgContent(
         gridLayer,
         gridSize,
         borderWidth,
         DEFAULT_SVG_STYLE,
-        mmPerUnit,
+        effectiveMmPerUnit,
       )
 
       // Normalising offsets: shift path coordinates so the tile starts at (0,0)
-      const normTx = -bbox.minX + padding
-      const normTy = -bbox.minY + padding
+      const normTx = (-bbox.minX + padding) * scale
+      const normTy = (-bbox.minY + padding) * scale
 
       items.push({
         rectIndex: rectIdx,
@@ -190,6 +196,7 @@ export function exportExportRectsSvg(
         normTx,
         normTy,
         content,
+        scale,
       })
     })
   })
@@ -230,10 +237,14 @@ export function exportExportRectsSvg(
 
   const groups = placed.map(({ item, copyIndex, x, y }) => {
     const groupId = `rect${item.rectIndex + 1}-layer${item.layerId}${item.quantity > 1 ? `-copy${copyIndex + 1}` : ""}`
-    // Combined translate: layout position + normalising shift so path coords become positive
-    const tx = x + item.normTx
-    const ty = y + item.normTy
-    return `  <g id="${groupId}" transform="translate(${tx} ${ty})">\n${item.content}\n  </g>`
+    // Transform: layout position (x, y) + scale + normalising shift
+    // The content is in subgrid units, scale it, then translate to normalize
+    const unscaledNormTx = item.normTx / item.scale
+    const unscaledNormTy = item.normTy / item.scale
+    const transform = item.scale !== 1
+      ? `translate(${x} ${y}) scale(${item.scale}) translate(${unscaledNormTx} ${unscaledNormTy})`
+      : `translate(${x + item.normTx} ${y + item.normTy})`
+    return `  <g id="${groupId}" transform="${transform}">\n${item.content}\n  </g>`
   })
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
