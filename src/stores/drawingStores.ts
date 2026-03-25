@@ -2,7 +2,11 @@ import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingDocument, LayerData } from "@/lib/storage/types"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
-import type { InteractionGroup, PointModifications, ExportRect } from "@/types/gridpaint"
+import type {
+  InteractionGroup,
+  PointModifications,
+  ExportRect,
+} from "@/types/gridpaint"
 import { pushHistory, clearHistory } from "@/stores/historyStore"
 
 export interface Layer {
@@ -71,6 +75,58 @@ export const $layersState = map<LayersState>({
 /** Export rectangles — persisted with the drawing, rendered when export tool is active */
 export const $exportRects = atom<ExportRect[]>([])
 
+/** Export mode (separate files vs combined) — persisted with the drawing */
+export type ExportMode = "separate" | "combined" | "combined-dxf"
+export const $exportMode = atom<ExportMode>("separate")
+
+/** IDs of selected export rects for export. Empty set = all rects selected. */
+export const $selectedExportRectIds = atom<Set<string>>(new Set())
+
+/** Toggle selection of a single export rect */
+export function toggleExportRectSelection(id: string): void {
+  const current = $selectedExportRectIds.get()
+  const newSet = new Set(current)
+  if (newSet.has(id)) {
+    newSet.delete(id)
+  } else {
+    newSet.add(id)
+  }
+  $selectedExportRectIds.set(newSet)
+}
+
+/** Select all export rects (clears the set = all selected) */
+export function selectAllExportRects(): void {
+  $selectedExportRectIds.set(new Set())
+}
+
+/** Deselect all export rects (adds all IDs to set) */
+export function deselectAllExportRects(): void {
+  const allIds = $exportRects.get().map((r) => r.id)
+  $selectedExportRectIds.set(new Set(allIds))
+}
+
+/** Remove a rect id from selection (when rect is deleted) */
+export function removeFromExportRectSelection(id: string): void {
+  const current = $selectedExportRectIds.get()
+  if (current.has(id)) {
+    const newSet = new Set(current)
+    newSet.delete(id)
+    $selectedExportRectIds.set(newSet)
+  }
+}
+
+/** Get filtered export rects based on selection */
+export function getFilteredExportRects(): ExportRect[] {
+  const rects = $exportRects.get()
+
+  const selectedIds = $selectedExportRectIds.get()
+  console.log({ rects, selectedIds })
+  if (selectedIds.size === 0) {
+    return rects
+  }
+  return rects.filter((r) => !selectedIds.has(r.id))
+}
+
 // Helper functions
 export function createDefaultLayer(id: number = 1): Layer {
   return {
@@ -111,6 +167,8 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
       })
 
       $exportRects.set(stored.exportRects ?? [])
+      $exportMode.set(stored.exportMode ?? "separate")
+      $selectedExportRectIds.set(new Set(stored.deselectedExportRectIds ?? []))
     } else {
       // Create new drawing
       const now = Date.now()
@@ -137,6 +195,8 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
       })
 
       $exportRects.set([])
+      $exportMode.set("separate")
+      $selectedExportRectIds.set(new Set())
     }
 
     clearHistory()
@@ -159,6 +219,8 @@ export async function saveDrawingState(): Promise<void> {
     ...canvasView,
     layers: layersState.layers,
     exportRects: $exportRects.get(),
+    exportMode: $exportMode.get(),
+    deselectedExportRectIds: Array.from($selectedExportRectIds.get()),
     updatedAt: Date.now(),
   }
 
@@ -277,7 +339,9 @@ export function addGroupToActiveLayer(): string | null {
   $layersState.setKey("layers", layers)
 
   const updatedLayer = layers.find((l) => l.id === current.activeLayerId)
-  return updatedLayer ? updatedLayer.groups[updatedLayer.groups.length - 1].id : null
+  return updatedLayer
+    ? updatedLayer.groups[updatedLayer.groups.length - 1].id
+    : null
 }
 
 /**
@@ -302,7 +366,10 @@ export function collapseEmptyTrailingGroups(keepUpToIndex: number): number {
     }
 
     // Keep groups up to max(lastNonEmptyIdx, keepUpToIndex), minimum 1 group
-    const keepCount = Math.max(lastNonEmptyIdx + 1, Math.min(keepUpToIndex + 1, layer.groups.length))
+    const keepCount = Math.max(
+      lastNonEmptyIdx + 1,
+      Math.min(keepUpToIndex + 1, layer.groups.length),
+    )
     const trimmedGroups = layer.groups.slice(0, Math.max(1, keepCount))
     resultCount = trimmedGroups.length
     return { ...layer, groups: trimmedGroups }
@@ -328,7 +395,10 @@ export function updatePointModifications(
     } else {
       newMods.set(pointKey, mods)
     }
-    return { ...layer, pointModifications: newMods.size > 0 ? newMods : undefined }
+    return {
+      ...layer,
+      pointModifications: newMods.size > 0 ? newMods : undefined,
+    }
   })
   $layersState.setKey("layers", layers)
 }
@@ -336,7 +406,10 @@ export function updatePointModifications(
 /**
  * Clear all modifications (overrides, cutouts) for a specific point.
  */
-export function clearPointModifications(layerId: number, pointKey: string): void {
+export function clearPointModifications(
+  layerId: number,
+  pointKey: string,
+): void {
   updatePointModifications(layerId, pointKey, undefined)
 }
 

@@ -130,7 +130,6 @@ function EditorPage() {
         layers={layersState.layers}
         canvasView={canvasView}
         drawingName={drawingMeta.name}
-        onClearExportRects={() => $exportRects.set([])}
       />
       <MeasuringBars show={showMeasuringBars} />
       <MeasuringTapeOverlay />

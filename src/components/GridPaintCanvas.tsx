@@ -23,6 +23,10 @@ import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 import { useExportRects } from "@/hooks/useExportRects"
 import { renderExportRects } from "@/lib/gridpaint/renderExportRects"
 import { ExportRectOverlay } from "@/components/ExportRectOverlay"
+import {
+  $selectedExportRectIds,
+  toggleExportRectSelection,
+} from "@/stores/drawingStores"
 
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
@@ -1667,8 +1671,12 @@ export const GridPaintCanvas = forwardRef<
         canvasView={canvasView}
         onQuantityChange={exportRectsHook.setQuantity}
         onNameChange={exportRectsHook.setName}
-        onDelete={exportRectsHook.deleteById}
+        onDelete={(id) => {
+          exportRectsHook.deleteById(id)
+        }}
         onCustomMmPerUnitChange={exportRectsHook.setCustomMmPerUnit}
+        onToggleSelection={toggleExportRectSelection}
+        selectedIds={$selectedExportRectIds.get()}
         visible={currentTool === "export"}
       />
     </div>

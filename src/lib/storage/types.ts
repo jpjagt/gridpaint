@@ -7,7 +7,7 @@
  * - Define data shapes for persistence: LayerData, DrawingMetadata, DrawingDocument
  */
 
-import type { Layer } from "@/stores/drawingStores"
+import type { Layer, ExportMode } from "@/stores/drawingStores"
 import type { CircularCutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
 
 // === Serialized Types (JSON-safe) ===
@@ -73,6 +73,10 @@ export interface DrawingDocument extends DrawingMetadata {
   layers: Layer[]
   /** Export rectangles — regions of the grid to include in SVG export */
   exportRects?: ExportRect[]
+  /** Export mode: separate files, combined SVG, or combined DXF */
+  exportMode?: ExportMode
+  /** IDs of deselected export rects (empty array = all selected) */
+  deselectedExportRectIds?: string[]
   /** Owner user ID (hashed passphrase) - for cloud storage */
   ownerId?: string
   /** Write token for authentication - for cloud storage */

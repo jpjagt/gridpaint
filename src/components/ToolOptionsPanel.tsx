@@ -6,26 +6,34 @@ import {
   $overrideToolSettings,
   $selectionState,
 } from "@/stores/ui"
-import { $exportRects } from "@/stores/drawingStores"
+import {
+  $exportRects,
+  $exportMode,
+  type ExportMode,
+  getFilteredExportRects,
+  selectAllExportRects,
+  deselectAllExportRects,
+} from "@/stores/drawingStores"
 import type { CutoutAnchor, ExportRect, QuadrantState } from "@/types/gridpaint"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import {
-  exportExportRectsSvg,
-  type ExportMode,
-} from "@/lib/export/exportRectsSvg"
+import { exportExportRectsSvg } from "@/lib/export/exportRectsSvg"
 import { exportSeparateZip } from "@/lib/export/exportZip"
 import { exportCombinedDxf } from "@/lib/export/exportRectsDxf"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import { Clipboard } from "lucide-react"
 import { ExportPreviewModal } from "@/components/ExportPreviewModal"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 
 interface ToolOptionsPanelProps {
   mmPerUnit: number
   layers?: Layer[]
   canvasView?: CanvasViewState
   drawingName?: string
-  onClearExportRects?: () => void
 }
 
 // 3×3 grid layout: rows top→bottom, cols left→right
@@ -200,7 +208,6 @@ export const ToolOptionsPanel = ({
   layers,
   canvasView,
   drawingName,
-  onClearExportRects,
 }: ToolOptionsPanelProps) => {
   const currentTool = useStore($currentTool)
   const cutoutSettings = useStore($cutoutToolSettings)
@@ -237,7 +244,6 @@ export const ToolOptionsPanel = ({
             layers={layers}
             canvasView={canvasView}
             drawingName={drawingName ?? "gridpaint"}
-            onClear={onClearExportRects}
           />
         )}
     </div>
@@ -249,26 +255,64 @@ function ExportOptions({
   layers,
   canvasView,
   drawingName,
-  onClear,
 }: {
   exportRects: ExportRect[]
   layers: Layer[]
   canvasView: CanvasViewState
   drawingName: string
-  onClear?: () => void
 }) {
-  const [mode, setMode] = useState<ExportMode>("separate")
+  const mode = useStore($exportMode)
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const hasRects = exportRects.length > 0
-  const namedRects = exportRects.filter((r) => r.name)
+  const filteredRects = getFilteredExportRects()
+  const selectedCount = filteredRects.length
+  const hasSelection = selectedCount > 0
 
   const handleCopyBom = () => {
-    const text = namedRects.map((r) => `- ${r.name}: x${r.quantity}`).join("\n")
+    const text = filteredRects
+      .filter((r) => r.name)
+      .map((r) => `- ${r.name}: x${r.quantity}`)
+      .join("\n")
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
+  }
+
+  const handleExport = () => {
+    if (mode === "separate") {
+      exportSeparateZip(filteredRects, layers, canvasView, drawingName ?? "")
+    } else if (mode === "combined-dxf") {
+      exportCombinedDxf(
+        filteredRects,
+        layers,
+        canvasView.gridSize,
+        canvasView.borderWidth,
+        drawingName ?? "",
+        canvasView.mmPerUnit,
+      )
+    } else {
+      exportExportRectsSvg(
+        filteredRects,
+        layers,
+        canvasView.gridSize,
+        canvasView.borderWidth,
+        drawingName,
+        canvasView.mmPerUnit,
+        mode,
+      )
+    }
+  }
+
+  const formatRectSummary = (rect: ExportRect) => {
+    const parts: string[] = []
+    parts.push(`${rect.quantity}×`)
+    parts.push(rect.name || "unnamed shape")
+    if (rect.customMmPerUnit && rect.customMmPerUnit > 0) {
+      parts.push(`@${rect.customMmPerUnit}mm`)
+    }
+    return parts.join(" ")
   }
 
   return (
@@ -278,15 +322,15 @@ function ExportOptions({
         <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
           {(
             [
-              ["separate", "separate files"],
-              ["combined", "combined SVG"],
-              ["combined-dxf", "combined DXF"],
+              ["separate", "separate"],
+              ["combined", "single svg"],
+              ["combined-dxf", "single DXF"],
             ] as [ExportMode, string][]
           ).map(([m, label]) => (
             <button
               key={m}
               type='button'
-              onClick={() => setMode(m)}
+              onClick={() => $exportMode.set(m)}
               className={cn(
                 "text-xs font-mono px-2 py-1 transition-colors",
                 mode === m
@@ -301,58 +345,42 @@ function ExportOptions({
 
         <div className='w-px h-5 bg-border' />
 
+        {/* Select all/none */}
+        {hasRects && (
+          <div className='flex gap-0.5'>
+            <button
+              type='button'
+              onClick={selectAllExportRects}
+              className='text-xs font-mono px-1.5 py-1 text-muted-foreground hover:text-foreground transition-colors'
+            >
+              all
+            </button>
+            <span className='text-xs text-muted-foreground/50'>·</span>
+            <button
+              type='button'
+              onClick={deselectAllExportRects}
+              className='text-xs font-mono px-1.5 py-1 text-muted-foreground hover:text-foreground transition-colors'
+            >
+              none
+            </button>
+          </div>
+        )}
+
+        <div className='w-px h-5 bg-border' />
+
         {/* Preview button */}
         <Button
           size='sm'
           variant='outline'
-          disabled={!hasRects}
+          disabled={!hasSelection}
           onClick={() => setPreviewOpen(true)}
           className='h-7 text-xs font-mono'
         >
           Preview
         </Button>
 
-        {/* Export button */}
-        <Button
-          size='sm'
-          variant='default'
-          disabled={!hasRects}
-          onClick={() => {
-            if (mode === "separate") {
-              exportSeparateZip(
-                exportRects,
-                layers,
-                canvasView,
-                drawingName ?? "",
-              )
-            } else if (mode === "combined-dxf") {
-              exportCombinedDxf(
-                exportRects,
-                layers,
-                canvasView.gridSize,
-                canvasView.borderWidth,
-                drawingName ?? "",
-                canvasView.mmPerUnit,
-              )
-            } else {
-              exportExportRectsSvg(
-                exportRects,
-                layers,
-                canvasView.gridSize,
-                canvasView.borderWidth,
-                drawingName,
-                canvasView.mmPerUnit,
-                mode,
-              )
-            }
-          }}
-          className='h-7 text-xs font-mono'
-        >
-          Export{hasRects ? ` (${exportRects.length})` : ""}
-        </Button>
-
         {/* Copy BOM to clipboard */}
-        {namedRects.length > 0 && (
+        {filteredRects.filter((r) => r.name).length > 0 && (
           <Button
             size='icon'
             variant='ghost'
@@ -366,23 +394,44 @@ function ExportOptions({
           </Button>
         )}
 
-        {/* Clear all */}
-        {hasRects && (
-          <Button
-            size='sm'
-            variant='ghost'
-            onClick={onClear}
-            className='h-7 text-xs font-mono text-muted-foreground'
+        {/* Export button with hover card */}
+        <HoverCard openDelay={50}>
+          <HoverCardTrigger asChild>
+            <Button
+              size='sm'
+              variant='default'
+              disabled={!hasSelection}
+              onClick={handleExport}
+              className='h-7 text-xs font-mono'
+            >
+              Export
+              {hasSelection
+                ? ` (${selectedCount}${hasRects && selectedCount !== exportRects.length ? `/${exportRects.length}` : ""})`
+                : ""}
+            </Button>
+          </HoverCardTrigger>
+          <HoverCardContent
+            side='top'
+            align='center'
+            className='min-w-60 w-auto p-2'
           >
-            Clear all
-          </Button>
-        )}
+            <div className='text-xs font-mono space-y-1'>
+              {filteredRects.length === 0 ? (
+                <p className='text-muted-foreground'>No shapes selected</p>
+              ) : (
+                filteredRects.map((rect, i) => (
+                  <p key={rect.id}>{formatRectSummary(rect)}</p>
+                ))
+              )}
+            </div>
+          </HoverCardContent>
+        </HoverCard>
       </div>
 
       <ExportPreviewModal
         isOpen={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        exportRects={exportRects}
+        exportRects={filteredRects}
         layers={layers}
         canvasView={canvasView}
         drawingName={drawingName}
@@ -550,7 +599,7 @@ function CutoutOptions({
                 "text-xs font-mono px-2 py-1 transition-colors",
                 settings.mode === m
                   ? "bg-foreground text-background"
-                  : "bg-transparent text-muted-foreground hover:text-foreground"
+                  : "bg-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               {m}

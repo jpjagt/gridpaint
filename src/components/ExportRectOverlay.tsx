@@ -2,6 +2,7 @@ import { useStore } from "@nanostores/react"
 import { $exportRects } from "@/stores/drawingStores"
 import type { CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,8 @@ interface ExportRectOverlayProps {
   onNameChange: (id: string, name: string) => void
   onDelete: (id: string) => void
   onCustomMmPerUnitChange: (id: string, value: number | undefined) => void
+  onToggleSelection: (id: string) => void
+  selectedIds: Set<string>
   visible: boolean
 }
 
@@ -37,6 +40,8 @@ function QuantityInput({
   onNameChange,
   onDelete,
   onCustomMmPerUnitChange,
+  onToggleSelection,
+  isSelected,
 }: {
   rect: ExportRect
   canvasView: CanvasViewState
@@ -44,23 +49,44 @@ function QuantityInput({
   onNameChange: (id: string, name: string) => void
   onDelete: (id: string) => void
   onCustomMmPerUnitChange: (id: string, value: number | undefined) => void
+  onToggleSelection: (id: string) => void
+  isSelected: boolean
 }) {
   const bottomRight = gridToScreen(rect.maxX + 1, rect.maxY + 1, canvasView)
+  const topLeft = gridToScreen(rect.minX, rect.minY, canvasView)
 
   const offsetPx = 4
   const totalWidth = 16 + 16 + 28 + 16 + 112 + 20 + 16
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        left: bottomRight.x - totalWidth - offsetPx,
-        top: bottomRight.y - 24 - offsetPx,
-        pointerEvents: "auto",
-        zIndex: 20,
-      }}
-    >
-      <div className='flex items-center gap-0.5 bg-background/90 backdrop-blur-sm border border-blue-400/60 rounded px-1 py-0.5'>
+    <>
+      <div
+        style={{
+          position: "fixed",
+          left: topLeft.x - offsetPx,
+          top: topLeft.y - offsetPx,
+          pointerEvents: "auto",
+          zIndex: 20,
+        }}
+      >
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={() => onToggleSelection(rect.id)}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          title={isSelected ? "Included in export" : "Excluded from export"}
+        />
+      </div>
+      <div
+        style={{
+          position: "fixed",
+          left: bottomRight.x - totalWidth - offsetPx,
+          top: bottomRight.y - 24 - offsetPx,
+          pointerEvents: "auto",
+          zIndex: 20,
+        }}
+      >
+        <div className={`flex items-center gap-0.5 bg-background/90 backdrop-blur-sm border rounded px-1 py-0.5 ${isSelected ? "border-blue-400/60" : "border-muted opacity-50"}`}>
         <button
           type='button'
           onClick={(e) => { e.stopPropagation(); if (rect.quantity > 1) onQuantityChange(rect.id, rect.quantity - 1) }}
@@ -158,8 +184,9 @@ function QuantityInput({
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -169,6 +196,8 @@ export function ExportRectOverlay({
   onNameChange,
   onDelete,
   onCustomMmPerUnitChange,
+  onToggleSelection,
+  selectedIds,
   visible,
 }: ExportRectOverlayProps) {
   const exportRects = useStore($exportRects)
@@ -186,6 +215,8 @@ export function ExportRectOverlay({
             onNameChange={onNameChange}
             onDelete={onDelete}
             onCustomMmPerUnitChange={onCustomMmPerUnitChange}
+            onToggleSelection={onToggleSelection}
+            isSelected={!selectedIds.has(rect.id)}
           />
         </div>
       ))}

@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback } from "react"
-import { $exportRects } from "@/stores/drawingStores"
+import { $exportRects, $selectedExportRectIds, removeFromExportRectSelection } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 
 /** Generate a simple unique id */
@@ -102,6 +102,7 @@ export const useExportRects = () => {
   /** Delete a specific rect by id */
   const deleteById = useCallback((id: string) => {
     $exportRects.set($exportRects.get().filter((r) => r.id !== id))
+    removeFromExportRectSelection(id)
     setSelectedId((prev) => (prev === id ? null : prev))
   }, [])
 
@@ -141,6 +142,7 @@ export const useExportRects = () => {
   /** Remove all export rects */
   const clearAll = useCallback(() => {
     $exportRects.set([])
+    $selectedExportRectIds.set(new Set())
     setSelectedId(null)
     setDrawStart(null)
     setDrawEnd(null)
