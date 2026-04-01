@@ -24,6 +24,9 @@ export interface SvgRenderOptions {
   strokeWidth?: number
   fillColor?: string
   opacity?: number
+  includeCutouts?: boolean
+  /** When set, hole paths get this stroke; outer paths get `strokeColor`. */
+  holeStrokeColor?: string
 }
 
 /**
@@ -115,6 +118,7 @@ export function generateLayerSvgContent(
       strokeWidth: style.strokeWidth,
       fillColor: style.fillColor,
       opacity: style.opacity,
+      holeStrokeColor: style.holeStrokeColor,
     },
     {
       zoom: 1,
@@ -124,6 +128,7 @@ export function generateLayerSvgContent(
     },
     layer,
     mmPerUnit,
+    style.includeCutouts ?? true,
   )
 }
 

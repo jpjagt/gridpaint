@@ -32,6 +32,10 @@ function fmtMm(v: number): string {
   return (Math.round(v * 10000) / 10000).toString()
 }
 
+function sanitizeLayerName(name: string): string {
+  return name.replace(/[^A-Z0-9]/gi, "")
+}
+
 function buildCombinedDxfHeader(
   layerNames: string[],
   minX: number,
@@ -136,7 +140,7 @@ export function buildDxfFiles(
 
       if (geometry.primitives.length === 0) return
 
-      const layerName = `layer-${layer.id}`
+      const layerName = sanitizeLayerName(`layer-${layer.id}`)
       const dxf = generateLayerDxf(geometry, gridLayer, effectiveMmPerUnit, layerName)
       if (!dxf) return
 
@@ -227,10 +231,11 @@ export function buildCombinedDxf(
       const itemHeightMm = bboxHeightMm + 2 * PADDING_MM
 
       const rectLabel = rect.name ? rect.name : `rect${rectIdx + 1}`
-      const layerName =
+      const baseLayerName =
         rect.quantity > 1
-          ? `rect${rectIdx + 1}-layer${layer.id}`
-          : `${rectLabel}-layer${layer.id}`
+          ? `rect${rectIdx + 1}_layer${layer.id}`
+          : `${rectLabel}_layer${layer.id}`
+      const layerName = sanitizeLayerName(baseLayerName)
 
       let currentXMm = 0
       for (let q = 0; q < rect.quantity; q++) {
@@ -238,7 +243,7 @@ export function buildCombinedDxf(
           geometry,
           gridLayer,
           effectiveMmPerUnit,
-          layerName: rect.quantity > 1 ? `${layerName}-copy${q + 1}` : layerName,
+          layerName: rect.quantity > 1 ? sanitizeLayerName(`${layerName}_copy${q + 1}`) : layerName,
           widthMm: itemWidthMm,
           heightMm: itemHeightMm,
           offsetXMm: currentXMm + PADDING_MM,

@@ -75,9 +75,13 @@ export const $layersState = map<LayersState>({
 /** Export rectangles — persisted with the drawing, rendered when export tool is active */
 export const $exportRects = atom<ExportRect[]>([])
 
-/** Export mode (separate files vs combined) — persisted with the drawing */
-export type ExportMode = "separate" | "combined" | "combined-dxf"
+/** Export mode (separate files vs combined vs holder) — persisted with the drawing */
+export type ExportMode = "separate" | "combined" | "holder"
 export const $exportMode = atom<ExportMode>("separate")
+
+/** Export format (svg vs dxf) — only used for combined/holder modes, persisted with the drawing */
+export type ExportFormat = "svg" | "dxf"
+export const $exportFormat = atom<ExportFormat>("svg")
 
 /** IDs of selected export rects for export. Empty set = all rects selected. */
 export const $selectedExportRectIds = atom<Set<string>>(new Set())
@@ -168,6 +172,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
 
       $exportRects.set(stored.exportRects ?? [])
       $exportMode.set(stored.exportMode ?? "separate")
+      $exportFormat.set(stored.exportFormat ?? "svg")
       $selectedExportRectIds.set(new Set(stored.deselectedExportRectIds ?? []))
     } else {
       // Create new drawing
@@ -196,6 +201,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
 
       $exportRects.set([])
       $exportMode.set("separate")
+      $exportFormat.set("svg")
       $selectedExportRectIds.set(new Set())
     }
 
@@ -220,6 +226,7 @@ export async function saveDrawingState(): Promise<void> {
     layers: layersState.layers,
     exportRects: $exportRects.get(),
     exportMode: $exportMode.get(),
+    exportFormat: $exportFormat.get(),
     deselectedExportRectIds: Array.from($selectedExportRectIds.get()),
     updatedAt: Date.now(),
   }

@@ -2,8 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Eye, EyeOff, Grid3X3, Square } from "lucide-react"
 import { useEffect } from "react"
 import { useStore } from "@nanostores/react"
-import type { Layer } from "@/stores/drawingStores"
-import { addGroupToActiveLayer, collapseEmptyTrailingGroups } from "@/stores/drawingStores"
+import { $layersState, addGroupToActiveLayer, collapseEmptyTrailingGroups } from "@/stores/drawingStores"
 import {
   $activeGroupIndex,
   setActiveGroupIndex,
@@ -15,8 +14,6 @@ import {
 import { undo, redo } from "@/stores/historyStore"
 
 interface LayerControlsProps {
-  layers: Layer[]
-  activeLayerId: number | null
   onLayerSelect: (layerId: number | null) => void
   onLayerVisibilityToggle: (layerId: number) => void
   onCreateLayer: () => void
@@ -26,8 +23,6 @@ interface LayerControlsProps {
 }
 
 export const LayerControls = ({
-  layers,
-  activeLayerId,
   onLayerSelect,
   onLayerVisibilityToggle,
   onCreateLayer,
@@ -35,6 +30,9 @@ export const LayerControls = ({
   onCreateOrActivateLayer,
   maxLayers = 6,
 }: LayerControlsProps) => {
+  const layersState = useStore($layersState)
+  const layers = layersState.layers
+  const activeLayerId = layersState.activeLayerId
   const activeGroupIndex = useStore($activeGroupIndex)
 
   const activeLayer = activeLayerId !== null

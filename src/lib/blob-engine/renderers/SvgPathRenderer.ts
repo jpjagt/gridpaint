@@ -36,6 +36,7 @@ import {
   type RenderOptions,
   type ViewportTransform,
 } from "./Renderer"
+import { createPathGroups } from "@/lib/export/pathUtils"
 
 // ---------------------------------------------------------------------------
 // Internal geometry types
@@ -697,6 +698,7 @@ export class SvgPathRenderer extends Renderer {
     _transform: ViewportTransform,
     layer?: GridLayer,
     mmPerUnit: number = 1,
+    includeCutouts: boolean = true,
   ): string {
     const dbg = this.debugMode
 
@@ -770,7 +772,7 @@ export class SvgPathRenderer extends Renderer {
     const svgPaths = stitchedPaths.map(pathToSvgString).filter(Boolean)
 
     // ── Step 5: Add cutout circles ────────────────────────────────────────────
-    const cutoutPaths = layer
+    const cutoutPaths = includeCutouts && layer
       ? generateCutoutPaths(layer.pointModifications, mmPerUnit)
       : []
 
@@ -807,16 +809,41 @@ export class SvgPathRenderer extends Renderer {
     }
 
     // ── Step 6: Emit SVG group ────────────────────────────────────────────────
-    const stroke = style.strokeColor || style.fillColor || "#000"
+    const outerStroke = style.strokeColor || style.fillColor || "#000"
     const strokeWidth = style.strokeWidth ?? 0.5
     const opacity = style.opacity ?? 1
     const fill = style.fillColor || "none"
 
     const allPaths = [...svgPaths, ...cutoutPaths]
-    const pathElements = allPaths.map((d) => `  <path d="${d}" />`).join("\n")
+
+    let pathElements: string
+    if (style.holeStrokeColor) {
+      // Per-path stroke: run containment detection on the blob paths only
+      // (cutout circles are always holes — give them hole color too).
+      const groups = createPathGroups(svgPaths)
+      const outerSet = new Set(groups.map((g) => g.outer))
+
+      pathElements = allPaths
+        .map((d) => {
+          const isOuter = outerSet.has(d)
+          // cutout paths are not in svgPaths so they fall to the else branch
+          const color = isOuter ? outerStroke : style.holeStrokeColor!
+          return `  <path d="${d}" stroke="${color}" />`
+        })
+        .join("\n")
+
+      // No group-level stroke — each path carries its own.
+      return (
+        `<g fill="${fill}" stroke-width="${strokeWidth}" opacity="${opacity}">\n` +
+        `${pathElements}\n` +
+        `</g>`
+      )
+    }
+
+    pathElements = allPaths.map((d) => `  <path d="${d}" />`).join("\n")
 
     return (
-      `<g fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}">\n` +
+      `<g fill="${fill}" stroke="${outerStroke}" stroke-width="${strokeWidth}" opacity="${opacity}">\n` +
       `${pathElements}\n` +
       `</g>`
     )

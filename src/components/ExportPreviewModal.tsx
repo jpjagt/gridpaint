@@ -16,6 +16,7 @@ import type { ExportRect } from "@/types/gridpaint"
 import { buildSvgFiles } from "@/lib/export/exportRectsSvg"
 import { buildDxfFiles } from "@/lib/export/exportRectsDxf"
 import { DxfPreview } from "@/components/DxfPreview"
+import { generateHolderPreviewSvg } from "@/lib/export/nestedLayout"
 import { useMemo } from "react"
 
 interface ExportPreviewModalProps {
@@ -25,6 +26,8 @@ interface ExportPreviewModalProps {
   layers: Layer[]
   canvasView: CanvasViewState
   drawingName: string
+  mode: "separate" | "combined" | "holder"
+  format: "svg" | "dxf"
 }
 
 const PREVIEW_SIZE = 400
@@ -58,7 +61,12 @@ function SvgPreview({
       alt='SVG preview'
       width={size}
       height={size}
-      style={{ width: size, height: size, objectFit: "contain", background: "#fff" }}
+      style={{
+        width: size,
+        height: size,
+        objectFit: "contain",
+        background: "#fff",
+      }}
     />
   )
 }
@@ -70,7 +78,11 @@ export function ExportPreviewModal({
   layers,
   canvasView,
   drawingName,
+  mode,
+  format,
 }: ExportPreviewModalProps) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void format // Reserved for future use: filter preview by format
   const { gridSize, borderWidth, mmPerUnit } = canvasView
 
   const previewItems = useMemo<RectPreviewItem[]>(() => {
@@ -83,7 +95,13 @@ export function ExportPreviewModal({
       borderWidth,
       drawingName,
       mmPerUnit,
-      { strokeColor: "#000", strokeWidth: 0.1, fillColor: "transparent", opacity: 1 },
+      {
+        strokeColor: "#2563eb",   // blue for outer paths
+        holeStrokeColor: "#dc2626", // red for inner holes
+        strokeWidth: 0.1,
+        fillColor: "none",
+        opacity: 1,
+      },
     )
 
     const dxfFiles = buildDxfFiles(
@@ -138,6 +156,54 @@ export function ExportPreviewModal({
     drawingName,
     mmPerUnit,
   ])
+
+  // Generate holder preview SVG
+  const holderPreview = useMemo(() => {
+    if (!isOpen || exportRects.length === 0 || mode !== "holder") return null
+
+    return generateHolderPreviewSvg(
+      exportRects,
+      layers,
+      gridSize,
+      borderWidth,
+      mmPerUnit,
+    )
+  }, [isOpen, exportRects, layers, gridSize, borderWidth, mmPerUnit, mode])
+
+  // For holder mode, show full-screen preview
+  if (mode === "holder" && holderPreview) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent
+          className='p-0 overflow-hidden flex flex-col max-w-4xl'
+          style={{
+            maxWidth: "90vw",
+            width: "90vw",
+            maxHeight: "90vh",
+            height: "90vh",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <DialogHeader className='px-6 py-4 border-b border-border shrink-0'>
+            <DialogTitle className='font-mono text-sm'>
+              Holder Preview
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className='flex-1 overflow-auto p-6 flex items-center justify-center bg-muted/20'>
+            <div
+              className='border border-border'
+              style={{ width: 700, height: 500 }}
+            >
+              <SvgPreview svgContent={holderPreview} size={700} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

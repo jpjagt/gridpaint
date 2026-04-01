@@ -18,6 +18,7 @@ interface ExportRectOverlayProps {
   onDelete: (id: string) => void
   onCustomMmPerUnitChange: (id: string, value: number | undefined) => void
   onToggleSelection: (id: string) => void
+  onView3D?: (id: string) => void
   selectedIds: Set<string>
   visible: boolean
 }
@@ -41,6 +42,7 @@ function QuantityInput({
   onDelete,
   onCustomMmPerUnitChange,
   onToggleSelection,
+  onView3D,
   isSelected,
 }: {
   rect: ExportRect
@@ -50,6 +52,7 @@ function QuantityInput({
   onDelete: (id: string) => void
   onCustomMmPerUnitChange: (id: string, value: number | undefined) => void
   onToggleSelection: (id: string) => void
+  onView3D?: (id: string) => void
   isSelected: boolean
 }) {
   const bottomRight = gridToScreen(rect.maxX + 1, rect.maxY + 1, canvasView)
@@ -149,6 +152,14 @@ function QuantityInput({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' className='min-w-[140px]'>
+            {onView3D && (
+              <DropdownMenuItem
+                className='text-xs'
+                onSelect={() => onView3D(rect.id)}
+              >
+                View 3D
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className='text-xs text-red-400 focus:text-red-400 focus:bg-red-400/10'
               onSelect={() => onDelete(rect.id)}
@@ -197,6 +208,7 @@ export function ExportRectOverlay({
   onDelete,
   onCustomMmPerUnitChange,
   onToggleSelection,
+  onView3D,
   selectedIds,
   visible,
 }: ExportRectOverlayProps) {
@@ -216,6 +228,7 @@ export function ExportRectOverlay({
             onDelete={onDelete}
             onCustomMmPerUnitChange={onCustomMmPerUnitChange}
             onToggleSelection={onToggleSelection}
+            onView3D={onView3D}
             isSelected={!selectedIds.has(rect.id)}
           />
         </div>

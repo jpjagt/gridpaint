@@ -22,9 +22,17 @@ import {
 import type { SvgRenderOptions } from "@/lib/export/svgUtils"
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import type { ExportFile } from "@/lib/export/exportRectsDxf"
+import {
+  packShapes,
+  generateHolderOutline,
+  shiftLayer,
+  getLayerBoundingBox,
+  type ShapeData,
+} from "@/lib/export/nestedLayout"
+import { filterOuterPaths } from "@/lib/export/pathUtils"
 
 export type { SvgRenderOptions as SvgPreviewOptions }
-export type ExportMode = "separate" | "combined" | "combined-dxf"
+export type ExportMode = "separate" | "combined" | "holder"
 
 interface ExportItem {
   rectIndex: number
@@ -155,6 +163,19 @@ export function exportExportRectsSvg(
     return
   }
 
+  if (mode === "holder") {
+    // Holder mode — pack shapes and generate holder with cutouts
+    exportHolderSvg(
+      exportRects,
+      visibleLayers,
+      gridSize,
+      borderWidth,
+      drawingName,
+      mmPerUnit,
+    )
+    return
+  }
+
   // Combined mode — build a single SVG with items laid out in rows
   // Gap constants in subgrid units (gridSize subgrid = 2 subgrid units per grid cell)
   const GAP_BETWEEN_COPIES = 2 // subgrid units between copies in a row
@@ -256,4 +277,101 @@ ${groups.join("\n")}
 </svg>`
 
   downloadSvg(svg, `${drawingName || "gridpaint"}-export.svg`)
+}
+
+function exportHolderSvg(
+  exportRects: ExportRect[],
+  layers: Layer[],
+  gridSize: number,
+  borderWidth: number,
+  drawingName: string,
+  mmPerUnit: number,
+): void {
+  const MARGIN = 2
+  const OUTER_MARGIN = 5
+
+  const shapeData: ShapeData[] = []
+
+  exportRects.forEach((rect, rectIdx) => {
+    const clippedLayers = clipLayersToSelection(layers, rect)
+
+    clippedLayers.forEach((layer) => {
+      const gridLayer = convertLayerToGridLayer(layer)
+      const svgBounds = computeLayerSvgDimensions(layer, gridSize, borderWidth)
+      const gridBounds = getLayerBoundingBox(gridLayer)
+      if (!svgBounds || !gridBounds) return
+
+      const width = svgBounds.maxX - svgBounds.minX + 2
+      const height = svgBounds.maxY - svgBounds.minY + 2
+
+      for (let q = 0; q < rect.quantity; q++) {
+        shapeData.push({
+          id: `rect${rectIdx + 1}-layer${layer.id}-copy${q + 1}`,
+          width,
+          height,
+          layerName: `rect${rectIdx + 1}-layer${layer.id}`,
+          layer: gridLayer,
+          offsetX: -gridBounds.minX,
+          offsetY: -gridBounds.minY,
+        })
+      }
+    })
+  })
+
+  if (shapeData.length === 0) return
+
+  const packed = packShapes(shapeData, {
+    margin: MARGIN,
+    outerMargin: OUTER_MARGIN,
+  })
+
+  const outline = generateHolderOutline(
+    packed.totalWidth,
+    packed.totalHeight,
+    OUTER_MARGIN,
+  )
+
+  const physW = packed.totalWidth * mmPerUnit
+  const physH = packed.totalHeight * mmPerUnit
+
+  const paths: string[] = [
+    `<path d="${outline}" fill="none" stroke="#000" stroke-width="0.1"/>`,
+  ]
+
+  packed.items.forEach((item) => {
+    const deltaX = item.x + item.offsetX
+    const deltaY = item.y + item.offsetY
+
+    const shiftedLayer = shiftLayer(item.layer, deltaX, deltaY)
+
+    const content = generateLayerSvgContent(
+      shiftedLayer,
+      gridSize,
+      borderWidth,
+      {
+        ...DEFAULT_SVG_STYLE,
+        includeCutouts: false,
+      },
+      mmPerUnit,
+    )
+
+    const pathMatches = Array.from(content.matchAll(/<path[^>]+d="([^"]+)"/g)).map(m => m[1])
+    const outerPaths = filterOuterPaths(pathMatches)
+
+    for (const pathD of outerPaths) {
+      paths.push(
+        `<path d="${pathD}" fill="none" stroke="#000" stroke-width="0.1"/>`,
+      )
+    }
+  })
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="${physW}mm"
+     height="${physH}mm"
+     viewBox="0 0 ${packed.totalWidth} ${packed.totalHeight}">
+${paths.join("\n")}
+</svg>`
+
+  downloadSvg(svg, `${drawingName || "gridpaint"}-holder.svg`)
 }

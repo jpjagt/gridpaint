@@ -23,6 +23,7 @@ import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 import { useExportRects } from "@/hooks/useExportRects"
 import { renderExportRects } from "@/lib/gridpaint/renderExportRects"
 import { ExportRectOverlay } from "@/components/ExportRectOverlay"
+import { ModelViewerModal } from "@/components/ModelViewerModal"
 import {
   $selectedExportRectIds,
   toggleExportRectSelection,
@@ -156,6 +157,9 @@ export const GridPaintCanvas = forwardRef<
     x: number
     y: number
   } | null>(null)
+
+  // 3D Model viewer state
+  const [viewingRectId, setViewingRectId] = useState<string | null>(null)
 
   /** Last known mouse position in client coordinates (used for cursor-position paste) */
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -1676,8 +1680,16 @@ export const GridPaintCanvas = forwardRef<
         }}
         onCustomMmPerUnitChange={exportRectsHook.setCustomMmPerUnit}
         onToggleSelection={toggleExportRectSelection}
+        onView3D={(id) => setViewingRectId(id)}
         selectedIds={$selectedExportRectIds.get()}
         visible={currentTool === "export"}
+      />
+      <ModelViewerModal
+        isOpen={viewingRectId !== null}
+        onClose={() => setViewingRectId(null)}
+        exportRect={exportRects.find((r) => r.id === viewingRectId) ?? null}
+        layers={layersState.layers}
+        canvasView={canvasView}
       />
     </div>
   )

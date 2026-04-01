@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import {
   $currentTool,
   $cutoutToolSettings,
@@ -9,7 +9,12 @@ import {
 import {
   $exportRects,
   $exportMode,
+  $exportFormat,
+  $canvasView,
+  $layersState,
+  $drawingMeta,
   type ExportMode,
+  type ExportFormat,
   getFilteredExportRects,
   selectAllExportRects,
   deselectAllExportRects,
@@ -28,13 +33,6 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
-
-interface ToolOptionsPanelProps {
-  mmPerUnit: number
-  layers?: Layer[]
-  canvasView?: CanvasViewState
-  drawingName?: string
-}
 
 // 3×3 grid layout: rows top→bottom, cols left→right
 const ANCHOR_GRID: { id: CutoutAnchor; label: string }[][] = [
@@ -203,19 +201,22 @@ const SHAPE_OPTIONS: {
   },
 ]
 
-export const ToolOptionsPanel = ({
-  mmPerUnit,
-  layers,
-  canvasView,
-  drawingName,
-}: ToolOptionsPanelProps) => {
+export const ToolOptionsPanel = () => {
+  const drawingMeta = useStore($drawingMeta)
+  const drawingName = drawingMeta.name
+
+  const canvasView = useStore($canvasView)
+  const mmPerUnit = canvasView.mmPerUnit
+
+  const layersState = useStore($layersState)
+  const layers = layersState.layers
+
   const currentTool = useStore($currentTool)
   const cutoutSettings = useStore($cutoutToolSettings)
   const overrideSettings = useStore($overrideToolSettings)
   const selectionState = useStore($selectionState)
-  const exportRects = useStore($exportRects)
-
   const hasFloatingPaste = !!selectionState.floatingPaste
+  const exportRects = useStore($exportRects)
 
   if (
     currentTool !== "cutout" &&
@@ -262,12 +263,15 @@ function ExportOptions({
   drawingName: string
 }) {
   const mode = useStore($exportMode)
+  const format = useStore($exportFormat)
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const hasRects = exportRects.length > 0
   const filteredRects = getFilteredExportRects()
   const selectedCount = filteredRects.length
   const hasSelection = selectedCount > 0
+
+  const isFormatDisabled = mode === "separate"
 
   const handleCopyBom = () => {
     const text = filteredRects
@@ -283,7 +287,7 @@ function ExportOptions({
   const handleExport = () => {
     if (mode === "separate") {
       exportSeparateZip(filteredRects, layers, canvasView, drawingName ?? "")
-    } else if (mode === "combined-dxf") {
+    } else if (format === "dxf") {
       exportCombinedDxf(
         filteredRects,
         layers,
@@ -323,8 +327,8 @@ function ExportOptions({
           {(
             [
               ["separate", "separate"],
-              ["combined", "single svg"],
-              ["combined-dxf", "single DXF"],
+              ["combined", "combined"],
+              ["holder", "holder"],
             ] as [ExportMode, string][]
           ).map(([m, label]) => (
             <button
@@ -334,6 +338,32 @@ function ExportOptions({
               className={cn(
                 "text-xs font-mono px-2 py-1 transition-colors",
                 mode === m
+                  ? "bg-foreground text-background"
+                  : "bg-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* SVG/DXF format tabs - disabled for separate mode */}
+        <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+          {(
+            [
+              ["svg", "SVG"],
+              ["dxf", "DXF"],
+            ] as [ExportFormat, string][]
+          ).map(([f, label]) => (
+            <button
+              key={f}
+              type='button'
+              onClick={() => $exportFormat.set(f)}
+              disabled={isFormatDisabled}
+              className={cn(
+                "text-xs font-mono px-2 py-1 transition-colors",
+                isFormatDisabled && "opacity-30 cursor-not-allowed",
+                !isFormatDisabled && format === f
                   ? "bg-foreground text-background"
                   : "bg-transparent text-muted-foreground hover:text-foreground",
               )}
@@ -419,7 +449,7 @@ function ExportOptions({
               {filteredRects.length === 0 ? (
                 <p className='text-muted-foreground'>No shapes selected</p>
               ) : (
-                filteredRects.map((rect, i) => (
+                filteredRects.map((rect) => (
                   <p key={rect.id}>{formatRectSummary(rect)}</p>
                 ))
               )}
@@ -435,6 +465,8 @@ function ExportOptions({
         layers={layers}
         canvasView={canvasView}
         drawingName={drawingName}
+        mode={mode}
+        format={format}
       />
     </>
   )

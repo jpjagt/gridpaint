@@ -27,6 +27,8 @@ export interface RenderOptions {
   showDebugInfo?: boolean
   /** Millimetres per grid unit; used to convert cutout diameterMm → grid units at render time */
   mmPerUnit?: number
+  /** Whether to include cutout circles in the output (for holder mode, set to false) */
+  includeCutouts?: boolean
 }
 
 /**

@@ -149,6 +149,12 @@ export interface RenderStyle {
   strokeColor?: string
   strokeWidth?: number
   opacity?: number
+  /**
+   * When set, SVG paths that are holes (fully contained inside another path)
+   * receive this stroke color instead of `strokeColor`. Each path gets an
+   * explicit `stroke` attribute; the group-level stroke is omitted.
+   */
+  holeStrokeColor?: string
 }
 
 export interface RenderContext {

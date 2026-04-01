@@ -1,10 +1,5 @@
 import { useRef, useState, useEffect } from "react"
-import {
-  Routes,
-  Route,
-  useParams,
-  useNavigate,
-} from "react-router-dom"
+import { Routes, Route, useParams, useNavigate } from "react-router-dom"
 import Home from "@/components/Home"
 import {
   GridPaintCanvas,
@@ -20,24 +15,27 @@ import { MeasuringTapeOverlay } from "@/components/MeasuringTapeOverlay"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
 import { useImagePaste } from "@/hooks/useImagePaste"
 import { useAuthInit } from "@/hooks/useAuthInit"
-import type { Layer } from "@/stores/drawingStores"
 import { drawingStore } from "@/lib/storage/store"
-import { generateSingleLayerSvg, convertLayerToGridLayer } from "@/lib/export/svgUtils"
+import {
+  generateSingleLayerSvg,
+  convertLayerToGridLayer,
+} from "@/lib/export/svgUtils"
 import { useStore } from "@nanostores/react"
-import { $canvasView, $drawingMeta, $layersState, $exportRects } from "@/stores/drawingStores"
+import {
+  $canvasView,
+  $drawingMeta,
+} from "@/stores/drawingStores"
 
 // Editor page for a given drawing ID
 function EditorPage() {
   const navigate = useNavigate()
   const { drawingId } = useParams<{ drawingId: string }>()
   const canvasRef = useRef<GridPaintCanvasMethods>(null)
-  const [layers, setLayers] = useState<Layer[]>([])
-  const [activeLayerId, setActiveLayerId] = useState<number | null>(null)
   const [showMeasuringBars, setShowMeasuringBars] = useState<boolean>(false)
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
   const drawingMeta = useStore($drawingMeta)
-  const layersState = useStore($layersState)
+
   // Enable paste-to-import
   useImagePaste()
 
@@ -45,27 +43,18 @@ function EditorPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target !== document.body) return
-      if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.key === "m" || e.key === "M")) {
+      if (
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        (e.key === "m" || e.key === "M")
+      ) {
         e.preventDefault()
         setShowMeasuringBars((v) => !v)
       }
     }
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [])
-
-  // Sync layer state
-  useEffect(() => {
-    const updateLayerState = () => {
-      const layerState = canvasRef.current?.getLayerState()
-      if (layerState) {
-        setLayers(layerState.layers)
-        setActiveLayerId(layerState.activeLayerId)
-      }
-    }
-    updateLayerState()
-    const interval = setInterval(updateLayerState, 100)
-    return () => clearInterval(interval)
   }, [])
 
   // Handlers
@@ -89,15 +78,10 @@ function EditorPage() {
 
   return (
     <div className='w-screen h-screen overflow-hidden relative'>
-      <GridPaintCanvas
-        ref={canvasRef}
-        drawingId={drawingId!}
-      />
+      <GridPaintCanvas ref={canvasRef} drawingId={drawingId!} />
       {/* Image import overlay renders above the canvas when active */}
       <ImageImportOverlay />
       <LayerControls
-        layers={layers}
-        activeLayerId={activeLayerId}
         onLayerSelect={handleLayerSelect}
         onLayerVisibilityToggle={handleVisibilityToggle}
         onCreateLayer={handleCreateLayer}
@@ -125,12 +109,7 @@ function EditorPage() {
         onClose={() => setShowShortcuts(false)}
       />
       <ToolSelection />
-      <ToolOptionsPanel
-        mmPerUnit={canvasView.mmPerUnit}
-        layers={layersState.layers}
-        canvasView={canvasView}
-        drawingName={drawingMeta.name}
-      />
+      <ToolOptionsPanel />
       <MeasuringBars show={showMeasuringBars} />
       <MeasuringTapeOverlay />
     </div>
@@ -166,7 +145,7 @@ function LayerSvgRoute() {
           return
         }
 
-        const layer = drawing.layers.find(l => l.id === layerId)
+        const layer = drawing.layers.find((l) => l.id === layerId)
         if (!layer) {
           setError(`Layer with ID ${layerId} not found`)
           return
@@ -180,7 +159,7 @@ function LayerSvgRoute() {
           drawing.gridSize,
           drawing.borderWidth,
           undefined, // use default style
-          true       // add margin and centering
+          true, // add margin and centering
         )
 
         setSvg(svgOutput)
@@ -210,8 +189,8 @@ export default function App() {
   if (!isInitialized) {
     // Show loading while initializing
     return (
-      <div className="w-screen h-screen flex items-center justify-center">
-        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+      <div className='w-screen h-screen flex items-center justify-center'>
+        <div className='text-gray-600 dark:text-gray-400'>Loading...</div>
       </div>
     )
   }
