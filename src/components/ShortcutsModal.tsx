@@ -97,6 +97,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys={["shift", "drag"]} description="Lift and drag all layers; bakes on release" />
             <KbdRow keys="Enter" description="Place / bake floating paste" />
             <KbdRow keys="Escape" description="Cancel floating paste / clear selection" />
+            <KbdRow keys="G (hold)" description="Display Center of Gravity for visible layers in selection" />
             <KbdRow keys={["Delete", "/ Backspace"]} description="Delete selected points from current layer" />
             <KbdRow keys={["shift", "Delete"]} description="Delete selected points from all layers" />
           </Section>

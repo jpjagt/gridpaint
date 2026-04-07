@@ -124,7 +124,6 @@ export function getFilteredExportRects(): ExportRect[] {
   const rects = $exportRects.get()
 
   const selectedIds = $selectedExportRectIds.get()
-  console.log({ rects, selectedIds })
   if (selectedIds.size === 0) {
     return rects
   }

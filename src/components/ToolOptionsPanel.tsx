@@ -13,9 +13,9 @@ import {
   $canvasView,
   $layersState,
   $drawingMeta,
+  $selectedExportRectIds,
   type ExportMode,
   type ExportFormat,
-  getFilteredExportRects,
   selectAllExportRects,
   deselectAllExportRects,
 } from "@/stores/drawingStores"
@@ -264,10 +264,13 @@ function ExportOptions({
 }) {
   const mode = useStore($exportMode)
   const format = useStore($exportFormat)
+  const selectedExportRectIds = useStore($selectedExportRectIds)
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const hasRects = exportRects.length > 0
-  const filteredRects = getFilteredExportRects()
+  const filteredRects = selectedExportRectIds.size === 0
+    ? exportRects
+    : exportRects.filter((r) => !selectedExportRectIds.has(r.id))
   const selectedCount = filteredRects.length
   const hasSelection = selectedCount > 0
 

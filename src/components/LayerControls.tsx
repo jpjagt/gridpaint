@@ -6,10 +6,12 @@ import { $layersState, addGroupToActiveLayer, collapseEmptyTrailingGroups } from
 import {
   $activeGroupIndex,
   setActiveGroupIndex,
+  $currentTool,
   setCurrentTool,
   prevGroup,
   nextGroup,
   type Tool,
+  $showCenterOfGravity,
 } from "@/stores/ui"
 import { undo, redo } from "@/stores/historyStore"
 
@@ -57,7 +59,12 @@ export const LayerControls = ({
       // Ignore when an input/textarea is focused
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
-      const key = e.key
+      const key = e.key.toLowerCase()
+
+      // Show CoG while 'g' is held (only if select tool is active)
+      if (key === "g" && $currentTool.get() === "select") {
+        $showCenterOfGravity.set(true)
+      }
 
       // Number keys 1-6: switch layer
       const isNumberKey =
@@ -140,8 +147,18 @@ export const LayerControls = ({
       }
     }
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "g") {
+        $showCenterOfGravity.set(false)
+      }
+    }
+
     window.addEventListener("keydown", handleKeyPress)
-    return () => window.removeEventListener("keydown", handleKeyPress)
+    window.addEventListener("keyup", handleKeyUp)
+    return () => {
+      window.removeEventListener("keydown", handleKeyPress)
+      window.removeEventListener("keyup", handleKeyUp)
+    }
   }, [activeLayerId, activeLayer, onLayerSelect, onCreateOrActivateLayer])
 
   return (

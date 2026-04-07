@@ -144,6 +144,7 @@ when the override tool is active, an options panel shows 10 shape options:
 | alt + arrows     | lift and nudge 10 grid units                                                                |
 | drag inside selection | lift and drag selected points (active layer only; hold shift = all layers); bakes on release |
 | =Enter=          | place / bake floating paste                                                     |
+| =G= (hold)       | display Center of Gravity for visible layers in selection                       |
 | =Escape=         | cancel floating paste / clear selection                                         |
 | =Delete= / =Backspace= | delete selected points from current layer                               |
 | shift + =Delete= / =Backspace= | delete selected points from all layers                          |

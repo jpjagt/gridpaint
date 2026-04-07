@@ -16,10 +16,12 @@ import {
   $overrideToolSettings,
   $measureState,
   $selectionState,
+  $showCenterOfGravity,
   setActiveGroupIndex,
 } from "@/stores/ui"
 import { useSelection } from "@/hooks/useSelection"
 import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
+import { computeCenterOfGravity } from "@/lib/gridpaint/cog"
 import { useExportRects } from "@/hooks/useExportRects"
 import { renderExportRects } from "@/lib/gridpaint/renderExportRects"
 import { ExportRectOverlay } from "@/components/ExportRectOverlay"
@@ -133,6 +135,7 @@ export const GridPaintCanvas = forwardRef<
   const cutoutSettings = useStore($cutoutToolSettings)
   const overrideSettings = useStore($overrideToolSettings)
   const $showActiveLayerOutline = useStore(showActiveLayerOutline)
+  const showCenterOfGravity = useStore($showCenterOfGravity)
   const canvasView = useStore($canvasView)
   const {
     zoom: canvasZoom,
@@ -189,6 +192,7 @@ export const GridPaintCanvas = forwardRef<
   // Export rect hooks
   const exportRectsHook = useExportRects()
   const exportRects = useStore($exportRects)
+  const selectedExportRectIds = useStore($selectedExportRectIds)
 
   const [didInitialize, setDidInitialize] = useState(false)
 
@@ -303,6 +307,66 @@ export const GridPaintCanvas = forwardRef<
     canvasView.gridSize,
     canvasView.borderWidth,
   ])
+
+  // Compatibility function for active layer outline (renders only active group)
+  const renderActiveLayerOutlineCompat = useCallback(
+    (activeLayer: Layer) => {
+      if (!renderer || !renderer.context) return
+
+      const ctx = renderer.context
+      ctx.save()
+      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
+      ctx.scale(canvasView.zoom, canvasView.zoom)
+
+      // Get points for the active group only (not all groups)
+      const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
+      const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
+      const outlinePoints = activeGroup
+        ? activeGroup.points
+        : getLayerPoints(activeLayer)
+
+      // Use current visible viewport for outline rendering
+      const viewport = calculateCurrentViewport()
+      for (let x = viewport.minX; x <= viewport.maxX; x++) {
+        for (let y = viewport.minY; y <= viewport.maxY; y++) {
+          const pointKey = `${x},${y}`
+          if (outlinePoints.has(pointKey)) {
+            // Create temporary RasterPoint for compatibility
+            const point = {
+              x,
+              y,
+              neighbors: [
+                [false, false, false],
+                [false, false, false],
+                [false, false, false],
+              ],
+            }
+
+            // Update neighbors
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const nx = x + dx
+                const ny = y + dy
+                const nkey = `${nx},${ny}`
+                point.neighbors[dx + 1][dy + 1] = outlinePoints.has(nkey)
+              }
+            }
+
+            drawActiveLayerOutline(
+              ctx,
+              point,
+              canvasView.gridSize,
+              getCanvasColor("--canvas-outline-active"),
+              2,
+            )
+          }
+        }
+      }
+
+      ctx.restore()
+    },
+    [renderer, canvasView, activeGroupIndex, calculateCurrentViewport],
+  )
 
   const getGridCoordinates = useCallback(
     (clientX: number, clientY: number) => {
@@ -786,6 +850,47 @@ export const GridPaintCanvas = forwardRef<
       ctx.restore()
     }
 
+    // Render Center of Gravity (hold 'G')
+    if (showCenterOfGravity && selectionState.bounds && renderer?.context) {
+      const cog = computeCenterOfGravity(layersState.layers, selectionState.bounds)
+      if (cog) {
+        const ctx = renderer.context
+        const highlightColor = getCanvasColor("--highlighted")
+        const px = (cog.x + 0.5) * canvasView.gridSize
+        const py = (cog.y + 0.5) * canvasView.gridSize
+
+        ctx.save()
+        ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
+        ctx.scale(canvasView.zoom, canvasView.zoom)
+
+        // Draw crosshair
+        const size = 10 / canvasView.zoom
+        ctx.beginPath()
+        ctx.moveTo(px - size, py)
+        ctx.lineTo(px + size, py)
+        ctx.moveTo(px, py - size)
+        ctx.lineTo(px, py + size)
+        ctx.strokeStyle = highlightColor
+        ctx.lineWidth = 2 / canvasView.zoom
+        ctx.stroke()
+
+        // Draw outer circle
+        ctx.beginPath()
+        ctx.arc(px, py, 6 / canvasView.zoom, 0, Math.PI * 2)
+        ctx.stroke()
+
+        // Label
+        ctx.font = `${11 / canvasView.zoom}px monospace`
+        ctx.fillStyle = highlightColor
+        ctx.textAlign = "center"
+        ctx.textBaseline = "top"
+        const label = `CoG (${cog.x.toFixed(1)}, ${cog.y.toFixed(1)})`
+        ctx.fillText(label, px, py + size + 2 / canvasView.zoom)
+
+        ctx.restore()
+      }
+    }
+
     const renderTime = performance.now() - startTime
     if (renderTime > 16) {
       // Log slow frames
@@ -798,7 +903,6 @@ export const GridPaintCanvas = forwardRef<
     canvasView,
     layersState,
     $showActiveLayerOutline,
-    activeGroupIndex,
     currentTool,
     selection.hasSelection,
     selection.selectionStart,
@@ -808,6 +912,9 @@ export const GridPaintCanvas = forwardRef<
     renderFloatingPaste,
     exportRects,
     exportRectsHook.draftBounds,
+    showCenterOfGravity,
+    selectionState.bounds,
+    renderActiveLayerOutlineCompat,
   ])
 
   // Center canvas to fit all visible content
@@ -865,66 +972,6 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [render])
 
-  // Compatibility function for active layer outline (renders only active group)
-  const renderActiveLayerOutlineCompat = useCallback(
-    (activeLayer: Layer) => {
-      if (!renderer || !renderer.context) return
-
-      const ctx = renderer.context
-      ctx.save()
-      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
-      ctx.scale(canvasView.zoom, canvasView.zoom)
-
-      // Get points for the active group only (not all groups)
-      const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
-      const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
-      const outlinePoints = activeGroup
-        ? activeGroup.points
-        : getLayerPoints(activeLayer)
-
-      // Use current visible viewport for outline rendering
-      const viewport = calculateCurrentViewport()
-      for (let x = viewport.minX; x <= viewport.maxX; x++) {
-        for (let y = viewport.minY; y <= viewport.maxY; y++) {
-          const pointKey = `${x},${y}`
-          if (outlinePoints.has(pointKey)) {
-            // Create temporary RasterPoint for compatibility
-            const point = {
-              x,
-              y,
-              neighbors: [
-                [false, false, false],
-                [false, false, false],
-                [false, false, false],
-              ],
-            }
-
-            // Update neighbors
-            for (let dy = -1; dy <= 1; dy++) {
-              for (let dx = -1; dx <= 1; dx++) {
-                const nx = x + dx
-                const ny = y + dy
-                const nkey = `${nx},${ny}`
-                point.neighbors[dx + 1][dy + 1] = outlinePoints.has(nkey)
-              }
-            }
-
-            drawActiveLayerOutline(
-              ctx,
-              point,
-              canvasView.gridSize,
-              getCanvasColor("--canvas-outline-active"),
-              2,
-            )
-          }
-        }
-      }
-
-      ctx.restore()
-    },
-    [renderer, canvasView, activeGroupIndex, calculateCurrentViewport],
-  )
-
   // Initialize canvas on mount and when ready
   useEffect(() => {
     if (!isReady) return
@@ -946,7 +993,7 @@ export const GridPaintCanvas = forwardRef<
     if (isReady) {
       render()
     }
-  }, [canvasView, layersState, render, isReady])
+  }, [render, isReady])
 
   // Invalidate caches when layers change (covers non-paint edits like paste/selection)
   useEffect(() => {
@@ -1046,7 +1093,7 @@ export const GridPaintCanvas = forwardRef<
       }
       return coords
     },
-    [getGridCoordinates, currentTool, activeGroupIndex],
+    [getGridCoordinates, currentTool, activeGroupIndex, blobEngine.invalidateLayer],
   )
 
   // Mouse interaction handlers
@@ -1633,7 +1680,7 @@ export const GridPaintCanvas = forwardRef<
         // Cleanup happens here when the module is replaced
       })
     }
-  }, [blobEngine, initializeCanvas, render])
+  }, [blobEngine, initializeCanvas, render, layersState.layers])
 
   // Don't render until state is ready
   if (!isReady) {
@@ -1681,7 +1728,7 @@ export const GridPaintCanvas = forwardRef<
         onCustomMmPerUnitChange={exportRectsHook.setCustomMmPerUnit}
         onToggleSelection={toggleExportRectSelection}
         onView3D={(id) => setViewingRectId(id)}
-        selectedIds={$selectedExportRectIds.get()}
+        selectedIds={selectedExportRectIds}
         visible={currentTool === "export"}
       />
       <ModelViewerModal

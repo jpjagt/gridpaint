@@ -120,3 +120,7 @@ export const $measureState = map<MeasureState>({
   end: null,
   isDragging: false,
 })
+
+// === Center of Gravity ===
+
+export const $showCenterOfGravity = atom<boolean>(false)
