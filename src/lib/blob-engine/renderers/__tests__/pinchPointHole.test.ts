@@ -20,7 +20,7 @@ import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { SvgPathRenderer } from "@/lib/blob-engine/renderers/SvgPathRenderer"
 import { createPathGroups } from "@/lib/export/pathUtils"
 import type { GridLayer } from "@/lib/blob-engine/types"
-import type { PointModifications } from "@/types/gridpaint"
+import type { PointModifications } from "@/types/gridpaint" // used by the single-group override tests
 
 const GRID_SIZE = 50
 const BORDER_WIDTH = 2
@@ -198,30 +198,53 @@ describe("Pinch-point hole detection", () => {
   })
 
   /**
-   * Multi-group layer: two groups that together form a plus shape with an
-   * inner void via an empty quadrant override. Verifies that the fix works
-   * across the group-merge pipeline, not just single-group layers.
+   * Multi-group layer: two groups whose rendered blob-shapes touch at exactly
+   * one subgrid vertex (a pinch point), enclosing an inner void.
+   *
+   * Group 1 (arch): {0,1  1,0  2,1} — a blob arch. Group-isolated, so it has
+   *   rounded corners where it doesn't see group-2 neighbors.
+   * Group 2 (L):    {0,1  0,2  1,2  2,2} — an L-shape along the bottom-left.
+   *   Shared point (0,1) is in both groups but rendered independently in each.
+   *
+   * The right arm of the arch (2,1) and the right end of the L (2,2) are in
+   * different groups and don't blob — their rounded corners meet at a single
+   * subgrid vertex (2,1.5), the pinch point.
+   *
+   * The arch curves over the top while the L runs along the bottom.  Together
+   * they enclose a hole: the concave space inside the arch above the L's top
+   * edge.
+   *
+   * Expected: stitcher produces 2 closed loops (outer perimeter + inner void),
+   * createPathGroups classifies them as 1 outer path with 1 hole.
    */
-  it("multi-group plus with empty quadrant — hole correctly detected after group merge", () => {
+  it("multi-group two touching blobs — stitcher splits at pinch, hole correctly detected", () => {
     const layer: GridLayer = {
       id: 1,
       isVisible: true,
       renderStyle: "default",
       groups: [
-        { id: "top-bottom", points: new Set(["1,0", "1,2"]) },
-        { id: "cross", points: new Set(["0,1", "1,1", "2,1"]) },
+        { id: "default",  points: new Set(["0,1", "1,0", "2,1"]) },
+        { id: "group-2",  points: new Set(["0,1", "0,2", "1,2", "2,2"]) },
       ],
-      pointModifications: new Map<string, PointModifications>([
-        ["1,1", { quadrantOverrides: { 3: "empty" } }],
-      ]),
     }
 
     const debug = renderLayer(layer)
     expect(debug).not.toBeNull()
 
-    const groups = createPathGroups(debug!.svgPaths)
+    // The stitcher must split the self-touching boundary at the pinch point
+    // into 2 closed loops rather than one merged figure-8
+    expect(debug!.stitchedPaths).toHaveLength(2)
 
-    // Should have 1 outer with 1 hole, same as the single-group case
+    // Both loops must be closed
+    for (const path of debug!.stitchedPaths) {
+      const first = path[0].a
+      const last  = path[path.length - 1].b
+      expect(last.x2).toBe(first.x2)
+      expect(last.y2).toBe(first.y2)
+    }
+
+    // The arch + L together enclose a hole: 1 outer shape, 1 inner hole
+    const groups = createPathGroups(debug!.svgPaths)
     expect(groups).toHaveLength(1)
     expect(groups[0].holes).toHaveLength(1)
   })
