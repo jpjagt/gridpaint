@@ -1737,6 +1737,7 @@ export const GridPaintCanvas = forwardRef<
         exportRect={exportRects.find((r) => r.id === viewingRectId) ?? null}
         layers={layersState.layers}
         canvasView={canvasView}
+        drawingName={drawingMeta.name ?? undefined}
       />
     </div>
   )

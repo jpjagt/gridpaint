@@ -479,7 +479,81 @@ function deduplicateEdges(edges: Edge[], debugMode: boolean): Edge[] {
 //
 // Given a bag of boundary edges, chain them into closed loops.
 // Each edge can be traversed forward (a→b) or backward (b→a).
+//
+// At "pinch points" (vertices shared by two separate loops, e.g. when two
+// filled regions touch at a single corner), the adjacency list has 4+ entries.
+// We use an angle-based "hardest right turn" rule to stay on the same
+// topological face and avoid merging two loops into a figure-8 path.
 // ---------------------------------------------------------------------------
+
+/**
+ * Compute the departure angle (radians) of an already-oriented edge at its
+ * start point (edge.a).
+ *
+ * For a line, this is simply atan2(dy, dx) from a→b.
+ * For an arc, we use the tangent at the start point. The tangent direction is
+ * perpendicular to the radius (center→a), rotated 90° in the direction of
+ * travel (CW sweep=1 means the tangent is rotated -90° from the outward
+ * radius; CCW sweep=0 means +90°).
+ */
+function edgeDepartureAngle(edge: Edge): number {
+  if (edge.kind === "line") {
+    return Math.atan2(edge.b.y2 - edge.a.y2, edge.b.x2 - edge.a.x2)
+  }
+  // Arc: radius vector from center to start point
+  const rx = edge.a.x2 - edge.center.x2
+  const ry = edge.a.y2 - edge.center.y2
+  // Tangent at start: rotate radius 90° in direction of travel
+  // sweep=1 (CW in screen coords, y+ down): tangent = (ry, -rx)
+  // sweep=0 (CCW): tangent = (-ry, rx)
+  if (edge.sweep === 1) {
+    return Math.atan2(-rx, ry)
+  } else {
+    return Math.atan2(rx, -ry)
+  }
+}
+
+/**
+ * Orient an edge so it departs from `from` (either forward or flipped).
+ * Returns the oriented edge, or null if the edge does not connect to `from`.
+ */
+function orientEdgeFrom(edge: Edge, flip: boolean): Edge {
+  if (!flip) return edge
+  if (edge.kind === "line") {
+    return { kind: "line", a: edge.b, b: edge.a }
+  }
+  return {
+    kind: "arc",
+    a: edge.b,
+    b: edge.a,
+    center: edge.center,
+    sweep: (edge.sweep ^ 1) as 0 | 1,
+  }
+}
+
+/**
+ * Compute the clockwise turn angle from `incomingAngle` to `outgoingAngle`.
+ *
+ * Returns a value in [0, 2π): 0 = straight ahead (no turn), increasing
+ * values = more clockwise turn (in screen coords where y+ is down,
+ * "clockwise" means turning right).
+ *
+ * We want to pick the candidate with the SMALLEST clockwise turn (hardest
+ * right), which keeps us on the same topological face of the planar graph and
+ * correctly separates figure-8 loops at pinch points.
+ */
+function cwTurnAngle(incomingAngle: number, outgoingAngle: number): number {
+  // The incoming direction as seen from the vertex: the edge arrived pointing
+  // toward us, so the "incoming direction at the vertex" points in the
+  // opposite direction (incomingAngle + π).
+  const reversedIncoming = incomingAngle + Math.PI
+  // Clockwise turn = how much we rotate CW from reversedIncoming to outgoing.
+  // In screen coords (y+ down), CW rotation increases angle.
+  let turn = outgoingAngle - reversedIncoming
+  // Normalise to [0, 2π)
+  turn = ((turn % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+  return turn
+}
 
 function stitchEdgesIntoPaths(edges: Edge[], debugMode: boolean): Edge[][] {
   if (edges.length === 0) return []
@@ -529,41 +603,46 @@ function stitchEdgesIntoPaths(edges: Edge[], debugMode: boolean): Edge[][] {
         break
       }
 
-      // Find unused edge starting from currentEnd
+      // Find the best unused edge departing from currentEnd.
+      //
+      // When there are multiple candidates (pinch point), use the "hardest
+      // right turn" rule: pick the candidate whose outgoing direction makes the
+      // smallest clockwise turn from the incoming direction. This is the
+      // standard planar face-tracing algorithm and correctly separates two
+      // loops that share a single vertex into distinct closed paths rather than
+      // merging them into a self-intersecting figure-8.
       const candidates = startIndex.get(ptKey(currentEnd))
       let found = false
 
       if (candidates) {
+        const incomingAngle = edgeDepartureAngle(path[path.length - 1])
+
+        // Collect all unused candidates as oriented edges with their CW turn.
+        type Candidate = { idx: number; oriented: Edge; turn: number }
+        const viable: Candidate[] = []
+
         for (const { idx, flip } of candidates) {
           if (used[idx]) continue
-          used[idx] = true
+          const oriented = orientEdgeFrom(edges[idx], flip)
+          const turn = cwTurnAngle(incomingAngle, edgeDepartureAngle(oriented))
+          viable.push({ idx, oriented, turn })
+        }
 
-          const edge = edges[idx]
-          let oriented: Edge
-          if (!flip) {
-            oriented = edge
-          } else {
-            // Flip the edge so it starts at currentEnd
-            if (edge.kind === "line") {
-              oriented = { kind: "line", a: edge.b, b: edge.a }
-            } else {
-              oriented = {
-                kind: "arc",
-                a: edge.b,
-                b: edge.a,
-                center: edge.center,
-                sweep: (edge.sweep ^ 1) as 0 | 1,
-              }
-            }
-          }
+        if (viable.length > 0) {
+          // Sort by turn ascending (smallest CW turn = hardest right = stay on face)
+          viable.sort((a, b) => a.turn - b.turn)
+          const best = viable[0]
 
-          path.push(oriented)
+          used[best.idx] = true
+          path.push(best.oriented)
           found = true
 
           if (debugMode) {
-            console.log(`[SvgPathRenderer]   + ${edgeToString(oriented)}`)
+            console.log(
+              `[SvgPathRenderer]   + ${edgeToString(best.oriented)}` +
+              (viable.length > 1 ? ` (chose hardest-right from ${viable.length} candidates, turn=${(best.turn * 180 / Math.PI).toFixed(1)}°)` : ""),
+            )
           }
-          break
         }
       }
 

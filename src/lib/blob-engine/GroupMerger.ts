@@ -196,6 +196,80 @@ export class GroupMerger {
   }
 
   /**
+   * Re-classify primitives at quadrant-override target points using the global
+   * (cross-group) neighborhood and upgrade them if the global view warrants it.
+   *
+   * When groups are split, a point may have fewer visible neighbors within its
+   * own group, causing its quadrant to be classified as roundedCorner instead of
+   * rectangle. When a "empty" override later tries to delete that quadrant it
+   * finds nothing (or only a rounded corner that doesn't form boundary edges),
+   * so the expected inner void never appears.
+   *
+   * This step replaces any roundedCorner at an override-target quadrant with the
+   * primitive that the global neighborhood dictates — ensuring the correct
+   * boundary geometry exists before the override is applied.
+   */
+  /**
+   * Upgrade all active-point primitives using the global (cross-group) neighborhood.
+   *
+   * In the per-group pass, each group only sees its own points. This means a
+   * point that has neighbors in OTHER groups will have its quadrants
+   * under-classified (e.g. roundedCorner instead of rectangle). After merging,
+   * we re-run classification for every active point using allGroupPoints and
+   * promote any existing primitive upward in priority if the global view warrants
+   * a higher-priority type.
+   *
+   * This ensures that, for example, an "empty" quadrant override correctly carves
+   * out a void by first ensuring the rectangle that borders it is present.
+   */
+  private upgradeToGlobalNeighborhood(
+    merged: Map<string, BlobPrimitive>,
+    allGroupPoints: Set<string>,
+    gridSize: number,
+    layerId: number,
+  ): void {
+    const pointsToProcess = this.analyzer.getPointsNeedingCalculation(allGroupPoints)
+
+    for (const pointKey of pointsToProcess) {
+      const [x, y] = pointKey.split(",").map(Number)
+      const point: GridPoint = { x, y }
+      const isActivePoint = allGroupPoints.has(pointKey)
+      const globalNeighborhood = this.analyzer.getNeighborhoodMap(point, allGroupPoints)
+
+      for (let q = 0; q < 4; q++) {
+        const globalType = this.analyzer.classifyQuadrant(globalNeighborhood, q as Quadrant, isActivePoint)
+        if (globalType === null) continue  // globally empty — no upgrade needed
+
+        const key = `${x},${y}:${q}`
+        const existing = merged.get(key)
+
+        // Only upgrade if the global type has higher priority than the existing merged type
+        if (!existing) {
+          // New primitive from global view (e.g. diagonalBridge from cross-group diagonal pair)
+          // We only add it if it's an active point; ghost points are handled by the group pass
+          if (isActivePoint && globalType === "rectangle") {
+            merged.set(key, {
+              type: "rectangle",
+              center: point,
+              quadrant: q as Quadrant,
+              size: gridSize / 2,
+              layerId,
+              curveType: "none",
+            })
+          }
+        } else if (PRIMITIVE_PRIORITY[globalType] > PRIMITIVE_PRIORITY[existing.type]) {
+          // Upgrade existing to higher-priority type
+          merged.set(key, {
+            ...existing,
+            type: globalType,
+            curveType: "none",  // will be recomputed in step 4
+          })
+        }
+      }
+    }
+  }
+
+  /**
    * Apply quadrant overrides from pointModifications.
    * Mutates the merged map in place.
    *

@@ -104,20 +104,35 @@ function isPointInPolygon(px: number, py: number, polygon: Array<[number, number
 }
 
 /**
- * Returns true if every sampled point of `inner` lies inside the polygon
- * approximation of `outer`.
+ * Returns true if (nearly) all sampled points of `inner` lie inside the
+ * polygon approximation of `outer`.
  *
  * Using a polygon approximation (via points-on-path) rather than the
  * point-in-svg-path library avoids a precision bug: that library uses a
  * step size of ~~(arcLength/8) which collapses to 0 for arcs shorter than
  * 8 units — all arcs in our coordinate space — making it always return false.
+ *
+ * We allow up to MAX_OUTSIDE_POINTS sampled points to be classified as
+ * outside/on-boundary. This handles the "touching at a single point" case
+ * where an inner loop shares exactly one vertex with the outer loop: the
+ * even-odd ray-cast is numerically degenerate for points that lie exactly on
+ * the polygon boundary, and at most 1–2 sampled points will land there.
  */
+const MAX_OUTSIDE_POINTS = 1
+
 function isFullyContained(inner: string, outer: string): boolean {
   const points = samplePoints(inner)
   if (points.length === 0) return false
   const outerPolygon = pathToPolygon(outer)
   if (outerPolygon.length === 0) return false
-  return points.every((p) => isPointInPolygon(p.x, p.y, outerPolygon))
+
+  let outsideCount = 0
+  for (const p of points) {
+    if (!isPointInPolygon(p.x, p.y, outerPolygon)) {
+      if (++outsideCount > MAX_OUTSIDE_POINTS) return false
+    }
+  }
+  return true
 }
 
 // ---------------------------------------------------------------------------
