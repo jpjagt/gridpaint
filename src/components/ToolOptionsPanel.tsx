@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import {
   $currentTool,
   $cutoutToolSettings,
@@ -25,14 +25,17 @@ import { cn } from "@/lib/utils"
 import { exportExportRectsSvg } from "@/lib/export/exportRectsSvg"
 import { exportSeparateZip } from "@/lib/export/exportZip"
 import { exportCombinedDxf } from "@/lib/export/exportRectsDxf"
+import { exportStl } from "@/lib/export/exportStl"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import { Clipboard } from "lucide-react"
 import { ExportPreviewModal } from "@/components/ExportPreviewModal"
+import { ModelViewerModal } from "@/components/ModelViewerModal"
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { LAYER_THICKNESS_OPTIONS, type LayerThickness } from "@/lib/threejs"
 
 // 3×3 grid layout: rows top→bottom, cols left→right
 const ANCHOR_GRID: { id: CutoutAnchor; label: string }[][] = [
@@ -267,14 +270,23 @@ function ExportOptions({
   const selectedExportRectIds = useStore($selectedExportRectIds)
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [model3dOpen, setModel3dOpen] = useState(false)
+
+  // 3D export options
+  const [layerThickness, setLayerThickness] = useState<LayerThickness>(1)
+  const [reverseLayers, setReverseLayers] = useState(false)
+  const [includeCutouts, setIncludeCutouts] = useState(true)
+
   const hasRects = exportRects.length > 0
-  const filteredRects = selectedExportRectIds.size === 0
-    ? exportRects
-    : exportRects.filter((r) => !selectedExportRectIds.has(r.id))
+  const filteredRects =
+    selectedExportRectIds.size === 0
+      ? exportRects
+      : exportRects.filter((r) => !selectedExportRectIds.has(r.id))
   const selectedCount = filteredRects.length
   const hasSelection = selectedCount > 0
 
-  const isFormatDisabled = mode === "separate"
+  const is3d = mode === "3d"
+  const isFormatDisabled = mode === "separate" || is3d
 
   const handleCopyBom = () => {
     const text = filteredRects
@@ -288,6 +300,23 @@ function ExportOptions({
   }
 
   const handleExport = () => {
+    if (is3d) {
+      const rect = filteredRects[0]
+      if (!rect) return
+      const visibleLayers = layers.filter((l) => l.isVisible)
+      const nameParts = [drawingName, rect.name].filter(Boolean)
+      const fileName = nameParts.length > 0 ? nameParts.join("-") : "model"
+      exportStl({
+        layers: visibleLayers,
+        exportRect: rect,
+        canvasView,
+        layerThickness,
+        reverseLayers,
+        includeCutouts,
+        fileName,
+      })
+      return
+    }
     if (mode === "separate") {
       exportSeparateZip(filteredRects, layers, canvasView, drawingName ?? "")
     } else if (format === "dxf") {
@@ -307,8 +336,16 @@ function ExportOptions({
         canvasView.borderWidth,
         drawingName,
         canvasView.mmPerUnit,
-        mode,
+        mode as "separate" | "combined" | "holder",
       )
+    }
+  }
+
+  const handlePreview = () => {
+    if (is3d) {
+      setModel3dOpen(true)
+    } else {
+      setPreviewOpen(true)
     }
   }
 
@@ -322,8 +359,105 @@ function ExportOptions({
     return parts.join(" ")
   }
 
+  const previewRect = filteredRects[0] ?? null
+
   return (
     <>
+      <div className='flex items-center gap-3 pb-2.5 mb-2.5 border-b border-border/60'>
+        {/* 3D export options — shown above the main row with a separator when mode is 3d */}
+        {is3d && (
+          <>
+            <span className='text-xs text-muted-foreground font-mono'>
+              Thickness:
+            </span>
+            <div className='flex gap-0.5'>
+              {LAYER_THICKNESS_OPTIONS.map((t) => (
+                <button
+                  key={t}
+                  type='button'
+                  onClick={() => setLayerThickness(t)}
+                  className={cn(
+                    "text-xs font-mono px-2 py-1 rounded transition-colors",
+                    layerThickness === t
+                      ? "bg-foreground text-background"
+                      : "bg-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {t}mm
+                </button>
+              ))}
+            </div>
+
+            <div className='w-px h-4 bg-border' />
+
+            <label className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground cursor-pointer select-none'>
+              <input
+                type='checkbox'
+                checked={reverseLayers}
+                onChange={(e) => setReverseLayers(e.target.checked)}
+                className='w-3 h-3'
+              />
+              Mirror
+            </label>
+
+            <div className='w-px h-4 bg-border' />
+
+            <label className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground cursor-pointer select-none'>
+              <input
+                type='checkbox'
+                checked={includeCutouts}
+                onChange={(e) => setIncludeCutouts(e.target.checked)}
+                className='w-3 h-3'
+              />
+              Include cutouts
+            </label>
+          </>
+        )}
+
+        {/* SVG/DXF format tabs - disabled for separate and 3d modes */}
+        {!is3d && (
+          <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+            {(
+              [
+                ["svg", "SVG"],
+                ["dxf", "DXF"],
+              ] as [ExportFormat, string][]
+            ).map(([f, label]) => (
+              <button
+                key={f}
+                type='button'
+                onClick={() => $exportFormat.set(f)}
+                disabled={isFormatDisabled}
+                className={cn(
+                  "text-xs font-mono px-2 py-1 transition-colors",
+                  isFormatDisabled && "opacity-30 cursor-not-allowed",
+                  !isFormatDisabled && format === f
+                    ? "bg-foreground text-background"
+                    : "bg-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Copy BOM to clipboard */}
+        {filteredRects.filter((r) => r.name).length > 0 && (
+          <Button
+            size='icon'
+            variant='ghost'
+            onClick={handleCopyBom}
+            className='h-7 w-7'
+            title='Copy bill of materials to clipboard'
+          >
+            <Clipboard
+              className={cn("w-3.5 h-3.5", copied && "text-green-500")}
+            />
+          </Button>
+        )}
+      </div>
+
       <div className='flex items-center gap-3'>
         {/* Mode toggle */}
         <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
@@ -332,6 +466,7 @@ function ExportOptions({
               ["separate", "separate"],
               ["combined", "combined"],
               ["holder", "holder"],
+              ["3d", "3D"],
             ] as [ExportMode, string][]
           ).map(([m, label]) => (
             <button
@@ -341,32 +476,6 @@ function ExportOptions({
               className={cn(
                 "text-xs font-mono px-2 py-1 transition-colors",
                 mode === m
-                  ? "bg-foreground text-background"
-                  : "bg-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* SVG/DXF format tabs - disabled for separate mode */}
-        <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
-          {(
-            [
-              ["svg", "SVG"],
-              ["dxf", "DXF"],
-            ] as [ExportFormat, string][]
-          ).map(([f, label]) => (
-            <button
-              key={f}
-              type='button'
-              onClick={() => $exportFormat.set(f)}
-              disabled={isFormatDisabled}
-              className={cn(
-                "text-xs font-mono px-2 py-1 transition-colors",
-                isFormatDisabled && "opacity-30 cursor-not-allowed",
-                !isFormatDisabled && format === f
                   ? "bg-foreground text-background"
                   : "bg-transparent text-muted-foreground hover:text-foreground",
               )}
@@ -406,26 +515,11 @@ function ExportOptions({
           size='sm'
           variant='outline'
           disabled={!hasSelection}
-          onClick={() => setPreviewOpen(true)}
+          onClick={handlePreview}
           className='h-7 text-xs font-mono'
         >
           Preview
         </Button>
-
-        {/* Copy BOM to clipboard */}
-        {filteredRects.filter((r) => r.name).length > 0 && (
-          <Button
-            size='icon'
-            variant='ghost'
-            onClick={handleCopyBom}
-            className='h-7 w-7'
-            title='Copy bill of materials to clipboard'
-          >
-            <Clipboard
-              className={cn("w-3.5 h-3.5", copied && "text-green-500")}
-            />
-          </Button>
-        )}
 
         {/* Export button with hover card */}
         <HoverCard openDelay={50}>
@@ -437,10 +531,16 @@ function ExportOptions({
               onClick={handleExport}
               className='h-7 text-xs font-mono'
             >
-              Export
-              {hasSelection
-                ? ` (${selectedCount}${hasRects && selectedCount !== exportRects.length ? `/${exportRects.length}` : ""})`
-                : ""}
+              {is3d ? (
+                "Download STL"
+              ) : (
+                <>
+                  Export
+                  {hasSelection
+                    ? ` (${selectedCount}${hasRects && selectedCount !== exportRects.length ? `/${exportRects.length}` : ""})`
+                    : ""}
+                </>
+              )}
             </Button>
           </HoverCardTrigger>
           <HoverCardContent
@@ -461,16 +561,34 @@ function ExportOptions({
         </HoverCard>
       </div>
 
-      <ExportPreviewModal
-        isOpen={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        exportRects={filteredRects}
-        layers={layers}
-        canvasView={canvasView}
-        drawingName={drawingName}
-        mode={mode}
-        format={format}
-      />
+      {!is3d && (
+        <ExportPreviewModal
+          isOpen={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          exportRects={filteredRects}
+          layers={layers}
+          canvasView={canvasView}
+          drawingName={drawingName}
+          mode={mode as "separate" | "combined" | "holder"}
+          format={format}
+        />
+      )}
+
+      {is3d && (
+        <ModelViewerModal
+          isOpen={model3dOpen}
+          onClose={() => setModel3dOpen(false)}
+          exportRect={previewRect}
+          layers={layers}
+          canvasView={canvasView}
+          drawingName={drawingName}
+          layerThickness={layerThickness}
+          onLayerThicknessChange={setLayerThickness}
+          reverseLayers={reverseLayers}
+          onReverseLayersChange={setReverseLayers}
+          includeCutouts={includeCutouts}
+        />
+      )}
     </>
   )
 }

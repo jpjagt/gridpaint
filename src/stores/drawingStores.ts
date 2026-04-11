@@ -75,8 +75,8 @@ export const $layersState = map<LayersState>({
 /** Export rectangles — persisted with the drawing, rendered when export tool is active */
 export const $exportRects = atom<ExportRect[]>([])
 
-/** Export mode (separate files vs combined vs holder) — persisted with the drawing */
-export type ExportMode = "separate" | "combined" | "holder"
+/** Export mode (separate files vs combined vs holder vs 3d stl) — persisted with the drawing */
+export type ExportMode = "separate" | "combined" | "holder" | "3d"
 export const $exportMode = atom<ExportMode>("separate")
 
 /** Export format (svg vs dxf) — only used for combined/holder modes, persisted with the drawing */

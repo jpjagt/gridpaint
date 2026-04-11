@@ -20,9 +20,13 @@ interface ModelViewerCanvasProps {
   exportRect: ExportRect
   canvasView: CanvasViewState
   layerThickness: LayerThickness
-  onThicknessChange: (thickness: LayerThickness) => void
+  onThicknessChange?: (thickness: LayerThickness) => void
   reverseLayers?: boolean
   onReverseLayersChange?: (reverse: boolean) => void
+  /** When false, cutout holes are omitted from the 3D geometry. Defaults to true. */
+  includeCutouts?: boolean
+  /** Hide the bottom controls bar (thickness picker, mirror checkbox). Defaults to false. */
+  hideControls?: boolean
 }
 
 export function ModelViewerCanvas({
@@ -33,6 +37,8 @@ export function ModelViewerCanvas({
   onThicknessChange,
   reverseLayers = false,
   onReverseLayersChange,
+  includeCutouts = true,
+  hideControls = false,
 }: ModelViewerCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const setupRef = useRef<ReturnType<typeof createSceneSetup> | null>(null)
@@ -57,6 +63,7 @@ export function ModelViewerCanvas({
       canvasView,
       layerThickness,
       reverseLayers,
+      includeCutouts,
     })
 
     if (result && result.group) {
@@ -92,7 +99,7 @@ export function ModelViewerCanvas({
       setup.renderer.render(setup.scene, setup.camera)
     }
     animate()
-  }, [layers, exportRect, canvasView, layerThickness, reverseLayers])
+  }, [layers, exportRect, canvasView, layerThickness, reverseLayers, includeCutouts])
 
   useEffect(() => {
     initScene()
@@ -143,37 +150,39 @@ export function ModelViewerCanvas({
   return (
     <div className='flex flex-col h-full'>
       <div ref={containerRef} className='flex-1 min-h-0' />
-      <div className='flex items-center justify-center gap-4 py-3 border-t border-border bg-muted/30'>
-        <div className='flex items-center gap-2'>
-          <span className='text-xs text-muted-foreground font-mono'>
-            Thickness:
-          </span>
-          {LAYER_THICKNESS_OPTIONS.map((t) => (
-            <button
-              key={t}
-              type='button'
-              onClick={() => onThicknessChange(t)}
-              className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
-                layerThickness === t
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted/80 text-muted-foreground"
-              }`}
-            >
-              {t}mm
-            </button>
-          ))}
+      {!hideControls && (
+        <div className='flex items-center justify-center gap-4 py-3 border-t border-border bg-muted/30'>
+          <div className='flex items-center gap-2'>
+            <span className='text-xs text-muted-foreground font-mono'>
+              Thickness:
+            </span>
+            {LAYER_THICKNESS_OPTIONS.map((t) => (
+              <button
+                key={t}
+                type='button'
+                onClick={() => onThicknessChange?.(t)}
+                className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                  layerThickness === t
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                }`}
+              >
+                {t}mm
+              </button>
+            ))}
+          </div>
+          <div className='w-px h-4 bg-border' />
+          <label className='flex items-center gap-2 text-xs text-muted-foreground font-mono cursor-pointer'>
+            <input
+              type='checkbox'
+              checked={reverseLayers}
+              onChange={(e) => onReverseLayersChange?.(e.target.checked)}
+              className='w-3 h-3'
+            />
+            Mirror
+          </label>
         </div>
-        <div className='w-px h-4 bg-border' />
-        <label className='flex items-center gap-2 text-xs text-muted-foreground font-mono cursor-pointer'>
-          <input
-            type='checkbox'
-            checked={reverseLayers}
-            onChange={(e) => onReverseLayersChange?.(e.target.checked)}
-            className='w-3 h-3'
-          />
-          Mirror
-        </label>
-      </div>
+      )}
     </div>
   )
 }

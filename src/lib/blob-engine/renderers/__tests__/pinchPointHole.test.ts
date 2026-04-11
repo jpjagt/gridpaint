@@ -248,4 +248,96 @@ describe("Pinch-point hole detection", () => {
     expect(groups).toHaveLength(1)
     expect(groups[0].holes).toHaveLength(1)
   })
+
+  /**
+   * Multi-group layer: outer ring + horizontal bar, creating TWO adjacent pinch
+   * points at the bar's right end.
+   *
+   * Group 1 (outer): a gear-like outer ring.
+   * Group 2 (bar):   {1,2  2,2  3,2  4,2} — a horizontal bar.
+   *
+   * The bar's right end (at x=3, between group-2 and the outer ring) creates
+   * TWO pinch points: (3,1.5) and (3,2.5). The face-tracing algorithm correctly
+   * handles each individually but previously merged both inner voids (top-left
+   * and top-right of bar, and bottom-left and bottom-right) into a single
+   * figure-8 path by re-visiting (3,1.5) mid-path.
+   *
+   * Fix: after appending each edge, if the new endpoint matches an interior
+   * start-vertex of the current path, the sub-loop is extracted and emitted as
+   * a separate closed path.
+   *
+   * Expected: 4 separate closed loops (1 outer + 3 inner voids), all correctly
+   * detected as holes.
+   */
+  it("double pinch point (bar ends) — sub-loop extraction produces 4 separate paths", () => {
+    const layer: GridLayer = {
+      id: 2, isVisible: true, renderStyle: "default",
+      groups: [
+        { id: "default", points: new Set(["0,1","0,2","0,3","1,0","1,2","1,4","2,0","2,4","3,1","3,3","4,0","4,4","5,1","5,3","6,2"]) },
+        { id: "group-2", points: new Set(["1,2","2,2","3,2","4,2"]) },
+      ],
+    }
+
+    const debug = renderLayer(layer)
+    expect(debug).not.toBeNull()
+
+    // 4 closed loops: outer + 3 inner voids
+    expect(debug!.stitchedPaths).toHaveLength(4)
+    for (const path of debug!.stitchedPaths) {
+      const first = path[0].a
+      const last  = path[path.length - 1].b
+      expect(last.x2).toBe(first.x2)
+      expect(last.y2).toBe(first.y2)
+    }
+
+    // 1 outer shape with 3 holes
+    const groups = createPathGroups(debug!.svgPaths)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].holes).toHaveLength(3)
+  })
+
+  /**
+   * Multi-group layer: arch group + flat-line group sharing a straight edge
+   * (not just a single vertex), enclosing an inner void.
+   *
+   * Group 1 (flat): {0,2  1,2  2,2  3,2} — a horizontal flat line.
+   * Group 2 (arch): {0,0  0,1  0,2  1,0  2,0  3,1} — an arch curving up and
+   *   back down.
+   *
+   * Unlike the arch+L case, the flat group's top edge (y=1.5) is shared with
+   * the inner void boundary — multiple sampled points land exactly on the outer
+   * polygon boundary, not just one pinch-point vertex.
+   *
+   * This requires MAX_OUTSIDE_FRACTION tolerance (fraction-based) rather than
+   * the old absolute MAX_OUTSIDE_POINTS=1 to correctly classify the inner void
+   * as a hole.
+   */
+  it("multi-group flat-line + arch — shared edge hole correctly detected", () => {
+    const layer: GridLayer = {
+      id: 2,
+      isVisible: true,
+      renderStyle: "default",
+      groups: [
+        { id: "default", points: new Set(["0,2", "1,2", "2,2", "3,2"]) },
+        { id: "group-2", points: new Set(["0,0", "0,1", "0,2", "1,0", "2,0", "3,1"]) },
+      ],
+    }
+
+    const debug = renderLayer(layer)
+    expect(debug).not.toBeNull()
+
+    // Should produce 2 closed loops
+    expect(debug!.stitchedPaths).toHaveLength(2)
+    for (const path of debug!.stitchedPaths) {
+      const first = path[0].a
+      const last  = path[path.length - 1].b
+      expect(last.x2).toBe(first.x2)
+      expect(last.y2).toBe(first.y2)
+    }
+
+    // Flat-line + arch enclose a hole: 1 outer shape, 1 inner hole
+    const groups = createPathGroups(debug!.svgPaths)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].holes).toHaveLength(1)
+  })
 })

@@ -112,13 +112,22 @@ function isPointInPolygon(px: number, py: number, polygon: Array<[number, number
  * step size of ~~(arcLength/8) which collapses to 0 for arcs shorter than
  * 8 units — all arcs in our coordinate space — making it always return false.
  *
- * We allow up to MAX_OUTSIDE_POINTS sampled points to be classified as
- * outside/on-boundary. This handles the "touching at a single point" case
- * where an inner loop shares exactly one vertex with the outer loop: the
- * even-odd ray-cast is numerically degenerate for points that lie exactly on
- * the polygon boundary, and at most 1–2 sampled points will land there.
+ * We use a fraction-based tolerance rather than an absolute count. Up to
+ * MAX_OUTSIDE_FRACTION of the sampled points may be classified as
+ * outside/on-boundary. This handles two known degenerate cases:
+ *
+ *   1. "Pinch point" (single shared vertex): 1–2 sampled points land exactly
+ *      on the outer polygon boundary, where the even-odd ray-cast is
+ *      numerically degenerate.
+ *
+ *   2. "Shared edge": the inner loop shares a straight edge with the outer
+ *      loop (e.g. flat-line group whose top edge coincides with the inner void
+ *      boundary). Several sampled points lie exactly on the boundary.
+ *
+ * In both cases, the fraction of on-boundary/outside points is small (< 15%)
+ * compared to the near-zero fraction for genuinely disjoint paths.
  */
-const MAX_OUTSIDE_POINTS = 1
+const MAX_OUTSIDE_FRACTION = 0.2
 
 function isFullyContained(inner: string, outer: string): boolean {
   const points = samplePoints(inner)
@@ -129,10 +138,10 @@ function isFullyContained(inner: string, outer: string): boolean {
   let outsideCount = 0
   for (const p of points) {
     if (!isPointInPolygon(p.x, p.y, outerPolygon)) {
-      if (++outsideCount > MAX_OUTSIDE_POINTS) return false
+      outsideCount++
     }
   }
-  return true
+  return outsideCount / points.length <= MAX_OUTSIDE_FRACTION
 }
 
 // ---------------------------------------------------------------------------

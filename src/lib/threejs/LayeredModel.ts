@@ -24,6 +24,8 @@ export interface LayeredModelOptions {
   canvasView: CanvasViewState
   layerThickness: LayerThickness
   reverseLayers: boolean
+  /** When false, cutout holes are omitted from the extruded geometry. Defaults to true. */
+  includeCutouts?: boolean
 }
 
 export interface LayeredModelResult {
@@ -35,7 +37,7 @@ export interface LayeredModelResult {
 export function createLayeredModel(
   options: LayeredModelOptions,
 ): LayeredModelResult | null {
-  const { layers, exportRect, canvasView, layerThickness, reverseLayers } =
+  const { layers, exportRect, canvasView, layerThickness, reverseLayers, includeCutouts = true } =
     options
   const { gridSize, borderWidth, mmPerUnit } = canvasView
 
@@ -70,7 +72,7 @@ export function createLayeredModel(
       gridLayer,
       gridSize,
       borderWidth,
-      { strokeColor: "#000", strokeWidth: 0.1, fillColor: "transparent" },
+      { strokeColor: "#000", strokeWidth: 0.1, fillColor: "transparent", includeCutouts },
       effectiveMmPerUnit,
     )
 

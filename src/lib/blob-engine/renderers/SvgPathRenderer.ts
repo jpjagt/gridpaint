@@ -596,7 +596,7 @@ function stitchEdgesIntoPaths(edges: Edge[], debugMode: boolean): Edge[][] {
     while (safety++ < 100000) {
       const currentEnd = path[path.length - 1].b
 
-      // Check if path is closed
+      // Check if path is closed (end matches start)
       if (path.length > 1 && ptEq(currentEnd, path[0].a)) {
         if (debugMode)
           console.log(`[SvgPathRenderer]   → closed after ${path.length} edges`)
@@ -642,6 +642,37 @@ function stitchEdgesIntoPaths(edges: Edge[], debugMode: boolean): Edge[][] {
               `[SvgPathRenderer]   + ${edgeToString(best.oriented)}` +
               (viable.length > 1 ? ` (chose hardest-right from ${viable.length} candidates, turn=${(best.turn * 180 / Math.PI).toFixed(1)}°)` : ""),
             )
+          }
+
+          // After appending, check if the new endpoint revisits an interior
+          // vertex — a "double pinch point" figure-8.
+          //
+          // The hardest-right-turn rule correctly traces each pinch point
+          // locally but can still produce a path that visits the same vertex
+          // twice when two pinch points are adjacent (e.g. both ends of a bar).
+          // The face-tracing path travels along the bar's top edge through the
+          // first pinch, continues around the right loop, comes back along the
+          // bar's bottom through the second pinch, and re-visits the first pinch
+          // coming from the opposite direction. The result is a figure-8 that
+          // combines two distinct inner voids into one path.
+          //
+          // Fix: whenever the new endpoint matches an interior start-vertex of
+          // the current path, extract the sub-loop [k..end] as a separate
+          // completed path and continue building the prefix [0..k-1].
+          const newEnd = path[path.length - 1].b
+          if (path.length > 2) {
+            const newEndKey = ptKey(newEnd)
+            for (let k = 1; k < path.length - 1; k++) {
+              if (ptKey(path[k].a) === newEndKey) {
+                const subLoop = path.splice(k)
+                if (subLoop.length >= 2) {
+                  if (debugMode)
+                    console.log(`[SvgPathRenderer]   → extracted sub-loop of ${subLoop.length} edges at interior vertex ${ptToString(newEnd)}`)
+                  paths.push(subLoop)
+                }
+                break
+              }
+            }
           }
         }
       }
