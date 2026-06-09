@@ -6,6 +6,7 @@
  * captureThumbnail() on content-change saves only.
  */
 
+// Single active editor canvas at a time (the app has one canvas per session).
 let registeredCanvas: HTMLCanvasElement | null = null
 
 /** Editor registers (or clears) its canvas element. */
@@ -19,6 +20,10 @@ const THUMB_MAX = 240
 /**
  * Capture the registered canvas, downscaled to fit THUMB_MAX, as a PNG dataURL.
  * Returns undefined if no canvas is registered or capture fails.
+ *
+ * Assumes the canvas already reflects the latest edit. This holds because
+ * capture runs inside the debounced save (~1s after the last edit), well after
+ * the canvas has repainted.
  */
 export function captureThumbnail(): string | undefined {
   const src = registeredCanvas

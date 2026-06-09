@@ -223,18 +223,23 @@ let lastThumbnail: string | undefined
 
 /**
  * Cheap signature of content that affects the rendered drawing. Excludes
- * pan/zoom so position-only saves don't trigger a thumbnail refresh.
+ * pan/zoom so position-only saves don't trigger a thumbnail refresh. Includes
+ * the actual pointModifications payload so edits to cutouts/overrides (which
+ * don't change the map size) still refresh the thumbnail.
  */
 function contentSignature(layers: Layer[], exportRects: ExportRect[]): string {
   const layerPart = layers
-    .map(
-      (l) =>
-        `${l.id}:${l.isVisible}:${l.renderStyle}:` +
-        l.groups.map((g) => `${g.id}#${g.points.size}`).join("|") +
-        `:${l.pointModifications ? l.pointModifications.size : 0}`,
-    )
+    .map((l) => {
+      const groups = l.groups
+        .map((g) => `${g.id}#${Array.from(g.points).sort().join(",")}`)
+        .join("|")
+      const mods = l.pointModifications
+        ? JSON.stringify(Array.from(l.pointModifications.entries()).sort())
+        : ""
+      return `${l.id}:${l.isVisible}:${l.renderStyle}:${groups}:${mods}`
+    })
     .join(";")
-  return `${layerPart}__${exportRects.length}`
+  return `${layerPart}__${JSON.stringify(exportRects)}`
 }
 
 export async function saveDrawingState(): Promise<void> {
@@ -245,12 +250,16 @@ export async function saveDrawingState(): Promise<void> {
 
   if (!meta.id) return
 
-  // Refresh the thumbnail only when content (not pan/zoom) changed.
+  // Refresh the thumbnail only when content (not pan/zoom) changed. Advance the
+  // signature only on a successful capture so a failed/early capture retries on
+  // the next save instead of pinning a stale thumbnail.
   const sig = contentSignature(layersState.layers, exportRects)
   if (sig !== lastContentSignature) {
     const captured = captureThumbnail()
-    if (captured !== undefined) lastThumbnail = captured
-    lastContentSignature = sig
+    if (captured !== undefined) {
+      lastThumbnail = captured
+      lastContentSignature = sig
+    }
   }
 
   const updatedAt = Date.now()

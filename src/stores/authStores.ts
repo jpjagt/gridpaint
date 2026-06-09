@@ -30,7 +30,7 @@ export const $syncStatus = atom<SyncStatus>({
 
 /**
  * Local save status. `failed: true` means the latest local (IndexedDB) write
- * did not persist. Drives a blocking editor banner so a failed save is never
+ * did not persist. Drives a persistent editor banner so a failed save is never
  * silent; it clears when a subsequent save succeeds.
  */
 export const $saveStatus = atom<SaveStatus>({
