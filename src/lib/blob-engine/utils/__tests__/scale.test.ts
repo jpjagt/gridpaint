@@ -14,4 +14,7 @@ describe("scaleToFactor", () => {
   it("returns 1 for 1/1", () => {
     expect(scaleToFactor({ num: 1, den: 1 })).toBe(1)
   })
+  it("returns 1 for a zero denominator (out-of-contract guard)", () => {
+    expect(scaleToFactor({ num: 1, den: 0 })).toBe(1)
+  })
 })

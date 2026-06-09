@@ -9,6 +9,6 @@ export interface LayerScale {
  * `{num:2,den:1}` → 2 (bigger), `{num:1,den:2}` → 0.5 (smaller).
  */
 export function scaleToFactor(scale: LayerScale | undefined): number {
-  if (!scale) return 1
+  if (!scale || scale.den === 0) return 1
   return scale.num / scale.den
 }
