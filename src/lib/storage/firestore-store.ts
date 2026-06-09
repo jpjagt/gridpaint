@@ -71,6 +71,9 @@ export class FirestoreDrawingStore implements DrawingStore {
             name: data.name,
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
+            ...(data.thumbnail !== undefined
+              ? { thumbnail: data.thumbnail }
+              : {}),
           })
         }
       }

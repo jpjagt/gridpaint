@@ -38,6 +38,13 @@ describe("LocalStorageDrawingStore (IndexedDB)", () => {
     expect((list[0] as unknown as Record<string, unknown>).layers).toBeUndefined()
   })
 
+  it("does not persist cloud credentials (ownerId/writeToken) to local storage", async () => {
+    await store.save({ ...baseDoc("a"), ownerId: "owner1", writeToken: "secret" })
+    const got = (await store.get("a")) as unknown as Record<string, unknown>
+    expect(got.ownerId).toBeUndefined()
+    expect(got.writeToken).toBeUndefined()
+  })
+
   it("one drawing's save does not affect another", async () => {
     await store.save(baseDoc("a"))
     await store.save(baseDoc("b"))

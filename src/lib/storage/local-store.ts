@@ -91,6 +91,10 @@ export class LocalStorageDrawingStore implements DrawingStore {
   async save(doc: DrawingDocument): Promise<void> {
     await this.migrateLegacyIfNeeded()
     const inner = serializeDocument(doc)
+    // Cloud-only credentials have no business in local storage — strip them so
+    // a write token is never persisted at rest in IndexedDB.
+    delete inner.ownerId
+    delete inner.writeToken
     await idbPutDrawing(inner, metaFromInner(inner))
   }
 
