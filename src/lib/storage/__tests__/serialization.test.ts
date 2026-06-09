@@ -45,4 +45,16 @@ describe("serialization round-trip", () => {
     const cutout = round.layers[0].pointModifications!.get("0,0")!.cutouts![0]
     expect((cutout as { diameterMm: number }).diameterMm).toBe(10)
   })
+  it("omits pointModifications when the layer has none", () => {
+    const ser = serializeDocument(baseDoc())
+    expect(ser.layers[0].pointModifications).toBeUndefined()
+  })
+
+  it("passes a v3 diameterMm cutout through unchanged", () => {
+    const ser = serializeDocument(baseDoc())
+    ser.layers[0].pointModifications = { "0,0": { cutouts: [{ diameterMm: 7 } as never] } }
+    const round = deserializeDocument(ser)
+    const cutout = round.layers[0].pointModifications!.get("0,0")!.cutouts![0]
+    expect((cutout as { diameterMm: number }).diameterMm).toBe(7)
+  })
 })

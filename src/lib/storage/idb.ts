@@ -9,7 +9,7 @@
  * own IndexedDB databases.
  */
 
-import { createStore, get, set, del, type UseStore } from "idb-keyval"
+import { createStore, get, set, del, update, type UseStore } from "idb-keyval"
 import type { InnerDrawingDocument, DrawingMetadata } from "./types"
 
 const store: UseStore = createStore("gridpaint-drawings", "drawings")
@@ -30,17 +30,27 @@ export async function idbGetIndex(): Promise<Record<string, DrawingMetadata>> {
 }
 
 export async function idbPutDrawing(doc: InnerDrawingDocument, meta: DrawingMetadata): Promise<void> {
+  // Write content first, then atomically update the index so concurrent
+  // saves can't clobber each other's entries.
   await set(drawingKey(doc.id), doc, store)
-  const index = await idbGetIndex()
-  index[doc.id] = meta
-  await set(INDEX_KEY, index, store)
+  await update<Record<string, DrawingMetadata>>(
+    INDEX_KEY,
+    (index) => ({ ...(index ?? {}), [doc.id]: meta }),
+    store,
+  )
 }
 
 export async function idbDeleteDrawing(id: string): Promise<void> {
   await del(drawingKey(id), store)
-  const index = await idbGetIndex()
-  delete index[id]
-  await set(INDEX_KEY, index, store)
+  await update<Record<string, DrawingMetadata>>(
+    INDEX_KEY,
+    (index) => {
+      const next = { ...(index ?? {}) }
+      delete next[id]
+      return next
+    },
+    store,
+  )
 }
 
 export async function idbClear(): Promise<void> {
