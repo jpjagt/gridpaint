@@ -33,24 +33,46 @@ export class LocalStorageDrawingStore implements DrawingStore {
   /** One-time migration of the legacy single-blob localStorage store. */
   private async migrateLegacyIfNeeded(): Promise<void> {
     if (this.migrated) return
-    this.migrated = true
-    if (typeof localStorage === "undefined") return
-    if (localStorage.getItem(MIGRATION_FLAG)) return
+    if (typeof localStorage === "undefined") {
+      this.migrated = true
+      return
+    }
+    if (localStorage.getItem(MIGRATION_FLAG)) {
+      this.migrated = true
+      return
+    }
 
     const json = localStorage.getItem(LEGACY_KEY)
+    let entries: InnerDrawingDocument[] = []
     if (json) {
       try {
         const data = JSON.parse(json) as Record<string, InnerDrawingDocument>
-        for (const inner of Object.values(data)) {
-          await idbPutDrawing(inner, metaFromInner(inner))
-        }
-        console.log("[LocalStore] Migrated legacy drawings to IndexedDB")
+        // Skip malformed entries rather than writing broken records.
+        entries = Object.values(data).filter(
+          (d): d is InnerDrawingDocument =>
+            !!d && typeof d.id === "string" && Array.isArray(d.layers),
+        )
       } catch {
         console.warn("[LocalStore] Failed to parse legacy storage; skipping migration")
+        // A syntactically broken blob is unrecoverable — mark migrated so we
+        // don't retry forever, and leave the legacy key in place.
+        localStorage.setItem(MIGRATION_FLAG, "1")
+        this.migrated = true
+        return
       }
     }
-    // Mark done. Keep the legacy key in place as a fallback (do not remove yet).
+
+    // Writes are outside the parse try/catch: if one fails, the exception
+    // propagates and neither flag is set, so a later call/reload retries.
+    for (const inner of entries) {
+      await idbPutDrawing(inner, metaFromInner(inner))
+    }
+    if (entries.length > 0) {
+      console.log(`[LocalStore] Migrated ${entries.length} legacy drawings to IndexedDB`)
+    }
+    // Keep the legacy key in place as a fallback (do not remove yet).
     localStorage.setItem(MIGRATION_FLAG, "1")
+    this.migrated = true
   }
 
   async list(): Promise<DrawingMetadata[]> {
@@ -69,7 +91,7 @@ export class LocalStorageDrawingStore implements DrawingStore {
   async save(doc: DrawingDocument): Promise<void> {
     await this.migrateLegacyIfNeeded()
     const inner = serializeDocument(doc)
-    await idbPutDrawing(inner, metaFromInner(inner, doc.thumbnail))
+    await idbPutDrawing(inner, metaFromInner(inner))
   }
 
   async delete(id: string): Promise<void> {
@@ -83,19 +105,12 @@ export class LocalStorageDrawingStore implements DrawingStore {
 }
 
 /** Build the metadata index entry from a serialized doc. */
-function metaFromInner(
-  inner: InnerDrawingDocument,
-  thumbnail?: string,
-): DrawingMetadata {
+function metaFromInner(inner: InnerDrawingDocument): DrawingMetadata {
   return {
     id: inner.id,
     name: inner.name,
     createdAt: inner.createdAt,
     updatedAt: inner.updatedAt,
-    ...(thumbnail !== undefined
-      ? { thumbnail }
-      : inner.thumbnail !== undefined
-        ? { thumbnail: inner.thumbnail }
-        : {}),
+    ...(inner.thumbnail !== undefined ? { thumbnail: inner.thumbnail } : {}),
   }
 }

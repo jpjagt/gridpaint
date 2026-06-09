@@ -55,3 +55,50 @@ describe("LocalStorageDrawingStore (IndexedDB)", () => {
     expect(await store.list()).toHaveLength(0)
   })
 })
+
+describe("LocalStorageDrawingStore legacy migration", () => {
+  beforeEach(async () => {
+    localStorage.clear()
+    await new LocalStorageDrawingStore().clear()
+  })
+
+  function legacyBlob() {
+    return JSON.stringify({
+      x: {
+        id: "x", name: "Legacy", createdAt: 1, updatedAt: 2,
+        gridSize: 75, borderWidth: 0.5, panOffset: { x: 0, y: 0 }, zoom: 1, mmPerUnit: 5,
+        layers: [{ id: 1, isVisible: true, renderStyle: "default", groups: [{ id: "default", points: ["1,1"] }] }],
+      },
+    })
+  }
+
+  it("migrates legacy drawings into IndexedDB and sets the flag", async () => {
+    localStorage.setItem("gridpaint:drawings", legacyBlob())
+    const store = new LocalStorageDrawingStore()
+    const list = await store.list()
+    expect(list.map((d) => d.id)).toContain("x")
+    const got = await store.get("x")
+    expect(got?.layers[0].groups[0].points).toEqual(new Set(["1,1"]))
+    expect(localStorage.getItem("gridpaint:migrated-to-idb")).toBe("1")
+  })
+
+  it("leaves the legacy localStorage key in place after migration", async () => {
+    localStorage.setItem("gridpaint:drawings", legacyBlob())
+    await new LocalStorageDrawingStore().list()
+    expect(localStorage.getItem("gridpaint:drawings")).not.toBeNull()
+  })
+
+  it("does not re-migrate when the flag is already set", async () => {
+    localStorage.setItem("gridpaint:migrated-to-idb", "1")
+    localStorage.setItem("gridpaint:drawings", legacyBlob())
+    const store = new LocalStorageDrawingStore()
+    expect(await store.list()).toHaveLength(0)
+  })
+
+  it("tolerates a malformed legacy blob without throwing", async () => {
+    localStorage.setItem("gridpaint:drawings", "{not json")
+    const store = new LocalStorageDrawingStore()
+    await expect(store.list()).resolves.toEqual([])
+    expect(localStorage.getItem("gridpaint:migrated-to-idb")).toBe("1")
+  })
+})
