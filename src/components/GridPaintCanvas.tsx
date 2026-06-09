@@ -144,12 +144,16 @@ export const GridPaintCanvas = forwardRef<
     gridSize: canvasGridSize,
   } = canvasView
   const layersState = useStore($layersState)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  // Register the canvas element so the save path can capture gallery thumbnails.
-  useEffect(() => {
-    registerThumbnailCanvas(canvasRef.current)
-    return () => registerThumbnailCanvas(null)
+  // Callback ref: fires the moment React attaches/detaches the <canvas>, which
+  // is reliable across StrictMode remounts (a plain mount effect could read the
+  // ref before it was attached and register null). Keeps canvasRef.current in
+  // sync for the rest of the component, and registers the element so the save
+  // path can capture gallery thumbnails.
+  const setCanvasRef = useCallback((el: HTMLCanvasElement | null) => {
+    canvasRef.current = el
+    registerThumbnailCanvas(el)
   }, [])
 
   const { drawingMeta, isReady } = useDrawingState(drawingId)
@@ -1721,7 +1725,7 @@ export const GridPaintCanvas = forwardRef<
   return (
     <div className="relative w-full h-full">
       <canvas
-        ref={canvasRef}
+        ref={setCanvasRef}
         className={`w-full h-full ${getCursorClass()}`}
         style={{ display: "block" }}
       />
