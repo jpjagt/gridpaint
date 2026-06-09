@@ -17,6 +17,12 @@ export interface Layer {
   groups: InteractionGroup[]
   /** Per-point modifications keyed by "x,y". Only points with mods need entries. */
   pointModifications?: Map<string, PointModifications>
+  /**
+   * Per-layer uniform scale applied to the layer's finished render output.
+   * One of num/den is always 1: `{num:2,den:1}` = 2× bigger cell,
+   * `{num:1,den:2}` = 2× smaller. Absent ⇒ 1/1.
+   */
+  scale?: { num: number; den: number }
 }
 
 /** Derive the union of all points across all groups in a layer */
