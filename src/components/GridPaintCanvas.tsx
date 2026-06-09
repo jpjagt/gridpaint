@@ -35,6 +35,7 @@ import { registerThumbnailCanvas } from "@/lib/storage/thumbnail"
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
+import { layersToGridLayers } from "@/lib/blob-engine/convertLayers"
 import type {
   GridLayer as BlobGridLayer,
   SpatialRegion,
@@ -238,20 +239,12 @@ export const GridPaintCanvas = forwardRef<
   )
 
   // Convert store layers to blob engine format
+  // Canonical Layer → GridLayer conversion (carries offsetPhase + scale). Using
+  // the shared helper rather than an inline copy ensures the live canvas sees
+  // every engine-consumed field — an inline copy previously dropped offsetPhase
+  // and scale, silently disabling half-offset and per-layer scale on screen.
   const convertLayersToBlobFormat = useCallback(
-    (layers: Layer[]): BlobGridLayer[] => {
-      return layers.map((layer) => ({
-        id: layer.id,
-        groups: layer.groups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          points: new Set(g.points),
-        })),
-        isVisible: layer.isVisible,
-        renderStyle: layer.renderStyle,
-        pointModifications: layer.pointModifications,
-      }))
-    },
+    (layers: Layer[]): BlobGridLayer[] => layersToGridLayers(layers),
     [],
   )
 
