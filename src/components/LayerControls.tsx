@@ -2,7 +2,14 @@ import { Button } from "@/components/ui/button"
 import { Eye, EyeOff, Grid3X3, Square } from "lucide-react"
 import { useEffect } from "react"
 import { useStore } from "@nanostores/react"
-import { $layersState, addGroupToActiveLayer, collapseEmptyTrailingGroups } from "@/stores/drawingStores"
+import {
+  $layersState,
+  addGroupToActiveLayer,
+  collapseEmptyTrailingGroups,
+  toggleGroupOffsetPhase,
+  setLayerScale,
+  type Layer,
+} from "@/stores/drawingStores"
 import {
   $activeGroupIndex,
   setActiveGroupIndex,
@@ -14,6 +21,26 @@ import {
   $showCenterOfGravity,
 } from "@/stores/ui"
 import { undo, redo } from "@/stores/historyStore"
+
+// Scale options: label → scale value (undefined = 1×)
+const SCALE_OPTIONS: { label: string; value: Layer["scale"] }[] = [
+  { label: "⅓", value: { num: 1, den: 3 } },
+  { label: "½", value: { num: 1, den: 2 } },
+  { label: "1×", value: undefined },
+  { label: "2×", value: { num: 2, den: 1 } },
+  { label: "3×", value: { num: 3, den: 1 } },
+]
+
+function scaleToOptionValue(scale: Layer["scale"]): string {
+  if (!scale) return "1"
+  return `${scale.num}/${scale.den}`
+}
+
+function optionValueToScale(val: string): Layer["scale"] {
+  if (val === "1") return undefined
+  const [num, den] = val.split("/").map(Number)
+  return { num, den }
+}
 
 interface LayerControlsProps {
   onLayerSelect: (layerId: number | null) => void
@@ -218,6 +245,45 @@ export const LayerControls = ({
                       <Square className='w-3 h-3' />
                     )}
                   </Button>
+
+                  {/* Half-offset toggle: operates on the active group when layer is active,
+                      otherwise the first group */}
+                  {(() => {
+                    const groupIdx = isActive ? activeGroupIndex : 0
+                    const group = layer?.groups[groupIdx]
+                    if (!group) return null
+                    const isHalf = group.offsetPhase === "half"
+                    return (
+                      <Button
+                        size='icon'
+                        variant={isHalf ? "default" : "ghost"}
+                        onClick={() => toggleGroupOffsetPhase(layerId, group.id)}
+                        className='size-5 text-xs font-mono'
+                        title='Half-grid offset'
+                      >
+                        ½
+                      </Button>
+                    )
+                  })()}
+
+                  {/* Per-layer scale select */}
+                  <select
+                    value={scaleToOptionValue(layer?.scale)}
+                    onChange={(e) =>
+                      setLayerScale(layerId, optionValueToScale(e.target.value))
+                    }
+                    title='Layer scale'
+                    className='h-5 w-full rounded text-xs font-mono bg-background border border-input text-foreground px-0.5 cursor-pointer'
+                  >
+                    {SCALE_OPTIONS.map((opt) => (
+                      <option
+                        key={scaleToOptionValue(opt.value)}
+                        value={scaleToOptionValue(opt.value)}
+                      >
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>

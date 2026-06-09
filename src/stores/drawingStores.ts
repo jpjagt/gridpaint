@@ -332,6 +332,46 @@ export function updateLayerPoints(layerId: number, points: Set<string>): void {
 }
 
 /**
+ * Toggle a group's offset phase between "normal" and "half".
+ * Half shifts the group's rendered points by +0.5 in both dimensions.
+ */
+export function toggleGroupOffsetPhase(layerId: number, groupId: string): void {
+  const current = $layersState.get()
+  pushHistory(current.layers)
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== layerId) return layer
+    const groups = layer.groups.map((g) =>
+      g.id === groupId
+        ? {
+            ...g,
+            offsetPhase: (g.offsetPhase === "half" ? "normal" : "half") as
+              | "normal"
+              | "half",
+          }
+        : g,
+    )
+    return { ...layer, groups }
+  })
+  $layersState.setKey("layers", layers)
+}
+
+/**
+ * Set (or clear, with undefined) a layer's uniform scale.
+ * One of num/den is expected to be 1.
+ */
+export function setLayerScale(
+  layerId: number,
+  scale: { num: number; den: number } | undefined,
+): void {
+  const current = $layersState.get()
+  pushHistory(current.layers)
+  const layers = current.layers.map((layer) =>
+    layer.id === layerId ? { ...layer, scale } : layer,
+  )
+  $layersState.setKey("layers", layers)
+}
+
+/**
  * Add a new interaction group to the active layer.
  * Returns the new group's id, or null if no active layer.
  */
