@@ -37,6 +37,7 @@ import {
   type ViewportTransform,
 } from "./Renderer"
 import { createPathGroups } from "@/lib/export/pathUtils"
+import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
 // ---------------------------------------------------------------------------
 // Internal geometry types
@@ -811,6 +812,8 @@ export class SvgPathRenderer extends Renderer {
     includeCutouts: boolean = true,
   ): string {
     const dbg = this.debugMode
+    const scaleFactor = scaleToFactor(layer?.scale)
+    const scaleAttr = scaleFactor !== 1 ? ` transform="scale(${scaleFactor})"` : ""
 
     if (dbg) {
       console.log(
@@ -944,7 +947,7 @@ export class SvgPathRenderer extends Renderer {
 
       // No group-level stroke — each path carries its own.
       return (
-        `<g fill="${fill}" stroke-width="${strokeWidth}" opacity="${opacity}">\n` +
+        `<g fill="${fill}" stroke-width="${strokeWidth}" opacity="${opacity}"${scaleAttr}>\n` +
         `${pathElements}\n` +
         `</g>`
       )
@@ -953,7 +956,7 @@ export class SvgPathRenderer extends Renderer {
     pathElements = allPaths.map((d) => `  <path d="${d}" />`).join("\n")
 
     return (
-      `<g fill="${fill}" stroke="${outerStroke}" stroke-width="${strokeWidth}" opacity="${opacity}">\n` +
+      `<g fill="${fill}" stroke="${outerStroke}" stroke-width="${strokeWidth}" opacity="${opacity}"${scaleAttr}>\n` +
       `${pathElements}\n` +
       `</g>`
     )
