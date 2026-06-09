@@ -30,6 +30,7 @@ import {
   $selectedExportRectIds,
   toggleExportRectSelection,
 } from "@/stores/drawingStores"
+import { registerThumbnailCanvas } from "@/lib/storage/thumbnail"
 
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
@@ -144,6 +145,12 @@ export const GridPaintCanvas = forwardRef<
   } = canvasView
   const layersState = useStore($layersState)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // Register the canvas element so the save path can capture gallery thumbnails.
+  useEffect(() => {
+    registerThumbnailCanvas(canvasRef.current)
+    return () => registerThumbnailCanvas(null)
+  }, [])
 
   const { drawingMeta, isReady } = useDrawingState(drawingId)
 
