@@ -32,6 +32,7 @@
 import type { BlobGeometry, BlobPrimitive, GridLayer } from "../types"
 import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
 import type { PointModifications } from "@/types/gridpaint"
+import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
 // ---------------------------------------------------------------------------
 // Mode toggle
@@ -820,6 +821,11 @@ export function generateLayerDxfEntities(
 ): DxfLayerEntities | null {
   if (geometry.primitives.length === 0) return null
 
+  // Apply per-layer scale by folding it into a single effective unit factor.
+  // All coordinate/radius outputs use effectiveUnit instead of mmPerUnit.
+  const scaleFactor = scaleToFactor(layer?.scale)
+  const effectiveUnit = mmPerUnit * scaleFactor
+
   // Step 1: collect edges
   const allEdges: Edge[] = []
   for (const primitive of geometry.primitives) {
@@ -839,16 +845,16 @@ export function generateLayerDxfEntities(
   const originY2 = Math.round(geometry.boundingBox.min.y * 2)
 
   const bboxWidthMm =
-    (geometry.boundingBox.max.x - geometry.boundingBox.min.x) * mmPerUnit
+    (geometry.boundingBox.max.x - geometry.boundingBox.min.x) * effectiveUnit
   const bboxHeightMm =
-    (geometry.boundingBox.max.y - geometry.boundingBox.min.y) * mmPerUnit
+    (geometry.boundingBox.max.y - geometry.boundingBox.min.y) * effectiveUnit
 
   // Wrap the coordinate helpers to apply the mm offset.
   // DXF Y-up: the bbox min (originY2) maps to bboxHeightMm + offsetYMm,
   // and the bbox max maps to offsetYMm (Y is flipped).
-  const toX = (x2: number) => toMmX(x2, originX2, mmPerUnit) + offsetXMm
+  const toX = (x2: number) => toMmX(x2, originX2, effectiveUnit) + offsetXMm
   const toY = (y2: number) =>
-    toMmY(y2, originY2, mmPerUnit, bboxHeightMm) + offsetYMm
+    toMmY(y2, originY2, effectiveUnit, bboxHeightMm) + offsetYMm
 
   // Re-implement the emit helpers with offset-aware coordinate functions.
   // We do this inline to avoid changing the existing helper signatures.
@@ -880,11 +886,11 @@ export function generateLayerDxfEntities(
 
   const emitLegacyPolyline = (path: Edge[]): string => {
     if (path.length === 0) return ""
-    const radiusMm = 0.5 * mmPerUnit
+    const radiusMm = 0.5 * effectiveUnit
     const ptToMmOffset = (p: Pt) => ({ x: toX(p.x2), y: toY(p.y2) })
     const sgToMmOffset = (p: { x: number; y: number }) => ({
-      x: (p.x - originX2 / 2) * mmPerUnit + offsetXMm,
-      y: bboxHeightMm - (p.y - originY2 / 2) * mmPerUnit + offsetYMm,
+      x: (p.x - originX2 / 2) * effectiveUnit + offsetXMm,
+      y: bboxHeightMm - (p.y - originY2 / 2) * effectiveUnit + offsetYMm,
     })
     const pts: Array<{ x: number; y: number }> = []
     for (const edge of path) {
@@ -942,7 +948,7 @@ export function generateLayerDxfEntities(
     cutoutPolylines = layer
       ? generateCutoutLegacyPolylines(
           layer.pointModifications,
-          mmPerUnit,
+          effectiveUnit,
           originX2,
           originY2,
           bboxHeightMm,
@@ -955,7 +961,7 @@ export function generateLayerDxfEntities(
     cutoutPolylines = layer
       ? generateCutoutLwpolylines(
           layer.pointModifications,
-          mmPerUnit,
+          effectiveUnit,
           originX2,
           originY2,
           bboxHeightMm,
