@@ -53,6 +53,8 @@ export interface DrawingMetadata {
   createdAt: number
   /** Timestamp (ms since epoch) when last updated */
   updatedAt: number
+  /** Small viewport PNG dataURL for the gallery; refreshed only on content changes */
+  thumbnail?: string
 }
 
 /**
