@@ -8,6 +8,7 @@ import type {
   ExportRect,
 } from "@/types/gridpaint"
 import { pushHistory, clearHistory } from "@/stores/historyStore"
+import { captureThumbnail } from "@/lib/storage/thumbnail"
 
 export interface Layer {
   id: number
@@ -144,6 +145,9 @@ export function createDefaultLayer(id: number = 1): Layer {
 export async function initializeDrawingState(drawingId: string): Promise<void> {
   $loadingState.set("loading")
 
+  lastContentSignature = ""
+  lastThumbnail = undefined
+
   try {
     const stored = await drawingStore.get(drawingId)
 
@@ -212,28 +216,61 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
   }
 }
 
+/** Last persisted content signature, to decide when to refresh the thumbnail. */
+let lastContentSignature = ""
+/** Last captured thumbnail, reused across position-only saves. */
+let lastThumbnail: string | undefined
+
+/**
+ * Cheap signature of content that affects the rendered drawing. Excludes
+ * pan/zoom so position-only saves don't trigger a thumbnail refresh.
+ */
+function contentSignature(layers: Layer[], exportRects: ExportRect[]): string {
+  const layerPart = layers
+    .map(
+      (l) =>
+        `${l.id}:${l.isVisible}:${l.renderStyle}:` +
+        l.groups.map((g) => `${g.id}#${g.points.size}`).join("|") +
+        `:${l.pointModifications ? l.pointModifications.size : 0}`,
+    )
+    .join(";")
+  return `${layerPart}__${exportRects.length}`
+}
+
 export async function saveDrawingState(): Promise<void> {
   const meta = $drawingMeta.get()
   const canvasView = $canvasView.get()
   const layersState = $layersState.get()
+  const exportRects = $exportRects.get()
 
   if (!meta.id) return
 
+  // Refresh the thumbnail only when content (not pan/zoom) changed.
+  const sig = contentSignature(layersState.layers, exportRects)
+  if (sig !== lastContentSignature) {
+    const captured = captureThumbnail()
+    if (captured !== undefined) lastThumbnail = captured
+    lastContentSignature = sig
+  }
+
+  const updatedAt = Date.now()
   const document: DrawingDocument = {
     ...meta,
     ...canvasView,
     layers: layersState.layers,
-    exportRects: $exportRects.get(),
+    exportRects,
     exportMode: $exportMode.get(),
     exportFormat: $exportFormat.get(),
     deselectedExportRectIds: Array.from($selectedExportRectIds.get()),
-    updatedAt: Date.now(),
+    updatedAt,
+    thumbnail: lastThumbnail,
   }
 
   try {
     await drawingStore.save(document)
-    $drawingMeta.setKey("updatedAt", document.updatedAt)
+    $drawingMeta.setKey("updatedAt", updatedAt)
   } catch (error) {
+    // hybrid-store already set $saveStatus.failed; do not swallow silently.
     console.error("Failed to save drawing:", error)
   }
 }
