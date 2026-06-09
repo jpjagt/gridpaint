@@ -30,6 +30,7 @@ describe("half-offset fusion", () => {
       expect(Number.isNaN(n)).toBe(false)
       expect(Math.abs((n * 2) - Math.round(n * 2))).toBeLessThan(1e-9)
     }
+    expect(svg).toContain("<path")
   })
 
   it("renders a normal point and a half-offset point together without error", () => {
