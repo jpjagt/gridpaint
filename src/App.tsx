@@ -13,6 +13,7 @@ import { ToolOptionsPanel } from "@/components/ToolOptionsPanel"
 import { MeasuringBars } from "@/components/MeasuringBars"
 import { MeasuringTapeOverlay } from "@/components/MeasuringTapeOverlay"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
+import { SaveStatusBanner } from "@/components/SaveStatusBanner"
 import { useImagePaste } from "@/hooks/useImagePaste"
 import { useAuthInit } from "@/hooks/useAuthInit"
 import { drawingStore } from "@/lib/storage/store"
@@ -78,6 +79,7 @@ function EditorPage() {
 
   return (
     <div className='w-screen h-screen overflow-hidden relative'>
+      <SaveStatusBanner />
       <GridPaintCanvas ref={canvasRef} drawingId={drawingId!} />
       {/* Image import overlay renders above the canvas when active */}
       <ImageImportOverlay />
