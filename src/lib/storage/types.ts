@@ -16,6 +16,7 @@ export interface SerializedInteractionGroup {
   id: string
   name?: string
   points: string[]
+  offsetPhase?: "normal" | "half"
 }
 
 export interface SerializedPointModifications {
@@ -37,6 +38,8 @@ export interface LayerData {
   groups?: SerializedInteractionGroup[]
   /** Per-point modifications keyed by "x,y" */
   pointModifications?: Record<string, SerializedPointModifications>
+  /** Per-layer uniform scale; one of num/den is always 1. Absent ⇒ 1/1. */
+  scale?: { num: number; den: number }
   /** @deprecated Legacy format: flat array/set of "x,y" strings. Migrated to groups on load. */
   points?: string[] | Set<string>
 }

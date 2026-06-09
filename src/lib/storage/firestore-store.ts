@@ -112,6 +112,7 @@ export class FirestoreDrawingStore implements DrawingStore {
             id: g.id,
             name: g.name,
             points: new Set(g.points),
+            offsetPhase: g.offsetPhase,
           }))
         } else if (layer.points) {
           const pointsArray = Array.isArray(layer.points)
@@ -156,6 +157,7 @@ export class FirestoreDrawingStore implements DrawingStore {
           renderStyle: layer.renderStyle,
           groups,
           pointModifications,
+          scale: layer.scale,
         }
       })
       
@@ -196,7 +198,7 @@ export class FirestoreDrawingStore implements DrawingStore {
             isVisible: layer.isVisible,
             renderStyle: layer.renderStyle,
             groups: layer.groups.map((g) => {
-              const group: { id: string; name?: string; points: string[] } = {
+              const group: { id: string; name?: string; points: string[]; offsetPhase?: "normal" | "half" } = {
                 id: g.id,
                 points: Array.from(g.points),
               }
@@ -204,11 +206,17 @@ export class FirestoreDrawingStore implements DrawingStore {
               if (g.name !== undefined) {
                 group.name = g.name
               }
+              if (g.offsetPhase !== undefined) {
+                group.offsetPhase = g.offsetPhase
+              }
               return group
             }),
           }
           if (layer.pointModifications && layer.pointModifications.size > 0) {
             serialized.pointModifications = Object.fromEntries(layer.pointModifications)
+          }
+          if (layer.scale) {
+            serialized.scale = layer.scale
           }
           return serialized
         }),

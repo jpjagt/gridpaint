@@ -373,10 +373,12 @@ export function convertLayersToGridLayers(layers: Layer[]): GridLayer[] {
       id: g.id,
       name: g.name,
       points: new Set(g.points),
+      offsetPhase: g.offsetPhase,
     })),
     isVisible: layer.isVisible,
     renderStyle: layer.renderStyle || "default",
     pointModifications: layer.pointModifications,
+    scale: layer.scale,
   }))
 }
 

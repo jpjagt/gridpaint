@@ -74,6 +74,7 @@ export class LocalStorageDrawingStore implements DrawingStore {
           id: g.id,
           name: g.name,
           points: new Set(g.points),
+          offsetPhase: g.offsetPhase,
         }))
       } else if (layer.points) {
         // Legacy format: migrate flat points to a single default group
@@ -119,6 +120,7 @@ export class LocalStorageDrawingStore implements DrawingStore {
         renderStyle: layer.renderStyle,
         groups,
         pointModifications,
+        scale: layer.scale,
       }
     })
 
@@ -142,10 +144,14 @@ export class LocalStorageDrawingStore implements DrawingStore {
             id: g.id,
             name: g.name,
             points: Array.from(g.points),
+            offsetPhase: g.offsetPhase,
           })),
         }
         if (layer.pointModifications && layer.pointModifications.size > 0) {
           serialized.pointModifications = Object.fromEntries(layer.pointModifications)
+        }
+        if (layer.scale) {
+          serialized.scale = layer.scale
         }
         return serialized
       }),
