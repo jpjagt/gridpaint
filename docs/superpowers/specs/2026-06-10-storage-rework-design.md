@@ -54,32 +54,39 @@ is enabled:
 
 - Remove the localStorage quota ceiling as a source of silent data loss.
 - Never report a save as succeeded when it did not persist.
-- Make cloud reconciliation correct: never silently discard the side that is ahead.
+- Fix cloud reconciliation so a stale device can no longer clobber newer work.
 - Make the homepage load only metadata + a small thumbnail, not full documents.
 
 ## Non-goals
 
 - Live multi-device sync (no Firestore `onSnapshot` listener). Reconcile on drawing open only.
+- Full conflict-resolution machinery (rev versioning, durable outbox, conflict modal,
+  recovery snapshots). Deferred — see "Deferred: full sync model".
 - Multi-user / sharing changes beyond what exists.
 - Rewriting the serialization / legacy-migration logic (it is correct and tested; it is
   extracted and kept).
 
-## Approach
+## Scope decision
 
-Approach B (confirmed): **rewrite the sync orchestration; keep serialization & migration.**
-The bugs live in orchestration (single-key localStorage, silent quota failure, timestamp-based
-reconciliation, unconditional cloud writes). The serialization/migration code is correct.
+The identified root cause is the **localStorage quota error**. After weighing it, the chosen
+scope is **lean**: fix both bugs with the minimum necessary change, and skip the heavy
+multi-device sync machinery (per-document `rev` versioning, durable outbox with retry queue,
+blocking conflict modal, recovery snapshots). That machinery defends against genuine concurrent
+multi-device divergence — a rare case for a single user — and the dangerous cloud-clobber it
+guards against is already eliminated by the much smaller fixes below. The full design is
+preserved in "Deferred: full sync model" for revisiting if real multi-device conflicts appear.
 
-The robust sync model is the standard local-first playbook:
+Approach B still holds at a smaller scale: **fix the storage orchestration; keep serialization
+& migration.**
 
-1. **A content version (`rev`)**, not a wall clock. A monotonically increasing integer bumped
-   in exactly one place (the engine save path) and preserved verbatim through local and cloud.
-   Reconciliation compares `rev`, never two independent `Date.now()` stamps.
-2. **A durable outbox** (dirty queue) so an unconfirmed write survives reload and retries. A
-   write leaves the outbox only after cloud confirms.
-3. **Conditional cloud writes** (Firestore transaction): a device may only overwrite the cloud
-   version it last saw (`baseRev`). If cloud advanced, the write aborts → conflict path. This
-   is what makes stale-device clobbering impossible.
+## In scope
+
+1. **IndexedDB local store** — removes the ~5MB ceiling that caused the loss.
+2. **Loud save failures** — replace the silent `console.error` with a visible, blocking,
+   retrying banner.
+3. **Homepage thumbnails** — metadata + stored thumbnail, no full-document fetch.
+4. **Minimal sync correctness fix** — single-source `updatedAt` + conditional cloud write, so a
+   stale device can no longer clobber newer cloud work.
 
 ## Architecture
 
@@ -87,115 +94,82 @@ The robust sync model is the standard local-first playbook:
 
 ```
 src/lib/storage/
-  types.ts            (+ rev, thumbnail fields; outbox + recovery types)
+  types.ts            (+ thumbnail field on metadata)
   serialization.ts    NEW — shared serialize/deserialize + legacy migration
                       (extracted from local-store & firestore-store, currently duplicated)
-  idb.ts              NEW — tiny IndexedDB wrapper (or idb-keyval dep) for the local store
+  idb.ts              NEW — tiny IndexedDB wrapper (idb-keyval dep is acceptable)
   local-store.ts      thin: IndexedDB read/write of serialized docs + metadata index
   firestore-store.ts  thin: Firestore read + CONDITIONAL (transaction) write
-  outbox.ts           NEW — durable per-drawing dirty queue (localStorage; tiny)
-  reconcile.ts        NEW — PURE reconciliation function (the testable core)
-  sync-engine.ts      NEW — replaces hybrid-store: save path, drain, flush, reconcile orchestration
+  hybrid-store.ts     updated: reconcile by single-source updatedAt (no re-rolling),
+                      never clobber newer local; debounced drain reads current doc
   store.ts            DrawingStore interface (shape unchanged) + instance
   storage-manager.ts  unchanged role (singleton + setCloudSync)
   thumbnail.ts        NEW — capture viewport PNG → dataURL helper
 ```
 
+`hybrid-store.ts` is kept (not replaced by a new sync-engine). The lean fixes are surgical
+changes to it; no outbox/reconcile modules are introduced.
+
 ### Local store: IndexedDB
 
 - Durable local store moves from localStorage to **IndexedDB** (via a small wrapper; `idb-keyval`
-  is acceptable). Removes the ~5MB ceiling that caused the loss.
-- One record per drawing (no single giant blob): a save rewrites only that drawing's bytes.
-- A small **metadata index** (id, name, createdAt, updatedAt, rev, thumbnail) is maintained so
+  is acceptable). Removes the ~5MB ceiling that caused the loss — the direct fix for the quota bug.
+- One record per drawing (no single giant blob): a save rewrites only that drawing's bytes, so a
+  single large drawing can never block saves for others.
+- A small **metadata index** (id, name, createdAt, updatedAt, thumbnail) is maintained so
   `list()` is fast and never touches full content.
-- The **outbox** stays in localStorage (it is tiny: `{ [id]: { baseRev, queuedAt } }`). Keeping
-  it in localStorage keeps it synchronously readable during exit handlers.
 
 ### Data model (types.ts)
 
-- `rev: number` — monotonic content version. Bumped only by the engine save path; preserved
-  verbatim across local and cloud. `updatedAt` remains, but is **display-only** ("last edited"),
-  no longer used for reconciliation.
-- `DrawingMetadata` gains `rev: number` and `thumbnail?: string` (dataURL).
-- Outbox record: `{ [id]: { baseRev: number; queuedAt: number } }`.
-- Recovery snapshot: stored in localStorage under `gridpaint:recovery:{id}:{rev}`.
-- Legacy docs without `rev` are treated as `rev = 0` and migrated on first write.
+- `DrawingMetadata` gains `thumbnail?: string` (dataURL).
+- No `rev` field. Reconciliation uses `updatedAt`, but **stamped once at the source** (see below)
+  rather than re-rolled per layer — which is what made the old timestamp compare unsafe.
 
-### Write path (engine.save)
+### Single-source `updatedAt`
+
+- `updatedAt` is set **once**, in `saveDrawingState` (the engine entry point), and passed
+  verbatim through local and cloud writes. The store layers must **not** re-roll `Date.now()`.
+  (Today `local-store.save` and `firestore-store.save` each call `Date.now()` independently,
+  making cloud structurally newer than local for identical content.)
+- With a single source, `updatedAt` correctly identifies content: equal stamps = same content.
+
+### Write path (save)
 
 1. Determine whether this save is a **content change** (layers/points/pointModifications/
-   exportRects changed) vs **position-only** (panOffset/zoom). Only content changes bump the
+   exportRects changed) vs **position-only** (panOffset/zoom). Only content changes refresh the
    thumbnail (see Homepage).
-2. Bump `rev = rev + 1`; set `updatedAt = now`.
-3. Write to IndexedDB (await). The engine reads the **current** doc at drain time — no
-   closure capture of a stale `doc` (also fixes the old debounce-closure bug).
-4. If the local write throws (quota/denied): **do not** advance persisted `rev`, **do not**
-   clear outbox, surface the blocking save-failure banner (see below), and retry. Never report
-   success.
-5. On successful local write: mark dirty in outbox (`baseRev` = last known cloud rev for this id).
-6. Schedule debounced cloud drain (~1–2s) and ensure exit-flush handlers are registered.
+2. Set `updatedAt = now` **once** here.
+3. Write to IndexedDB (await).
+4. If the local write throws (quota/denied): surface the blocking save-failure banner, keep the
+   data dirty, retry. **Never report success.** (Replaces today's silent `console.error`.)
+5. On success, schedule the debounced cloud drain. The drain reads the **current** doc from the
+   local store at fire time (no stale closure capture).
 
 ### Conditional cloud write (firestore-store, in a transaction)
 
-- In a transaction: read current cloud doc; `cloudRev = doc.rev ?? 0`.
-- If `cloudRev === outbox.baseRev` → write local doc (with its `rev`), commit, clear outbox
-  entry, update last-known-cloud-rev.
-- If `cloudRev > outbox.baseRev` → abort; return `{ conflict: true, cloudDoc }` to the engine.
-- Legacy cloud docs (no `rev`) → treated as rev 0; first write migrates them.
+- In a transaction: read current cloud doc; compare its `updatedAt` to the `updatedAt` of the
+  doc being written derived from (the version this device last saw).
+- If cloud has **not** advanced past what this device last saw → write. Commit.
+- If cloud **has** advanced (someone else wrote a newer `updatedAt`) → **abort the write**;
+  do not overwrite. Pull the newer cloud doc and adopt it locally on the next reconcile.
+- This guarantees a stale device cannot clobber newer cloud work — the dangerous case from the
+  diagnosis. It resolves to last-write-wins by `updatedAt` (no conflict modal); the loser is not
+  destroyed locally because local already holds whichever version the user is actively editing.
 
-### Reconciliation (reconcile.ts — pure)
+### Reconciliation (hybrid-store.get)
 
-`reconcile(local, cloud, outboxEntry) → Action`. Drives both drawing-open and post-drain.
-
-| Local dirty? | cloud rev vs baseRev/local | Action |
-|---|---|---|
-| no | cloud.rev > local.rev | `adopt-cloud` — save cloud to local, update baseRev. Legit background-device update; silent. |
-| no | cloud.rev === local.rev | `in-sync` — nothing. |
-| yes | cloud.rev === baseRev | `push-local` — conditional write succeeds. |
-| yes | cloud.rev > baseRev | `conflict` — return `{ local, cloud }`. Engine/UI handles. |
-
-The idle / just-opened tab has nothing dirty, so it always lands in `adopt-cloud` or `in-sync`
-— **no modal, no noise**, per requirement. A modal only appears on genuine divergence.
-
-### Conflict handling: blocking modal
-
-On `conflict`, the editor must **block** loading the drawing for editing and show
-`ConflictResolutionModal` so the user cannot deepen the conflict by editing the wrong base.
-
-Modal contents:
-
-- Title: "This drawing was edited on another device"
-- **This device** — last edited `<local.updatedAt>` (`toLocaleString()`), optional thumbnail.
-- **Other device** — last edited `<cloud.updatedAt>` (`toLocaleString()`), optional thumbnail.
-- Buttons: **Keep this version** / **Use the other version**.
-- Note: "The version you don't pick is saved as a recoverable copy."
-
-Behavior:
-
-- **Always** write the displaced version to `gridpaint:recovery:{id}:{rev}` (local-only), regardless
-  of choice, where `{rev}` is the displaced version's own `rev` (so the key is unique and the
-  snapshot is self-describing) — the modal makes the choice explicit *and* keeps a safety net.
-- The chosen version gets a fresh `rev` above cloud and is queued for sync.
-- `reconcile.ts` stays pure (returns `{ action: 'conflict', local, cloud }`); the engine surfaces a
-  pending-conflict state the editor reads; the editor renders the modal and applies the choice.
+- Pull cloud + read local. Use single-source `updatedAt`.
+- cloud newer than local → adopt cloud, save to local (legit background-device update).
+- local newer than or equal to cloud → keep local; never overwrite newer local with older cloud.
+- This fixes the specific clobber bug: because `updatedAt` is now single-source, an older cloud
+  copy can no longer out-rank newer local content.
 
 ### Save-failure UX: blocking banner + retry
 
 A persistent, blocking banner ("Couldn't save your latest changes — retrying…") shown whenever a
 local write fails (e.g. genuine IndexedDB quota exhaustion or denied storage). Data stays dirty
 and retries; success is never reported while a write is failing. This replaces today's silent
-`console.error`. (Exposed via an `$saveStatus` store consumed by an editor-level banner component.)
-
-### Flush-on-exit (durability backstop)
-
-Wired in the editor:
-
-- On `visibilitychange → hidden` (fires reliably on tab close / nav, desktop + mobile) and on
-  route-change away from the editor: trigger an immediate cloud drain.
-- The local IndexedDB write already happened synchronously at edit time, so local is safe.
-- The exit flush is **best-effort** — the browser may not await the network call. Correctness
-  comes from the **durable outbox**, not the exit flush: a hard kill mid-flush just leaves the
-  entry pending for the next load. The flush only shortens the window.
+`console.error`. Exposed via a `$saveStatus` store consumed by an editor-level banner component.
 
 ### Homepage payload
 
@@ -204,37 +178,54 @@ Wired in the editor:
 - Thumbnail = `canvas.toDataURL()` of the current viewport (recognizable to the user), captured
   by `thumbnail.ts` using the live p5 canvas in the editor.
 - Thumbnail is regenerated **only on content-change saves**, not on position-only (pan/zoom)
-  saves. The editor requests a refresh when the engine reports a content change.
+  saves. The editor requests a refresh when the save path reports a content change.
 - Delete `generatePreview()` from `Home.tsx`; render `metadata.thumbnail` directly. Show a
   neutral placeholder when a drawing has no thumbnail yet.
 
 ### Firestore changes
 
-- Add `rev` to each drawing document; writes go through a transaction (conditional write).
-- `firestore.rules` updated as needed to keep the existing `writeToken` gate working alongside
-  the new field (the user approved updating the model + transactions).
+- Writes go through a transaction (conditional write keyed on `updatedAt`).
+- `firestore.rules` updated only as needed to keep the existing `writeToken` gate working with
+  the transactional write.
 
 ## Testing
 
-- **`reconcile.ts`** — unit tests covering every row of the table (this is where correctness lives).
-- **`outbox.ts`** — add / drain / persist round-trip; survives simulated reload.
 - **`serialization.ts`** — serialize/deserialize round-trip + the existing legacy-migration cases
   (groups, pointModifications, cutout v1→v2→v3), moved out of the store files.
-- **Conditional write** — conflict path with a faked Firestore transaction (cloud rev advanced).
-- **Save-failure path** — IndexedDB write throws → `$saveStatus` reflects failure, outbox not
-  cleared, rev not advanced, success not reported.
+- **`local-store` (IndexedDB)** — save/get/list/delete round-trip; metadata index stays in sync;
+  one drawing's write does not affect another's bytes.
+- **Reconciliation in `hybrid-store.get`** — cloud-newer adopts cloud; local-newer keeps local;
+  equal stays in sync. Asserts older cloud never clobbers newer local.
+- **Conditional write** — cloud advanced → write aborts (no clobber); cloud unchanged → write lands.
+- **Save-failure path** — IndexedDB write throws → `$saveStatus` reflects failure, success not
+  reported.
 
 ## Migration / rollout
 
-- On first load after deploy, migrate existing `gridpaint:drawings` localStorage blob into the
-  per-drawing IndexedDB records + metadata index (one-time), then leave the old key in place as a
-  fallback (do not delete immediately) until confirmed migrated.
-- Existing docs (local & cloud) without `rev` are treated as `rev = 0`.
+- On first load after deploy, migrate the existing `gridpaint:drawings` localStorage blob into
+  per-drawing IndexedDB records + metadata index (one-time). Leave the old localStorage key in
+  place as a fallback (do not delete immediately) until migration is confirmed.
 
 ## Open trade-offs (accepted)
 
-- Exit-flush is best-effort; durability rests on the outbox. (Accepted.)
-- No live listener; background-device changes are picked up on next open. (Accepted — YAGNI for
-  single user.)
-- Conflict snapshots are local-only; a localStorage clear loses the *snapshot* (not the chosen
-  version). (Accepted.)
+- Cloud reconciliation is last-write-wins by single-source `updatedAt`; no conflict modal. The
+  dangerous stale-clobber is prevented by the conditional write, and local always retains the
+  version being actively edited. (Accepted for single-user use.)
+- No live listener; background-device changes are picked up on next open. (Accepted — YAGNI.)
+
+## Deferred: full sync model (not building now)
+
+Documented in case real multi-device conflicts appear later. The robust local-first model adds:
+
+1. **Per-document `rev`** (monotonic content version) bumped in one place, preserved verbatim
+   across local/cloud; reconciliation compares `rev` instead of timestamps.
+2. **Durable outbox** (dirty queue in localStorage) so unconfirmed writes survive reload and
+   retry; an entry leaves only after cloud confirms.
+3. **Conditional cloud writes keyed on `baseRev`** in a transaction.
+4. **Blocking conflict modal** (`ConflictResolutionModal`) when both sides diverge from the same
+   base: shows each version's `updatedAt` (`toLocaleString()`) + thumbnail, user picks one, the
+   unpicked version saved to `gridpaint:recovery:{id}:{rev}` (local-only recovery snapshot).
+5. A pure `reconcile(local, cloud, outboxEntry) → action` function as the testable core.
+
+This is strictly additive over the lean scope: the IndexedDB store, thumbnails, and loud save
+failures all carry forward unchanged.
