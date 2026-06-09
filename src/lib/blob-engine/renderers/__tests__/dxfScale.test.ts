@@ -3,17 +3,16 @@ import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { generateLayerDxf } from "@/lib/blob-engine/renderers/DxfRenderer"
 import type { GridLayer } from "@/lib/blob-engine/types"
 
-function maxCoord(dxf: string): number {
+function extents(dxf: string): { x: number; y: number } {
   const lines = dxf.split(/\r?\n/)
-  let max = 0
-  for (let i = 0; i < lines.length - 1; i++) {
+  let maxX = 0
+  let maxY = 0
+  for (let i = 0; i + 1 < lines.length; i++) {
     const code = lines[i].trim()
-    if (code === "10" || code === "20") {
-      const v = Math.abs(parseFloat(lines[i + 1]))
-      if (!Number.isNaN(v)) max = Math.max(max, v)
-    }
+    if (code === "10") maxX = Math.max(maxX, Math.abs(parseFloat(lines[i + 1])))
+    if (code === "20") maxY = Math.max(maxY, Math.abs(parseFloat(lines[i + 1])))
   }
-  return max
+  return { x: maxX, y: maxY }
 }
 
 function render(scale?: { num: number; den: number }): string {
@@ -32,15 +31,18 @@ function render(scale?: { num: number; den: number }): string {
 }
 
 describe("DxfRenderer scale", () => {
-  it("doubles output extent for a 2x layer vs 1x", () => {
-    const base = maxCoord(render())
-    const doubled = maxCoord(render({ num: 2, den: 1 }))
-    expect(base).toBeGreaterThan(0)
-    expect(doubled).toBeCloseTo(base * 2, 3)
+  it("doubles output extent on both axes for a 2x layer vs 1x", () => {
+    const base = extents(render())
+    const doubled = extents(render({ num: 2, den: 1 }))
+    expect(base.x).toBeGreaterThan(0)
+    expect(base.y).toBeGreaterThan(0)
+    expect(doubled.x).toBeCloseTo(base.x * 2, 3)
+    expect(doubled.y).toBeCloseTo(base.y * 2, 3)
   })
-  it("halves output extent for a 1/2 layer vs 1x", () => {
-    const base = maxCoord(render())
-    const halved = maxCoord(render({ num: 1, den: 2 }))
-    expect(halved).toBeCloseTo(base / 2, 3)
+  it("halves output extent on both axes for a 1/2 layer vs 1x", () => {
+    const base = extents(render())
+    const halved = extents(render({ num: 1, den: 2 }))
+    expect(halved.x).toBeCloseTo(base.x / 2, 3)
+    expect(halved.y).toBeCloseTo(base.y / 2, 3)
   })
 })
