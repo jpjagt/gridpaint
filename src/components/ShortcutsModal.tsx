@@ -80,6 +80,17 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys="[" description="Previous group (collapses empty trailing groups)" />
           </Section>
 
+          <Section title="Layer & Group Options (Layer Controls)">
+            <KbdRow
+              keys="½ button"
+              description="Half-offset (per group): shifts the group's drawn shapes by half a grid cell in both directions. Each group is its own offset, so you can mix normal and half-offset regions on one layer. Half-offset shapes fuse with normal shapes where they meet."
+            />
+            <KbdRow
+              keys="scale ⅓–3×"
+              description="Layer scale (per layer): renders the whole layer — shapes and corner radii — larger or smaller. ⅓/½ shrink, 2×/3× enlarge, 1× is default. Applies to canvas, SVG, and DXF export."
+            />
+          </Section>
+
           <Section title="Viewport">
             <KbdRow keys="C" description="Center canvas to content" />
             <KbdRow keys="M" description="Toggle measuring overlay (mm grid)" />
@@ -112,15 +123,6 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys={["shift", "click"]} description="Add cutout to all layers with point" />
             <KbdRow keys={["alt", "click"]} description="Remove hovered cutout from active layer" />
             <KbdRow keys={["alt", "shift", "click"]} description="Clear all cutouts at point from all layers" />
-          </Section>
-
-          <Section title="Cutout Tool (O)">
-            <KbdRow keys="Q" description="Anchor: center" />
-            <KbdRow keys="X" description="Anchor: SE" />
-            <KbdRow keys="Z" description="Anchor: SW" />
-            <KbdRow keys="A" description="Anchor: NW" />
-            <KbdRow keys="W" description="Anchor: NE" />
-            <KbdRow keys="alt + click" description="Clear all cutouts on a point" />
           </Section>
 
           <Section title="Override Tool (V)">

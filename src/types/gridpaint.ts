@@ -119,6 +119,11 @@ export interface InteractionGroup {
   id: string
   name?: string
   points: Set<string> // "x,y" format
+  /**
+   * Lattice phase for this group. "half" shifts every point by +0.5 in both
+   * dimensions at render time (occupying a quadrant boundary). Absent ⇒ "normal".
+   */
+  offsetPhase?: "normal" | "half"
 }
 
 // === Export Rects ===

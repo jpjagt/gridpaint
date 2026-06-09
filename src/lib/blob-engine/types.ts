@@ -20,6 +20,8 @@ export interface GridLayer {
   renderStyle: "default" | "tiles"
   /** Per-point modifications keyed by "x,y" */
   pointModifications?: Map<string, PointModifications>
+  /** Per-layer uniform scale (see store Layer.scale). Absent ⇒ 1/1. */
+  scale?: { num: number; den: number }
 }
 
 /** Derive the union of all points across all groups in a GridLayer */

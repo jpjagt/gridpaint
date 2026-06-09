@@ -24,6 +24,7 @@ import {
 } from "./Renderer"
 import { PrimitiveGenerator } from "../PrimitiveGenerator"
 import { magicNr } from "@/lib/constants"
+import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
 // Debug visualization constants
 let SHOW_SUBGRID = false // Set to true to show quadrant grid lines
@@ -119,6 +120,12 @@ export class Canvas2DRenderer extends Renderer {
         ? getLayerStyle(layerGeometry.layer.id)
         : options.style
 
+      const scaleFactor = scaleToFactor(layerGeometry.layer.scale)
+      if (scaleFactor !== 1) {
+        mainCtx.save()
+        mainCtx.scale(scaleFactor, scaleFactor)
+      }
+
       this.renderLayerGeometry(
         layerGeometry.geometry,
         layerStyle,
@@ -126,6 +133,10 @@ export class Canvas2DRenderer extends Renderer {
         layerGeometry.layer,
         options.mmPerUnit ?? 1,
       )
+
+      if (scaleFactor !== 1) {
+        mainCtx.restore()
+      }
     }
 
     // Render subgrid overlay if enabled (while transforms are still active)

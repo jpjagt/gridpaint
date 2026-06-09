@@ -33,10 +33,14 @@ export function serializeDocument(doc: DrawingDocument): InnerDrawingDocument {
           id: g.id,
           ...(g.name !== undefined ? { name: g.name } : {}),
           points: Array.from(g.points),
+          ...(g.offsetPhase !== undefined ? { offsetPhase: g.offsetPhase } : {}),
         })),
       }
       if (layer.pointModifications && layer.pointModifications.size > 0) {
         serialized.pointModifications = Object.fromEntries(layer.pointModifications)
+      }
+      if (layer.scale) {
+        serialized.scale = layer.scale
       }
       return serialized
     }),
@@ -56,6 +60,7 @@ export function deserializeDocument(doc: InnerDrawingDocument): DrawingDocument 
         id: g.id,
         name: g.name,
         points: new Set(g.points),
+        offsetPhase: g.offsetPhase,
       }))
     } else if (layer.points) {
       // Legacy format: migrate flat points to a single default group
@@ -101,6 +106,7 @@ export function deserializeDocument(doc: InnerDrawingDocument): DrawingDocument 
       renderStyle: layer.renderStyle,
       groups,
       pointModifications,
+      scale: layer.scale,
     }
   })
 

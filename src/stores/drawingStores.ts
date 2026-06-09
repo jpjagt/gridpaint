@@ -18,6 +18,12 @@ export interface Layer {
   groups: InteractionGroup[]
   /** Per-point modifications keyed by "x,y". Only points with mods need entries. */
   pointModifications?: Map<string, PointModifications>
+  /**
+   * Per-layer uniform scale applied to the layer's finished render output.
+   * One of num/den is always 1: `{num:2,den:1}` = 2× bigger cell,
+   * `{num:1,den:2}` = 2× smaller. Absent ⇒ 1/1.
+   */
+  scale?: { num: number; den: number }
 }
 
 /** Derive the union of all points across all groups in a layer */
@@ -369,6 +375,46 @@ export function updateGroupPoints(
  */
 export function updateLayerPoints(layerId: number, points: Set<string>): void {
   updateGroupPoints(layerId, points)
+}
+
+/**
+ * Toggle a group's offset phase between "normal" and "half".
+ * Half shifts the group's rendered points by +0.5 in both dimensions.
+ */
+export function toggleGroupOffsetPhase(layerId: number, groupId: string): void {
+  const current = $layersState.get()
+  pushHistory(current.layers)
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== layerId) return layer
+    const groups = layer.groups.map((g) =>
+      g.id === groupId
+        ? {
+            ...g,
+            offsetPhase: (g.offsetPhase === "half" ? "normal" : "half") as
+              | "normal"
+              | "half",
+          }
+        : g,
+    )
+    return { ...layer, groups }
+  })
+  $layersState.setKey("layers", layers)
+}
+
+/**
+ * Set (or clear, with undefined) a layer's uniform scale.
+ * One of num/den is expected to be 1.
+ */
+export function setLayerScale(
+  layerId: number,
+  scale: { num: number; den: number } | undefined,
+): void {
+  const current = $layersState.get()
+  pushHistory(current.layers)
+  const layers = current.layers.map((layer) =>
+    layer.id === layerId ? { ...layer, scale } : layer,
+  )
+  $layersState.setKey("layers", layers)
 }
 
 /**

@@ -23,6 +23,7 @@ import { PrimitiveGenerator } from "./PrimitiveGenerator"
 import { GroupMerger } from "./GroupMerger"
 import { GeometryCache } from "./GeometryCache"
 import { BlobEngineError } from "./types"
+import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
 export interface BlobEngineOptions {
   enableCaching?: boolean
@@ -131,12 +132,15 @@ export class BlobEngine {
 
         totalPrimitives += geometry.primitives.length
 
-        // Update global bounds
+        // Update global bounds. Per-layer scale is applied about the origin as
+        // a render post-process, so the scaled bbox is the unscaled bbox times
+        // the factor (both min and max scale).
         if (geometry.primitives.length > 0) {
-          globalMinX = Math.min(globalMinX, geometry.boundingBox.min.x)
-          globalMinY = Math.min(globalMinY, geometry.boundingBox.min.y)
-          globalMaxX = Math.max(globalMaxX, geometry.boundingBox.max.x)
-          globalMaxY = Math.max(globalMaxY, geometry.boundingBox.max.y)
+          const sf = scaleToFactor(layer.scale)
+          globalMinX = Math.min(globalMinX, geometry.boundingBox.min.x * sf)
+          globalMinY = Math.min(globalMinY, geometry.boundingBox.min.y * sf)
+          globalMaxX = Math.max(globalMaxX, geometry.boundingBox.max.x * sf)
+          globalMaxY = Math.max(globalMaxY, geometry.boundingBox.max.y * sf)
         }
       }
 
@@ -177,7 +181,8 @@ export class BlobEngine {
   private needsGroupMerge(layer: GridLayer): boolean {
     return (
       layer.groups.length > 1 ||
-      (layer.pointModifications !== undefined && layer.pointModifications.size > 0)
+      (layer.pointModifications !== undefined && layer.pointModifications.size > 0) ||
+      layer.groups.some((g) => g.offsetPhase === "half")
     )
   }
 
