@@ -118,6 +118,7 @@ export class FirestoreDrawingStore implements DrawingStore {
     const cleanedDoc = removeUndefined(serializedDoc)
     const drawingRef = doc(db, "drawings", drawingDoc.id)
 
+    let didWrite = false
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(drawingRef)
       if (snap.exists()) {
@@ -132,13 +133,16 @@ export class FirestoreDrawingStore implements DrawingStore {
         }
       }
       tx.set(drawingRef, cleanedDoc)
+      didWrite = true
     })
 
-    const userRef = doc(db, "users", this.userId)
-    await updateDoc(userRef, {
-      drawing_ids: arrayUnion(drawingDoc.id),
-      updatedAt: Date.now(),
-    })
+    if (didWrite) {
+      const userRef = doc(db, "users", this.userId)
+      await updateDoc(userRef, {
+        drawing_ids: arrayUnion(drawingDoc.id),
+        updatedAt: Date.now(),
+      })
+    }
   }
 
   /**

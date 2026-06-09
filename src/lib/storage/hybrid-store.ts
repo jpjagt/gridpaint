@@ -39,16 +39,14 @@ export class HybridDrawingStore implements DrawingStore {
   private localStore: LocalStorageDrawingStore
   private cloudStore: FirestoreDrawingStore | null
   private syncTimeouts: Map<string, NodeJS.Timeout>
-  private enabled: boolean
 
   constructor(userId?: string, writeToken?: string) {
     this.localStore = new LocalStorageDrawingStore()
-    this.cloudStore = userId && writeToken 
+    this.cloudStore = userId && writeToken
       ? new FirestoreDrawingStore(userId, writeToken)
       : null
     this.syncTimeouts = new Map()
-    this.enabled = true
-    
+
     console.log('[HybridStore] Initialized', 
       this.cloudStore ? 'with cloud sync' : 'local-only'
     )
@@ -58,6 +56,10 @@ export class HybridDrawingStore implements DrawingStore {
    * Enable/disable cloud sync
    */
   setCloudSync(userId: string | null, writeToken: string | null): void {
+    // Cancel pending syncs queued against the previous cloud store.
+    for (const timeout of this.syncTimeouts.values()) clearTimeout(timeout)
+    this.syncTimeouts.clear()
+
     if (userId && writeToken) {
       this.cloudStore = new FirestoreDrawingStore(userId, writeToken)
       console.log('[HybridStore] Cloud sync enabled')
