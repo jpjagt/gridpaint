@@ -177,7 +177,8 @@ export class BlobEngine {
   private needsGroupMerge(layer: GridLayer): boolean {
     return (
       layer.groups.length > 1 ||
-      (layer.pointModifications !== undefined && layer.pointModifications.size > 0)
+      (layer.pointModifications !== undefined && layer.pointModifications.size > 0) ||
+      layer.groups.some((g) => g.offsetPhase === "half")
     )
   }
 
