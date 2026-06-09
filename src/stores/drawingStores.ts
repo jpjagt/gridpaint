@@ -1,6 +1,6 @@
 import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
-import type { DrawingDocument, LayerData } from "@/lib/storage/types"
+import type { DrawingDocument } from "@/lib/storage/types"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
 import type {
   InteractionGroup,

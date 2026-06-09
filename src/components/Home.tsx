@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingMetadata } from "@/lib/storage/types"
 import { Button } from "@/components/ui/button"
@@ -29,16 +29,16 @@ export default function Home() {
   const [showPassphraseModal, setShowPassphraseModal] = useState(false)
   const authState = useStore($authState)
 
-  useEffect(() => {
-    async function loadDrawings() {
-      setIsLoading(true)
-      const metadata = await drawingStore.list()
-      const sorted = [...metadata].sort((a, b) => b.updatedAt - a.updatedAt)
-      setDrawings(sorted)
-      setIsLoading(false)
-    }
-    loadDrawings()
+  // Load metadata and set the list sorted by last-modified descending.
+  const refreshDrawings = useCallback(async () => {
+    const metadata = await drawingStore.list()
+    setDrawings([...metadata].sort((a, b) => b.updatedAt - a.updatedAt))
   }, [])
+
+  useEffect(() => {
+    setIsLoading(true)
+    refreshDrawings().finally(() => setIsLoading(false))
+  }, [refreshDrawings])
 
   const createNew = () => {
     const id = crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
@@ -72,11 +72,10 @@ export default function Home() {
 
       // Save the duplicate
       await drawingStore.save(newDrawing)
-      
-      // Reload drawings list
-      const metadata = await drawingStore.list()
-      setDrawings(metadata)
-      
+
+      // Reload drawings list (sorted)
+      await refreshDrawings()
+
       toast.success('Drawing imported successfully!')
       
       // Navigate to the new drawing
@@ -243,7 +242,7 @@ export default function Home() {
           }
           
           // Reload drawings to include cloud drawings
-          drawingStore.list().then(setDrawings)
+          await refreshDrawings()
         }}
       />
     </div>
