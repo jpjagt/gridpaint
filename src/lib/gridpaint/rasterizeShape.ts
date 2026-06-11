@@ -1,4 +1,4 @@
-import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
+import type { ShapeKind, ShapeStyle, ShapeMeta } from "@/types/gridpaint"
 import type { ClipboardData } from "@/types/gridpaint"
 
 /**
@@ -56,6 +56,58 @@ export function buildShapeClipboard(
   return {
     layers: [{ layerId, groups: [{ id: groupId, points }] }],
     bounds: { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 },
+  }
+}
+
+/**
+ * Minimal shape-float shape used by {@link rebuildShapeFloatState}. Matches the
+ * relevant fields of `FloatingPaste` (defined in @/stores/ui) structurally so
+ * this leaf module stays free of a store import. Extra fields (e.g. `lifted`)
+ * are preserved by the caller's spread.
+ */
+export interface ShapeFloatState {
+  data: ClipboardData
+  origin: { x: number; y: number }
+  offset: { x: number; y: number }
+  shape?: ShapeMeta
+}
+
+/**
+ * Pure transform: given the current shape float, a patch of shape params, and an
+ * optional origin shift (used when dragging NW/N/W handles so the opposite edge
+ * stays anchored), return the next float with re-rasterized `data`. Returns
+ * `null` when the float carries no shape meta (caller should no-op).
+ *
+ * Width/height are clamped to >= 1. The target layer/group are taken from the
+ * float's existing data so the float keeps targeting whatever it already did.
+ */
+export function rebuildShapeFloatState<T extends ShapeFloatState>(
+  fp: T,
+  patch: Partial<ShapeMeta>,
+  originDelta: { x: number; y: number } = { x: 0, y: 0 },
+): T | null {
+  if (!fp.shape) return null
+  const next: ShapeMeta = {
+    ...fp.shape,
+    ...patch,
+    width: Math.max(1, Math.round(patch.width ?? fp.shape.width)),
+    height: Math.max(1, Math.round(patch.height ?? fp.shape.height)),
+  }
+  const layerId = fp.data.layers[0]?.layerId ?? 0
+  const groupId = fp.data.layers[0]?.groups[0]?.id ?? "default"
+  return {
+    ...fp,
+    shape: next,
+    origin: { x: fp.origin.x + originDelta.x, y: fp.origin.y + originDelta.y },
+    data: buildShapeClipboard(
+      next.kind,
+      next.style,
+      next.width,
+      next.height,
+      next.exponent,
+      layerId,
+      groupId,
+    ),
   }
 }
 

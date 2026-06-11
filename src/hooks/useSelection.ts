@@ -4,7 +4,7 @@ import { useStore } from "@nanostores/react"
 import { $layersState, updateGroupPoints, updatePointModifications } from "@/stores/drawingStores"
 import { $selectionState, $shapeToolSettings, activeShapeExponent } from "@/stores/ui"
 import type { SerializedPointModifications } from "@/lib/storage/types"
-import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
+import { buildShapeClipboard, rebuildShapeFloatState } from "@/lib/gridpaint/rasterizeShape"
 
 export type { SelectionBounds, ClipboardGroup, ClipboardLayer, ClipboardData } from "@/types/gridpaint"
 import type { SelectionBounds, ClipboardGroup, ClipboardLayer, ClipboardData, ShapeMeta } from "@/types/gridpaint"
@@ -273,30 +273,9 @@ export const useSelection = () => {
       originDelta: { x: number; y: number } = { x: 0, y: 0 },
     ) => {
       const fp = $selectionState.get().floatingPaste
-      if (!fp || !fp.shape) return
-      const next: ShapeMeta = {
-        ...fp.shape,
-        ...patch,
-        width: Math.max(1, Math.round(patch.width ?? fp.shape.width)),
-        height: Math.max(1, Math.round(patch.height ?? fp.shape.height)),
-      }
-      const layerId = fp.data.layers[0]?.layerId ?? 0
-      const groupId = fp.data.layers[0]?.groups[0]?.id ?? "default"
-
-      $selectionState.setKey("floatingPaste", {
-        ...fp,
-        shape: next,
-        origin: { x: fp.origin.x + originDelta.x, y: fp.origin.y + originDelta.y },
-        data: buildShapeClipboard(
-          next.kind,
-          next.style,
-          next.width,
-          next.height,
-          next.exponent,
-          layerId,
-          groupId,
-        ),
-      })
+      if (!fp) return
+      const next = rebuildShapeFloatState(fp, patch, originDelta)
+      if (next) $selectionState.setKey("floatingPaste", next)
     },
     [],
   )

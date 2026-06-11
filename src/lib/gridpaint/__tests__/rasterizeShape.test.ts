@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest"
-import { rasterizeShape, buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
+import {
+  rasterizeShape,
+  buildShapeClipboard,
+  rebuildShapeFloatState,
+} from "@/lib/gridpaint/rasterizeShape"
 
 const sorted = (keys: string[]) => [...keys].sort()
+
+const makeShapeFloat = () => ({
+  data: buildShapeClipboard("ellipse", "fill", 5, 5, 2, 3, "g1"),
+  origin: { x: 10, y: 20 },
+  offset: { x: 0, y: 0 },
+  shape: { kind: "ellipse" as const, style: "fill" as const, width: 5, height: 5, exponent: 2 },
+  lifted: false,
+})
 
 describe("rasterizeShape — rectangle (high exponent)", () => {
   it("fills every cell of the bbox at n=8", () => {
@@ -113,6 +125,43 @@ describe("rasterizeShape — non-square ellipse & fractional exponent", () => {
     const nearRect = new Set(rasterizeShape("ellipse", "fill", 11, 11, 8)).size
     expect(squircle).toBeGreaterThan(ellipse)
     expect(squircle).toBeLessThanOrEqual(nearRect)
+  })
+})
+
+describe("rebuildShapeFloatState", () => {
+  it("returns null when the float has no shape meta", () => {
+    const plain = { ...makeShapeFloat(), shape: undefined }
+    expect(rebuildShapeFloatState(plain, { width: 9 })).toBeNull()
+  })
+
+  it("re-rasterizes data and merges the patch (kind/exponent), clamping size >= 1", () => {
+    const fp = makeShapeFloat()
+    const next = rebuildShapeFloatState(fp, { kind: "rectangle", exponent: 8, width: 0 })!
+    expect(next.shape).toEqual({
+      kind: "rectangle",
+      style: "fill",
+      width: 1, // clamped
+      height: 5,
+      exponent: 8,
+    })
+    // 1x5 rectangle fill = 5 cells
+    expect(next.data.layers[0].groups[0].points.length).toBe(5)
+    expect(next.data.bounds).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 4 })
+  })
+
+  it("shifts origin by originDelta and preserves passthrough fields", () => {
+    const fp = makeShapeFloat()
+    const next = rebuildShapeFloatState(fp, { width: 3 }, { x: 2, y: -1 })!
+    expect(next.origin).toEqual({ x: 12, y: 19 })
+    expect(next.offset).toEqual({ x: 0, y: 0 })
+    expect(next.lifted).toBe(false) // passthrough preserved
+  })
+
+  it("targets the float's existing layerId/groupId", () => {
+    const fp = makeShapeFloat()
+    const next = rebuildShapeFloatState(fp, { width: 4 })!
+    expect(next.data.layers[0].layerId).toBe(3)
+    expect(next.data.layers[0].groups[0].id).toBe("g1")
   })
 })
 

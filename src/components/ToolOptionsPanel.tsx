@@ -8,8 +8,8 @@ import {
   $shapeToolSettings,
   activeShapeExponent,
 } from "@/stores/ui"
-import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
-import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
+import { rebuildShapeFloatState } from "@/lib/gridpaint/rasterizeShape"
+import type { ShapeKind, ShapeStyle, ShapeMeta } from "@/types/gridpaint"
 import type { FloatingPaste } from "@/stores/ui"
 import {
   $exportRects,
@@ -823,27 +823,11 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
   const sliderLabel = kind === "rectangle" ? "corners" : "squircle"
 
   /** Rewrite the live float (if any) after a param change. No-op without a float. */
-  const rebuild = (
-    patch: Partial<{ kind: ShapeKind; style: ShapeStyle; width: number; height: number; exponent: number }>,
-  ) => {
+  const rebuild = (patch: Partial<ShapeMeta>) => {
     const fp = $selectionState.get().floatingPaste
-    if (!fp || !fp.shape) return
-    const next = {
-      kind: patch.kind ?? fp.shape.kind,
-      style: patch.style ?? fp.shape.style,
-      width: Math.max(1, Math.round(patch.width ?? fp.shape.width)),
-      height: Math.max(1, Math.round(patch.height ?? fp.shape.height)),
-      exponent: patch.exponent ?? fp.shape.exponent,
-    }
-    const layerId = fp.data.layers[0]?.layerId ?? 0
-    const groupId = fp.data.layers[0]?.groups[0]?.id ?? "default"
-    $selectionState.setKey("floatingPaste", {
-      ...fp,
-      shape: next,
-      data: buildShapeClipboard(
-        next.kind, next.style, next.width, next.height, next.exponent, layerId, groupId,
-      ),
-    })
+    if (!fp) return
+    const next = rebuildShapeFloatState(fp, patch)
+    if (next) $selectionState.setKey("floatingPaste", next)
   }
 
   const setKind = (k: ShapeKind) => {
