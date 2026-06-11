@@ -45,6 +45,8 @@
     --canvas-layer-4: 215.4 16.3% 46.9%;
     --canvas-layer-5: 215.3 19.3% 34.5%;
     --canvas-layer-6: 215.3 25% 26.7%;
+    --canvas-layer-lightest: 214.3 31.8% 91.4%; /* matches --canvas-layer-1 */
+    --canvas-layer-darkest: 215.3 25% 26.7%; /* matches --canvas-layer-6 */
     --canvas-layer-border: 0 0% 0%;
     --canvas-outline-active: var(--highlighted);
     --canvas-outline-bridge: var(--highlighted);
