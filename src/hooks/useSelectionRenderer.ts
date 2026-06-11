@@ -108,6 +108,28 @@ export const useSelectionRenderer = () => {
       )
     }
 
+    // Resize handles — only for shape floats.
+    if (floatingPaste.shape && boundsMinX !== Infinity) {
+      const handleColor = getCanvasColor("--canvas-outline-active")
+      const hx0 = boundsMinX * gs
+      const hy0 = boundsMinY * gs
+      const hx1 = (boundsMaxX + 1) * gs
+      const hy1 = (boundsMaxY + 1) * gs
+      const hcx = (hx0 + hx1) / 2
+      const hcy = (hy0 + hy1) / 2
+      const handleSize = 8 / canvasView.zoom
+      const handleHalf = handleSize / 2
+      const handlePositions: [number, number][] = [
+        [hx0, hy0], [hcx, hy0], [hx1, hy0],
+        [hx0, hcy],             [hx1, hcy],
+        [hx0, hy1], [hcx, hy1], [hx1, hy1],
+      ]
+      ctx.fillStyle = handleColor
+      for (const [px, py] of handlePositions) {
+        ctx.fillRect(px - handleHalf, py - handleHalf, handleSize, handleSize)
+      }
+    }
+
     ctx.restore()
   }, [])
 
