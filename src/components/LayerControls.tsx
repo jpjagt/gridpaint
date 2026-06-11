@@ -4,12 +4,14 @@ import { useEffect } from "react"
 import { useStore } from "@nanostores/react"
 import {
   $layersState,
+  $canvasView,
   addGroupToActiveLayer,
   collapseEmptyTrailingGroups,
   toggleGroupOffsetPhase,
   setLayerScale,
   type Layer,
 } from "@/stores/drawingStores"
+import { layerRangeIds } from "@/types/layers"
 import {
   $activeGroupIndex,
   setActiveGroupIndex,
@@ -48,7 +50,6 @@ interface LayerControlsProps {
   onCreateLayer: () => void
   onLayerRenderStyleToggle: (layerId: number) => void
   onCreateOrActivateLayer: (layerId: number) => void
-  maxLayers?: number
 }
 
 export const LayerControls = ({
@@ -57,12 +58,13 @@ export const LayerControls = ({
   onCreateLayer,
   onLayerRenderStyleToggle,
   onCreateOrActivateLayer,
-  maxLayers = 6,
 }: LayerControlsProps) => {
   const layersState = useStore($layersState)
   const layers = layersState.layers
   const activeLayerId = layersState.activeLayerId
   const activeGroupIndex = useStore($activeGroupIndex)
+  const canvasView = useStore($canvasView)
+  const layerIds = layerRangeIds(canvasView.layerRange)
 
   const activeLayer = activeLayerId !== null
     ? layers.find((l) => l.id === activeLayerId)
@@ -93,12 +95,15 @@ export const LayerControls = ({
         $showCenterOfGravity.set(true)
       }
 
-      // Number keys 1-6: switch layer
+      // Number keys 1-9: switch layer by slot position within the range
       const isNumberKey =
-        /^[1-6]$/.test(key) && !e.ctrlKey && !e.metaKey && !e.altKey
+        /^[1-9]$/.test(key) && !e.ctrlKey && !e.metaKey && !e.altKey
       if (isNumberKey) {
+        const slotIndex = parseInt(key) - 1
+        const ids = layerRangeIds($canvasView.get().layerRange)
+        if (slotIndex >= ids.length) return // no such slot
         e.preventDefault()
-        const layerId = parseInt(key)
+        const layerId = ids[slotIndex]
         if (activeLayerId === layerId) {
           onLayerSelect(null) // Deactivate if already active
         } else {
@@ -190,10 +195,9 @@ export const LayerControls = ({
 
   return (
     <div className='fixed top-5 left-5 flex flex-col gap-2'>
-      {/* Layer buttons (1-6) with group subindex */}
-      <div className='flex gap-1'>
-        {Array.from({ length: maxLayers }, (_, index) => {
-          const layerId = index + 1
+      {/* Layer buttons (configurable range) with group subindex */}
+      <div className='flex gap-1 max-w-[90vw] overflow-x-auto pb-1'>
+        {layerIds.map((layerId) => {
           const layer = layers.find((l) => l.id === layerId)
           const isActive = activeLayerId === layerId
           const exists = !!layer
