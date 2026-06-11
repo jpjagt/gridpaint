@@ -12,6 +12,8 @@ dependencies = [
     "svgelements>=1.9",
     "matplotlib>=3.8",
     "contourpy>=1.2",
+    "networkx>=3.6.1",
+    "rtree>=1.4.1",
 ]
 
 [dependency-groups]
