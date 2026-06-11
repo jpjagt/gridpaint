@@ -24,6 +24,16 @@ a live floating preview before committing it into the active layer.
 5. **Commit semantics.** Committing adds the shape's cells to the active layer's
    active group (union). Holding **Alt/Option** while the shape tool is active
    makes the commit **subtract** those cells instead (mirrors draw/erase).
+6. **Squircliness slider.** Both rectangle and ellipse are modelled as a
+   **superellipse** `|x/a|^n + |y/b|^n ≤ 1`. A slider in the panel varies the
+   exponent `n`, and there is **one slider per shape kind**, rendered in the same
+   panel position and switched by the selected kind:
+   - **Ellipse → squircliness slider**, `n` from `1` (diamond) → `2` (true
+     ellipse, default) → `6` (boxy/near-rect).
+   - **Rectangle → corner-roundness slider**, `n` from `8` (sharp rectangle,
+     default) → `3` (clearly rounded corners). A high `n` keeps the full bbox with
+     crisp corners; lowering it rounds them.
+   Each kind stores its own `n` so switching Rect↔Ellipse remembers each setting.
 
 ## Key insight: reuse the floating-paste machinery
 
@@ -58,12 +68,21 @@ The bake path already targets the active layer/group for single-layer floats
 export interface ShapeToolSettings {
   shape: "rectangle" | "ellipse"
   style: "fill" | "edge"
+  /** Superellipse exponent per kind, so each remembers its own slider value. */
+  rectExponent: number    // default 8 (sharp); lower = rounder corners (min 3)
+  ellipseExponent: number // default 2 (true ellipse); 1 = diamond, up to 6 = boxy
 }
 export const $shapeToolSettings = map<ShapeToolSettings>({
   shape: "rectangle",
   style: "fill",
+  rectExponent: 8,
+  ellipseExponent: 2,
 })
 ```
+
+Slider ranges in the UI: rect `3..8`, ellipse `1..6` (step `0.1`). The active
+exponent for a given kind is `rectExponent` when `shape === "rectangle"`, else
+`ellipseExponent`.
 
 ### 3. Pure rasterizer (`src/lib/gridpaint/rasterizeShape.ts`)
 
@@ -71,23 +90,29 @@ export const $shapeToolSettings = map<ShapeToolSettings>({
 function rasterizeShape(
   shape: "rectangle" | "ellipse",
   style: "fill" | "edge",
-  width: number,   // in grid cells, >= 1
-  height: number,  // in grid cells, >= 1
-): string[]        // relative "x,y" keys, origin at (0,0) top-left of bbox
+  width: number,    // in grid cells, >= 1
+  height: number,   // in grid cells, >= 1
+  exponent: number, // superellipse exponent n (>= 1)
+): string[]         // relative "x,y" keys, origin at (0,0) top-left of bbox
 ```
 
-- **Rectangle / fill:** all cells `0..width-1 × 0..height-1`.
-- **Rectangle / edge:** perimeter cells only (top+bottom rows, left+right cols).
-  For width or height `<= 2`, this equals the fill (no interior to omit).
-- **Ellipse / fill:** per-cell inside test against the ellipse inscribed in the
-  bbox: a cell `(x,y)` is inside if its center is within the ellipse,
-  `((cx-a)/a)² + ((cy-b)/b)² <= 1` where `a=width/2`, `b=height/2`,
-  `cx=x+0.5`, `cy=y+0.5`.
-- **Ellipse / edge:** **fill minus eroded-fill** — a fill cell is on the edge if
-  any of its 4-neighbours is not filled. This yields a connected single-cell-wide
-  outline that is always a strict subset of the fill, so toggling fill→edge simply
-  hollows the shape out (visually consistent). Degenerate cases (`width<=2` or
-  `height<=2`) fall back to the fill of that thin box.
+Both kinds share one **superellipse fill test**: a cell `(x,y)` is inside if its
+center satisfies `|nx|^n + |ny|^n <= 1` where `nx=(cx-a)/a`, `ny=(cy-b)/b`,
+`a=width/2`, `b=height/2`, `cx=x+0.5`, `cy=y+0.5`, and `n` is the exponent.
+
+- **Rectangle** and **ellipse** differ only in their **default exponent** (passed
+  in by the caller): rectangle uses a high `n` (≈8, crisp corners), ellipse uses
+  `n≈2`. There is no separate perimeter algorithm — the rectangle is just a
+  high-`n` superellipse, which fills the whole bbox with rounded-to-crisp corners.
+- **fill:** all cells passing the test above.
+- **edge:** **fill minus eroded-fill** — a fill cell is on the edge if any of its
+  4-neighbours is not filled. Connected single-cell-wide outline, always a strict
+  subset of the fill, so toggling fill→edge just hollows the shape out. Degenerate
+  cases (`width<=2` or `height<=2`) fall back to the fill of that thin box.
+
+Note: at very high `n` the superellipse fill equals the full bbox (a sharp
+rectangle), and its erosion-derived **edge equals the rectangle perimeter** — so
+no special-casing is needed for the "sharp rect edge".
 
 This module is pure and unit-tested in isolation (no canvas). Built TDD.
 
@@ -102,13 +127,14 @@ shape?: {
   style: "fill" | "edge"
   width: number    // current size in cells
   height: number
+  exponent: number // superellipse exponent for this float
 }
 ```
 
 When `shape` is present:
 - The float's `data` (its cell set) is **derived** from
-  `rasterizeShape(kind, style, width, height)`, wrapped as a single-layer,
-  single-group `ClipboardData` with `bounds = {0,0,width-1,height-1}`.
+  `rasterizeShape(kind, style, width, height, exponent)`, wrapped as a
+  single-layer, single-group `ClipboardData` with `bounds = {0,0,width-1,height-1}`.
 - Changing `width`/`height`/`kind`/`style` re-runs the rasterizer and rewrites
   `data` (keeping `origin`/`offset`). A small helper
   `rebuildShapeFloat(partialShape)` in `useSelection` (or a thin store helper)
@@ -164,6 +190,15 @@ if (currentTool !== "cutout" && currentTool !== "override" &&
 - **Style** segmented toggle: Fill | Edge (same dual-write behavior).
 - **Size** W × H number inputs — shown only when a shape float is active;
   editing rebuilds the float at the new size. Inputs clamp to `>= 1`.
+- **Squircliness slider** — one slider rendered in a fixed position, switched by
+  the selected kind:
+  - Rectangle selected → **corner-roundness** slider, range `3..8`, bound to
+    `rectExponent`. Label e.g. "corners".
+  - Ellipse selected → **squircliness** slider, range `1..6`, bound to
+    `ellipseExponent`. Label e.g. "squircle".
+  Step `0.1`. Moving the slider writes the per-kind exponent to
+  `$shapeToolSettings` AND, if a shape float is active, rebuilds it with the new
+  exponent.
 
 When a shape float is active, the existing `FloatingPasteHint` (arrows/Enter/
 Esc help) is shown together with these controls.
@@ -174,7 +209,7 @@ Esc help) is shown together with these controls.
 shape tool: drag box ──► buildShapeClipboard(settings, w, h)
                          + shape metadata  ──► $selectionState.floatingPaste
 floating shape:
-  resize handle / W·H input ─► rebuildShapeFloat({width,height,...})
+  resize handle / W·H input / slider ─► rebuildShapeFloat({width,height,exponent,…})
                                └─► rasterizeShape ─► new data cells
   drag body / arrows ────────► moveFloatingPaste (existing)
   Enter / click-away ────────► bakeFloatingPaste (existing; union into
@@ -192,9 +227,11 @@ Default remains union, so paste behavior is unchanged.
 
 ## Testing
 
-- **Unit (TDD):** `rasterizeShape` — rectangle fill/edge, ellipse fill/edge,
-  degenerate thin shapes, 1×1, symmetry of the ellipse fill, edge ⊆ fill, and
-  hollow interior for a large ellipse edge.
+- **Unit (TDD):** `rasterizeShape` — fill/edge for both kinds, degenerate thin
+  shapes, 1×1, symmetry of the fill, edge ⊆ fill, hollow interior for a large
+  edge; plus exponent behaviour: high `n` (≈8) fills the whole bbox (sharp rect)
+  and its edge equals the rectangle perimeter, while `n=2` omits the bbox corners
+  (ellipse).
 - **Unit:** `rebuildShapeFloat` produces a single-layer/single-group
   `ClipboardData` with correct bounds and cell count for given params.
 - **Manual:** draw rect & ellipse in fill and edge; move with mouse and arrows;

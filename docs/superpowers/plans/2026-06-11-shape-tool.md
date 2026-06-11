@@ -4,7 +4,7 @@
 
 **Goal:** Add a shape tool that lets the user drag out a rectangle or ellipse (fill or single-cell edge), then move/resize it as a live floating preview before committing it into the active layer.
 
-**Architecture:** A rasterized shape is just a set of relative `"x,y"` grid cells — identical to `ClipboardData`/`FloatingPaste`. The shape tool generates that data and rides the existing floating-paste system in `useSelection` (render overlay, move, bake, cancel). We add: a pure `rasterizeShape` module, shape metadata on the float (so resize can re-rasterize), 8 resize handles, an `Alt`-subtract commit path, and a `ShapeOptions` panel.
+**Architecture:** A rasterized shape is just a set of relative `"x,y"` grid cells — identical to `ClipboardData`/`FloatingPaste`. Both rectangle and ellipse are one **superellipse** `|x/a|^n + |y/b|^n ≤ 1`; a per-kind exponent slider controls squircliness (rect ≈ sharp corners, ellipse = round). The shape tool generates that data and rides the existing floating-paste system in `useSelection` (render overlay, move, bake, cancel). We add: a pure `rasterizeShape` module, shape metadata on the float (so resize/slider can re-rasterize), 8 resize handles, an `Alt`-subtract commit path, and a `ShapeOptions` panel with the slider.
 
 **Tech Stack:** React 18 + TypeScript, Nanostores, Canvas2D, Vitest, lucide-react icons.
 
@@ -18,8 +18,8 @@
 
 - **Create** `src/lib/gridpaint/rasterizeShape.ts` — pure rasterizer: shape params → relative `"x,y"` cells. Plus `buildShapeClipboard()` helper producing a single-layer/single-group `ClipboardData`.
 - **Create** `src/lib/gridpaint/__tests__/rasterizeShape.test.ts` — unit tests.
-- **Modify** `src/types/gridpaint.ts` — add `ShapeKind`, `ShapeStyle`, `ShapeMeta` types.
-- **Modify** `src/stores/ui.ts` — add `"shape"` to `Tool`, `$shapeToolSettings` map, and `shape?: ShapeMeta` field on `FloatingPaste`.
+- **Modify** `src/types/gridpaint.ts` — add `ShapeKind`, `ShapeStyle`, `ShapeMeta` (incl. superellipse `exponent`) types.
+- **Modify** `src/stores/ui.ts` — add `"shape"` to `Tool`, `$shapeToolSettings` map (with per-kind exponents + `activeShapeExponent` helper), and `shape?: ShapeMeta` field on `FloatingPaste`.
 - **Modify** `src/hooks/useSelection.ts` — add `subtract` support to `bakeFloatingPaste`; add `startShapeFloat()` and `rebuildShapeFloat()` helpers.
 - **Modify** `src/hooks/useSelectionRenderer.ts` — draw 8 resize handles when the float carries shape metadata.
 - **Modify** `src/components/ToolSelection.tsx` — add the shape toolbar button.
@@ -56,6 +56,8 @@ export interface ShapeMeta {
   style: ShapeStyle
   width: number
   height: number
+  /** Superellipse exponent n in |x/a|^n + |y/b|^n <= 1. */
+  exponent: number
 }
 ```
 
@@ -73,11 +75,15 @@ git commit -m "feat: add shape tool types"
 
 ---
 
-## Task 2: rasterizeShape — rectangle
+## Task 2: rasterizeShape — superellipse fill & edge
 
 **Files:**
 - Create: `src/lib/gridpaint/rasterizeShape.ts`
 - Test: `src/lib/gridpaint/__tests__/rasterizeShape.test.ts`
+
+Both rectangle and ellipse are one superellipse `|x/a|^n + |y/b|^n <= 1`; the
+caller passes the exponent `n`. A high `n` (≈8) fills the whole bbox (a sharp
+rectangle); `n=2` is a true ellipse; `n=1` is a diamond.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -89,20 +95,25 @@ import { rasterizeShape } from "@/lib/gridpaint/rasterizeShape"
 
 const sorted = (keys: string[]) => [...keys].sort()
 
-describe("rasterizeShape — rectangle", () => {
-  it("fills every cell of the bbox", () => {
-    expect(sorted(rasterizeShape("rectangle", "fill", 2, 2))).toEqual(
-      sorted(["0,0", "1,0", "0,1", "1,1"]),
+describe("rasterizeShape — rectangle (high exponent)", () => {
+  it("fills every cell of the bbox at n=8", () => {
+    expect(sorted(rasterizeShape("rectangle", "fill", 4, 4, 8))).toEqual(
+      sorted([
+        "0,0","1,0","2,0","3,0",
+        "0,1","1,1","2,1","3,1",
+        "0,2","1,2","2,2","3,2",
+        "0,3","1,3","2,3","3,3",
+      ]),
     )
   })
 
   it("1x1 fill is a single cell", () => {
-    expect(rasterizeShape("rectangle", "fill", 1, 1)).toEqual(["0,0"])
+    expect(rasterizeShape("rectangle", "fill", 1, 1, 8)).toEqual(["0,0"])
   })
 
-  it("edge is the perimeter only", () => {
-    // 4x3 box: omit the single interior cell (1,1) and (2,1)
-    expect(sorted(rasterizeShape("rectangle", "edge", 4, 3))).toEqual(
+  it("edge of a full bbox (n=8) equals the rectangle perimeter", () => {
+    // 4x3 sharp rect: interior cells (1,1) and (2,1) are omitted
+    expect(sorted(rasterizeShape("rectangle", "edge", 4, 3, 8))).toEqual(
       sorted([
         "0,0", "1,0", "2,0", "3,0",
         "0,1", "3,1",
@@ -112,9 +123,63 @@ describe("rasterizeShape — rectangle", () => {
   })
 
   it("edge of a thin (height<=2) box equals fill", () => {
-    expect(sorted(rasterizeShape("rectangle", "edge", 4, 2))).toEqual(
-      sorted(rasterizeShape("rectangle", "fill", 4, 2)),
+    expect(sorted(rasterizeShape("rectangle", "edge", 4, 2, 8))).toEqual(
+      sorted(rasterizeShape("rectangle", "fill", 4, 2, 8)),
     )
+  })
+})
+
+describe("rasterizeShape — ellipse (n=2)", () => {
+  it("fill is symmetric horizontally and vertically", () => {
+    const w = 7, h = 5
+    const set = new Set(rasterizeShape("ellipse", "fill", w, h, 2))
+    for (const key of set) {
+      const [x, y] = key.split(",").map(Number)
+      expect(set.has(`${w - 1 - x},${y}`)).toBe(true) // mirror X
+      expect(set.has(`${x},${h - 1 - y}`)).toBe(true) // mirror Y
+    }
+  })
+
+  it("fill omits the corners of a large ellipse", () => {
+    const set = new Set(rasterizeShape("ellipse", "fill", 9, 9, 2))
+    expect(set.has("0,0")).toBe(false)
+    expect(set.has("8,0")).toBe(false)
+    expect(set.has("4,4")).toBe(true) // center filled
+  })
+
+  it("edge cells are a subset of fill cells", () => {
+    const fill = new Set(rasterizeShape("ellipse", "fill", 9, 7, 2))
+    const edge = rasterizeShape("ellipse", "edge", 9, 7, 2)
+    for (const key of edge) expect(fill.has(key)).toBe(true)
+  })
+
+  it("edge has no filled interior (center cell absent for a large ellipse)", () => {
+    const edge = new Set(rasterizeShape("ellipse", "edge", 11, 11, 2))
+    expect(edge.has("5,5")).toBe(false)
+  })
+
+  it("thin ellipse (height<=2) falls back to fill", () => {
+    expect(rasterizeShape("ellipse", "edge", 6, 2, 2).sort()).toEqual(
+      rasterizeShape("ellipse", "fill", 6, 2, 2).sort(),
+    )
+  })
+})
+
+describe("rasterizeShape — exponent controls squircliness", () => {
+  it("higher exponent fills strictly more cells than a lower one", () => {
+    const lo = new Set(rasterizeShape("ellipse", "fill", 9, 9, 2)) // ellipse
+    const hi = new Set(rasterizeShape("ellipse", "fill", 9, 9, 8)) // near-rect
+    // ellipse omits corners; near-rect includes them
+    expect(lo.has("0,0")).toBe(false)
+    expect(hi.has("0,0")).toBe(true)
+    expect(hi.size).toBeGreaterThan(lo.size)
+  })
+
+  it("n=1 is a diamond (corners and edge-midpoints differ)", () => {
+    const set = new Set(rasterizeShape("ellipse", "fill", 9, 9, 1))
+    expect(set.has("0,0")).toBe(false)   // corner empty
+    expect(set.has("4,0")).toBe(true)    // top-middle filled
+    expect(set.has("0,4")).toBe(true)    // left-middle filled
   })
 })
 ```
@@ -124,7 +189,7 @@ describe("rasterizeShape — rectangle", () => {
 Run: `pnpm test:run src/lib/gridpaint/__tests__/rasterizeShape.test.ts`
 Expected: FAIL — cannot find module `rasterizeShape`.
 
-- [ ] **Step 3: Implement rectangle rasterization**
+- [ ] **Step 3: Implement the superellipse rasterizer**
 
 Create `src/lib/gridpaint/rasterizeShape.ts`:
 
@@ -132,123 +197,31 @@ Create `src/lib/gridpaint/rasterizeShape.ts`:
 import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
 
 /**
- * Rasterize a shape into relative grid-cell keys ("x,y"), with the bbox's
- * top-left at (0,0). width/height are in grid cells and clamped to >= 1.
+ * Rasterize a superellipse into relative grid-cell keys ("x,y"), bbox top-left
+ * at (0,0). width/height are in grid cells (clamped >= 1). `exponent` is the
+ * superellipse n: ~8 ⇒ sharp rectangle, 2 ⇒ true ellipse, 1 ⇒ diamond.
+ * `kind` is accepted for call-site clarity but does not change the math — only
+ * the exponent does (the caller picks the kind-appropriate default exponent).
  */
 export function rasterizeShape(
-  kind: ShapeKind,
+  _kind: ShapeKind,
   style: ShapeStyle,
   width: number,
   height: number,
+  exponent: number,
 ): string[] {
   const w = Math.max(1, Math.round(width))
   const h = Math.max(1, Math.round(height))
-  if (kind === "rectangle") return rasterizeRectangle(style, w, h)
-  return rasterizeEllipse(style, w, h)
-}
+  const n = Math.max(1, exponent)
 
-function rasterizeRectangle(style: ShapeStyle, w: number, h: number): string[] {
-  const cells: string[] = []
-  const isEdge = style === "edge"
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const onPerimeter = x === 0 || x === w - 1 || y === 0 || y === h - 1
-      if (!isEdge || onPerimeter) cells.push(`${x},${y}`)
-    }
-  }
-  return cells
-}
-
-// Ellipse implemented in the next task.
-function rasterizeEllipse(_style: ShapeStyle, w: number, h: number): string[] {
-  // temporary: full bbox so the function is defined; replaced in Task 3
-  const cells: string[] = []
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) cells.push(`${x},${y}`)
-  return cells
-}
-```
-
-- [ ] **Step 4: Run tests, verify they pass**
-
-Run: `pnpm test:run src/lib/gridpaint/__tests__/rasterizeShape.test.ts`
-Expected: PASS (rectangle cases).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/lib/gridpaint/rasterizeShape.ts src/lib/gridpaint/__tests__/rasterizeShape.test.ts
-git commit -m "feat: rasterizeShape rectangle fill/edge"
-```
-
----
-
-## Task 3: rasterizeShape — ellipse fill & edge
-
-**Files:**
-- Modify: `src/lib/gridpaint/rasterizeShape.ts`
-- Test: `src/lib/gridpaint/__tests__/rasterizeShape.test.ts`
-
-- [ ] **Step 1: Add failing ellipse tests**
-
-Append a new `describe` block to `rasterizeShape.test.ts`:
-
-```ts
-describe("rasterizeShape — ellipse", () => {
-  it("fill is symmetric horizontally and vertically", () => {
-    const w = 7, h = 5
-    const set = new Set(rasterizeShape("ellipse", "fill", w, h))
-    for (const key of set) {
-      const [x, y] = key.split(",").map(Number)
-      expect(set.has(`${w - 1 - x},${y}`)).toBe(true) // mirror X
-      expect(set.has(`${x},${h - 1 - y}`)).toBe(true) // mirror Y
-    }
-  })
-
-  it("fill omits the corners of a large ellipse", () => {
-    const set = new Set(rasterizeShape("ellipse", "fill", 9, 9))
-    expect(set.has("0,0")).toBe(false)
-    expect(set.has("8,0")).toBe(false)
-    expect(set.has("4,4")).toBe(true) // center filled
-  })
-
-  it("edge cells are a subset of fill cells", () => {
-    const fill = new Set(rasterizeShape("ellipse", "fill", 9, 7))
-    const edge = rasterizeShape("ellipse", "edge", 9, 7)
-    for (const key of edge) expect(fill.has(key)).toBe(true)
-  })
-
-  it("edge has no filled interior (center cell absent for a large ellipse)", () => {
-    const edge = new Set(rasterizeShape("ellipse", "edge", 11, 11))
-    expect(edge.has("5,5")).toBe(false)
-  })
-
-  it("thin ellipse (height<=2) falls back to fill", () => {
-    expect(rasterizeShape("ellipse", "edge", 6, 2).sort()).toEqual(
-      rasterizeShape("ellipse", "fill", 6, 2).sort(),
-    )
-  })
-})
-```
-
-- [ ] **Step 2: Run tests, verify the new ones fail**
-
-Run: `pnpm test:run src/lib/gridpaint/__tests__/rasterizeShape.test.ts`
-Expected: FAIL — the temporary ellipse stub returns the full bbox, so the corner/edge tests fail.
-
-- [ ] **Step 3: Implement ellipse fill + edge**
-
-Replace the temporary `rasterizeEllipse` in `src/lib/gridpaint/rasterizeShape.ts` with:
-
-```ts
-function rasterizeEllipse(style: ShapeStyle, w: number, h: number): string[] {
-  const fill = ellipseFillCells(w, h)
+  const fill = superellipseFillCells(w, h, n)
   if (style === "fill") return [...fill]
 
-  // Degenerate thin ellipse: nothing meaningful to outline → return the fill.
+  // Degenerate thin shape: nothing meaningful to outline → return the fill.
   if (w <= 2 || h <= 2) return [...fill]
 
-  // Edge = fill cells minus the fill eroded by one cell in all 4 directions.
-  // A fill cell is on the edge if any 4-neighbor is NOT filled.
+  // Edge = fill minus fill eroded by one cell: a fill cell is on the edge if any
+  // of its 4-neighbours is not filled. Connected, 1-cell-wide, subset of fill.
   const edge: string[] = []
   for (const key of fill) {
     const [x, y] = key.split(",").map(Number)
@@ -262,44 +235,37 @@ function rasterizeEllipse(style: ShapeStyle, w: number, h: number): string[] {
   return edge
 }
 
-/** Cells whose center lies within the ellipse inscribed in the w×h bbox. */
-function ellipseFillCells(w: number, h: number): Set<string> {
+/** Cells whose center satisfies |nx|^n + |ny|^n <= 1 for the w×h bbox. */
+function superellipseFillCells(w: number, h: number, n: number): Set<string> {
   const a = w / 2
   const b = h / 2
   const cells = new Set<string>()
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const nx = (x + 0.5 - a) / a
-      const ny = (y + 0.5 - b) / b
-      if (nx * nx + ny * ny <= 1) cells.add(`${x},${y}`)
+      const nx = Math.abs((x + 0.5 - a) / a)
+      const ny = Math.abs((y + 0.5 - b) / b)
+      if (Math.pow(nx, n) + Math.pow(ny, n) <= 1) cells.add(`${x},${y}`)
     }
   }
   return cells
 }
 ```
 
-Note: this edge approach (fill minus eroded fill) yields a connected single-cell
-outline for the inscribed-ellipse fill we use, and keeps the edge a strict subset
-of the fill (which the tests assert). The midpoint-style 1-cell outline from the
-spec is satisfied by this erosion since the fill boundary is already 1 cell thick
-along axis directions; this avoids a separate midpoint implementation while
-meeting all stated requirements.
-
 - [ ] **Step 4: Run tests, verify they pass**
 
 Run: `pnpm test:run src/lib/gridpaint/__tests__/rasterizeShape.test.ts`
-Expected: PASS (all rectangle + ellipse cases).
+Expected: PASS (all cases).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/lib/gridpaint/rasterizeShape.ts src/lib/gridpaint/__tests__/rasterizeShape.test.ts
-git commit -m "feat: rasterizeShape ellipse fill/edge"
+git commit -m "feat: rasterizeShape superellipse fill/edge with exponent"
 ```
 
 ---
 
-## Task 4: buildShapeClipboard helper
+## Task 3: buildShapeClipboard helper
 
 **Files:**
 - Modify: `src/lib/gridpaint/rasterizeShape.ts`
@@ -314,7 +280,7 @@ import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
 
 describe("buildShapeClipboard", () => {
   it("wraps cells as a single-layer/single-group ClipboardData with bbox bounds", () => {
-    const clip = buildShapeClipboard("rectangle", "fill", 3, 2, 5, "g1")
+    const clip = buildShapeClipboard("rectangle", "fill", 3, 2, 8, 5, "g1")
     expect(clip.bounds).toEqual({ minX: 0, minY: 0, maxX: 2, maxY: 1 })
     expect(clip.layers).toHaveLength(1)
     expect(clip.layers[0].layerId).toBe(5)
@@ -350,12 +316,13 @@ export function buildShapeClipboard(
   style: ShapeStyle,
   width: number,
   height: number,
+  exponent: number,
   layerId: number,
   groupId: string,
 ): ClipboardData {
   const w = Math.max(1, Math.round(width))
   const h = Math.max(1, Math.round(height))
-  const points = rasterizeShape(kind, style, w, h)
+  const points = rasterizeShape(kind, style, w, h, exponent)
   return {
     layers: [{ layerId, groups: [{ id: groupId, points }] }],
     bounds: { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 },
@@ -377,7 +344,7 @@ git commit -m "feat: buildShapeClipboard helper"
 
 ---
 
-## Task 5: Store — shape tool registration & settings
+## Task 4: Store — shape tool registration & settings
 
 **Files:**
 - Modify: `src/stores/ui.ts`
@@ -406,12 +373,24 @@ c) Add the settings store (place after `$cutoutToolSettings` or near `$overrideT
 export interface ShapeToolSettings {
   shape: ShapeKind
   style: ShapeStyle
+  /** Superellipse exponent per kind so each remembers its own slider value. */
+  rectExponent: number    // default 8 (sharp corners); lower = rounder (min 3)
+  ellipseExponent: number // default 2 (true ellipse); 1 = diamond, up to 6 boxy
 }
 
 export const $shapeToolSettings = map<ShapeToolSettings>({
   shape: "rectangle",
   style: "fill",
+  rectExponent: 8,
+  ellipseExponent: 2,
 })
+```
+
+Helper used by both panel and canvas to pick the active exponent:
+
+```ts
+export const activeShapeExponent = (s: ShapeToolSettings): number =>
+  s.shape === "rectangle" ? s.rectExponent : s.ellipseExponent
 ```
 
 d) Add the optional `shape` field to the `FloatingPaste` interface (after the `lifted?` field):
@@ -438,7 +417,7 @@ git commit -m "feat: register shape tool, settings store, float shape metadata"
 
 ---
 
-## Task 6: bakeFloatingPaste — Alt-subtract support
+## Task 5: bakeFloatingPaste — Alt-subtract support
 
 **Files:**
 - Modify: `src/hooks/useSelection.ts`
@@ -517,7 +496,7 @@ git commit -m "feat: bakeFloatingPaste supports Alt-subtract"
 
 ---
 
-## Task 7: useSelection — startShapeFloat & rebuildShapeFloat
+## Task 6: useSelection — startShapeFloat & rebuildShapeFloat
 
 **Files:**
 - Modify: `src/hooks/useSelection.ts`
@@ -529,7 +508,7 @@ In `src/hooks/useSelection.ts`:
 a) Add imports at top (extend existing imports):
 
 ```ts
-import { $shapeToolSettings } from "@/stores/ui"
+import { $shapeToolSettings, activeShapeExponent } from "@/stores/ui"
 import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
 import type { ShapeMeta } from "@/types/gridpaint"
 ```
@@ -550,15 +529,17 @@ b) Add the helpers near `pasteData` (they need access to `layersState`, so defin
       const layer = layers.find((l) => l.id === activeLayerId)
       if (!layer) return
       const groupId = layer.groups[0]?.id ?? "default"
-      const { shape, style } = $shapeToolSettings.get()
+      const settings = $shapeToolSettings.get()
+      const { shape, style } = settings
+      const exponent = activeShapeExponent(settings)
       const w = Math.max(1, Math.round(width))
       const h = Math.max(1, Math.round(height))
 
       $selectionState.setKey("floatingPaste", {
-        data: buildShapeClipboard(shape, style, w, h, activeLayerId, groupId),
+        data: buildShapeClipboard(shape, style, w, h, exponent, activeLayerId, groupId),
         origin,
         offset: { x: 0, y: 0 },
-        shape: { kind: shape, style, width: w, height: h },
+        shape: { kind: shape, style, width: w, height: h, exponent },
       })
     },
     [bakeFloatingPaste, layersState],
@@ -595,6 +576,7 @@ b) Add the helpers near `pasteData` (they need access to `layersState`, so defin
           next.style,
           next.width,
           next.height,
+          next.exponent,
           layerId,
           groupId,
         ),
@@ -625,7 +607,7 @@ git commit -m "feat: startShapeFloat and rebuildShapeFloat helpers"
 
 ---
 
-## Task 8: Toolbar button
+## Task 7: Toolbar button
 
 **Files:**
 - Modify: `src/components/ToolSelection.tsx`
@@ -660,7 +642,7 @@ git commit -m "feat: shape tool toolbar button"
 
 ---
 
-## Task 9: ShapeOptions panel
+## Task 8: ShapeOptions panel
 
 **Files:**
 - Modify: `src/components/ToolOptionsPanel.tsx`
@@ -679,11 +661,7 @@ import {
 } from "@/stores/ui"
 ```
 
-Add the rebuild helper import:
-
-```ts
-// (no new lib import needed here; panel writes settings + calls the rebuild via store)
-```
+(Additional imports for the `ShapeOptions` component are listed in Step 3.)
 
 Update the early-return guard:
 
@@ -719,17 +697,17 @@ shape float both the hint and the shape options render together.
 
 Add at the bottom of `src/components/ToolOptionsPanel.tsx`. It imports the rebuild through the store by re-deriving the float; since `rebuildShapeFloat` lives in the hook, the panel instead writes settings to `$shapeToolSettings` and directly rewrites the float using `buildShapeClipboard` (same logic), keeping the panel dependency-free of React hooks:
 
+Add these imports near the top of the file (note `FloatingPaste` lives in
+`@/stores/ui`, not `@/types/gridpaint`):
+
 ```tsx
-import { $shapeToolSettings, $selectionState } from "@/stores/ui"
+import { activeShapeExponent } from "@/stores/ui"
 import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
-import type { ShapeKind, ShapeStyle, FloatingPaste } from "@/types/gridpaint"
-```
-
-Wait — `FloatingPaste` lives in `@/stores/ui`, not `@/types/gridpaint`. Use:
-
-```tsx
+import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
 import type { FloatingPaste } from "@/stores/ui"
 ```
+
+(`$shapeToolSettings` and `$selectionState` are already imported in Step 1.)
 
 Then the component:
 
@@ -737,13 +715,21 @@ Then the component:
 function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }) {
   const settings = useStore($shapeToolSettings)
 
-  // When a shape float is live, settings come from the float so the controls
-  // reflect the shape currently being edited.
+  // When a shape float is live, the controls reflect the shape being edited;
+  // otherwise they reflect the persisted tool settings.
   const kind = floatingPaste?.shape?.kind ?? settings.shape
   const style = floatingPaste?.shape?.style ?? settings.style
+  const exponent =
+    floatingPaste?.shape?.exponent ?? activeShapeExponent(settings)
+
+  // Slider range + label depend on the kind.
+  const sliderRange = kind === "rectangle" ? { min: 3, max: 8 } : { min: 1, max: 6 }
+  const sliderLabel = kind === "rectangle" ? "corners" : "squircle"
 
   /** Rewrite the live float (if any) after a param change. */
-  const rebuild = (patch: Partial<{ kind: ShapeKind; style: ShapeStyle; width: number; height: number }>) => {
+  const rebuild = (
+    patch: Partial<{ kind: ShapeKind; style: ShapeStyle; width: number; height: number; exponent: number }>,
+  ) => {
     const fp = $selectionState.get().floatingPaste
     if (!fp || !fp.shape) return
     const next = {
@@ -751,23 +737,33 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
       style: patch.style ?? fp.shape.style,
       width: Math.max(1, Math.round(patch.width ?? fp.shape.width)),
       height: Math.max(1, Math.round(patch.height ?? fp.shape.height)),
+      exponent: patch.exponent ?? fp.shape.exponent,
     }
     const layerId = fp.data.layers[0]?.layerId ?? 0
     const groupId = fp.data.layers[0]?.groups[0]?.id ?? "default"
     $selectionState.setKey("floatingPaste", {
       ...fp,
       shape: next,
-      data: buildShapeClipboard(next.kind, next.style, next.width, next.height, layerId, groupId),
+      data: buildShapeClipboard(
+        next.kind, next.style, next.width, next.height, next.exponent, layerId, groupId,
+      ),
     })
   }
 
   const setKind = (k: ShapeKind) => {
     $shapeToolSettings.setKey("shape", k)
-    rebuild({ kind: k })
+    // Switching kind also switches to that kind's stored exponent.
+    const exp = k === "rectangle" ? settings.rectExponent : settings.ellipseExponent
+    rebuild({ kind: k, exponent: exp })
   }
   const setStyle = (s: ShapeStyle) => {
     $shapeToolSettings.setKey("style", s)
     rebuild({ style: s })
+  }
+  const setExponent = (n: number) => {
+    // Persist into the per-kind slot so each kind remembers its own value.
+    $shapeToolSettings.setKey(kind === "rectangle" ? "rectExponent" : "ellipseExponent", n)
+    rebuild({ exponent: n })
   }
 
   const seg = (active: boolean) =>
@@ -798,6 +794,22 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
         ))}
       </div>
 
+      <div className='w-px h-5 bg-border' />
+
+      {/* Squircliness slider — range/label switch by kind, same position */}
+      <label className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground select-none'>
+        {sliderLabel}
+        <input
+          type='range'
+          min={sliderRange.min}
+          max={sliderRange.max}
+          step={0.1}
+          value={exponent}
+          onChange={(e) => setExponent(parseFloat(e.target.value))}
+          className='w-24 accent-foreground'
+        />
+      </label>
+
       {/* Size — only when a shape float is live */}
       {floatingPaste?.shape && (
         <>
@@ -826,21 +838,25 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
 }
 ```
 
+Note: when no float is live, the slider still edits the persisted per-kind
+exponent (via `setExponent` → `$shapeToolSettings`), so the next shape drawn uses
+it; `rebuild` simply no-ops because there's no float yet.
+
 - [ ] **Step 4: Verify it compiles & renders**
 
 Run: `pnpm build`
-Expected: PASS. Then `pnpm dev`, select the shape tool — the panel shows Rect/Ellipse + fill/edge toggles.
+Expected: PASS. Then `pnpm dev`, select the shape tool — the panel shows Rect/Ellipse + fill/edge toggles and the squircliness slider (range/label switching by kind).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/components/ToolOptionsPanel.tsx
-git commit -m "feat: ShapeOptions panel (kind/style toggles + W/H inputs)"
+git commit -m "feat: ShapeOptions panel (kind/style toggles, squircliness slider, W/H inputs)"
 ```
 
 ---
 
-## Task 10: Resize-handle rendering
+## Task 9: Resize-handle rendering
 
 **Files:**
 - Modify: `src/hooks/useSelectionRenderer.ts`
@@ -893,13 +909,13 @@ git commit -m "feat: render resize handles for shape floats"
 
 ---
 
-## Task 11: Canvas — shape tool create / move / resize
+## Task 10: Canvas — shape tool create / move / resize
 
 **Files:**
 - Modify: `src/components/GridPaintCanvas.tsx`
 
 This is the integration task. It has no unit test (canvas/pointer interaction); it
-is validated manually in Task 12.
+is validated manually in Task 11.
 
 - [ ] **Step 1: Add refs and helpers for shape interaction**
 
@@ -1028,7 +1044,7 @@ In the `handleMouseMove` callback add a `currentTool === "shape"` branch:
                   origin: { x: newLeft, y: newTop },
                   offset: { x: 0, y: 0 },
                   shape: { ...fp.shape, width: newW, height: newH },
-                  data: buildShapeClipboard(fp.shape.kind, fp.shape.style, newW, newH, layerId, groupId),
+                  data: buildShapeClipboard(fp.shape.kind, fp.shape.style, newW, newH, fp.shape.exponent, layerId, groupId),
                 })
               }
             }
@@ -1155,7 +1171,7 @@ git commit -m "feat: shape tool canvas interaction (create/move/resize/commit)"
 
 ---
 
-## Task 12: Full manual verification
+## Task 11: Full manual verification
 
 **Files:** none (manual QA).
 
@@ -1173,6 +1189,10 @@ Verify each:
 - Edit W and H inputs in the panel → preview resizes.
 - Switch to **Ellipse** in the panel while floating → preview updates to an oval.
 - Switch **fill → edge** → preview becomes a 1-cell outline.
+- With **Rectangle** selected, drag the squircliness slider (range 3–8) → corners
+  round off as it lowers. Switch to **Ellipse**: slider becomes range 1–6, and at
+  the low end the preview becomes a diamond, mid an ellipse, high near-rect.
+- Switch Rect↔Ellipse repeatedly → each remembers its own slider value.
 - **Enter** → committed cells appear on the active layer/group and render through the blob engine.
 - Repeat, press **Esc** → preview discarded, nothing committed.
 - Draw a shape overlapping existing cells, hold **Alt** + press **Enter** → those cells are removed (subtract).
