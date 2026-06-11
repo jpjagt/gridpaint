@@ -127,7 +127,7 @@ export class BlobEngine {
         layerGeometries.push({
           layer,
           geometry,
-          renderOrder: 6 - layer.id, // Higher layer IDs render on top
+          renderOrder: -layer.id, // Higher layer IDs render on top (any integer id)
         })
 
         totalPrimitives += geometry.primitives.length

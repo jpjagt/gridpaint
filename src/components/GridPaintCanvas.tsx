@@ -340,7 +340,7 @@ export const GridPaintCanvas = forwardRef<
       layerGeometries.push({
         layer: entry.gridLayer,
         geometry: entry.geometry,
-        renderOrder: 6 - layer.id, // Higher layer IDs render on top
+        renderOrder: -layer.id, // Higher layer IDs render on top (any integer id)
       })
       totalPrimitives += entry.geometry.primitives.length
 
