@@ -8,6 +8,8 @@ import {
   setTransform,
   resetImageImport,
 } from '@/stores/imageImport'
+import { recognizeSelectionPayload } from '@/hooks/useSelection'
+import type { ClipboardData } from '@/hooks/useSelection'
 
 async function imageBitmapFromBlob(blob: Blob): Promise<ImageBitmap | HTMLImageElement> {
   if ('createImageBitmap' in window) {
@@ -25,50 +27,66 @@ async function imageBitmapFromBlob(blob: Blob): Promise<ImageBitmap | HTMLImageE
   })
 }
 
-export function useImagePaste() {
+interface PasteDispatcherOptions {
+  /** Called when a recognized gridpaint selection payload is pasted. */
+  onSelectionPaste?: (data: ClipboardData) => void
+}
+
+export function useImagePaste(options: PasteDispatcherOptions = {}) {
   const canvasView = useStore($canvasView)
   const imageImport = useStore($imageImport)
+  const { onSelectionPaste } = options
 
   useEffect(() => {
     const onPaste = async (e: ClipboardEvent) => {
-      // If overlay already active, allow replacing the image
       const items = e.clipboardData?.items
       if (!items) return
+
+      // ── Image branch ──────────────────────────────────────────────────
       const imgItem = Array.from(items).find(i => i.type.startsWith('image/'))
-      if (!imgItem) return
-      e.preventDefault()
+      if (imgItem) {
+        e.preventDefault()
+        try {
+          const blob = imgItem.getAsFile()
+          if (!blob) return
+          const bitmap = await imageBitmapFromBlob(blob)
+          const size = ('width' in bitmap && 'height' in bitmap)
+            ? { width: (bitmap as ImageBitmap).width, height: (bitmap as ImageBitmap).height }
+            : { width: (bitmap as HTMLImageElement).naturalWidth, height: (bitmap as HTMLImageElement).naturalHeight }
 
-      try {
-        const blob = imgItem.getAsFile()
-        if (!blob) return
-        const bitmap = await imageBitmapFromBlob(blob)
-        const size = ('width' in bitmap && 'height' in bitmap)
-          ? { width: (bitmap as ImageBitmap).width, height: (bitmap as ImageBitmap).height }
-          : { width: (bitmap as HTMLImageElement).naturalWidth, height: (bitmap as HTMLImageElement).naturalHeight }
+          setImageSource(bitmap, size)
+          setImageImportActive(true)
 
-        setImageSource(bitmap, size)
-        setImageImportActive(true)
+          // Center on current viewport center
+          const viewportCenterX = window.innerWidth / 2
+          const viewportCenterY = window.innerHeight / 2
+          const { panOffset, zoom, gridSize } = canvasView
+          const worldX = (viewportCenterX - panOffset.x) / (zoom * gridSize)
+          const worldY = (viewportCenterY - panOffset.y) / (zoom * gridSize)
 
-        // Center on current viewport center
-        const viewportCenterX = window.innerWidth / 2
-        const viewportCenterY = window.innerHeight / 2
-        const { panOffset, zoom, gridSize } = canvasView
-        const worldX = (viewportCenterX - panOffset.x) / (zoom * gridSize)
-        const worldY = (viewportCenterY - panOffset.y) / (zoom * gridSize)
+          // Initial scale so image width ~ 60% of viewport width in grid units
+          const targetWorldWidth = (window.innerWidth * 0.6) / gridSize / zoom
+          const scale = Math.max(0.01, targetWorldWidth / size.width)
 
-        // Initial scale so image width ~ 60% of viewport width in grid units
-        const targetWorldWidth = (window.innerWidth * 0.6) / gridSize / zoom
-        const scale = Math.max(0.01, targetWorldWidth / size.width)
+          // Use center-of-cell coordinates (add 0.5) so image aligns with cell centers
+          setTransform({ cx: worldX + 0.5, cy: worldY + 0.5, scale, rotationDeg: 0 })
+        } catch (err) {
+          console.error('Failed to handle pasted image', err)
+          resetImageImport()
+        }
+        return
+      }
 
-        // Use center-of-cell coordinates (add 0.5) so image aligns with cell centers
-        setTransform({ cx: worldX + 0.5, cy: worldY + 0.5, scale, rotationDeg: 0 })
-      } catch (err) {
-        console.error('Failed to handle pasted image', err)
-        resetImageImport()
+      // ── gridpaint-JSON branch ─────────────────────────────────────────
+      const text = e.clipboardData?.getData('text') ?? ''
+      const selectionData = recognizeSelectionPayload(text)
+      if (selectionData && onSelectionPaste) {
+        e.preventDefault()
+        onSelectionPaste(selectionData)
       }
     }
 
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
-  }, [canvasView, imageImport.isActive])
+  }, [canvasView, imageImport.isActive, onSelectionPaste])
 }

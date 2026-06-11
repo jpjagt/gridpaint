@@ -14,7 +14,6 @@ import { MeasuringBars } from "@/components/MeasuringBars"
 import { MeasuringTapeOverlay } from "@/components/MeasuringTapeOverlay"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
 import { SaveStatusBanner } from "@/components/SaveStatusBanner"
-import { useImagePaste } from "@/hooks/useImagePaste"
 import { useAuthInit } from "@/hooks/useAuthInit"
 import { drawingStore } from "@/lib/storage/store"
 import {
@@ -36,9 +35,6 @@ function EditorPage() {
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
   const drawingMeta = useStore($drawingMeta)
-
-  // Enable paste-to-import
-  useImagePaste()
 
   // M key: toggle measuring bars overlay
   useEffect(() => {

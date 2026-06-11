@@ -20,6 +20,8 @@ import {
   setActiveGroupIndex,
 } from "@/stores/ui"
 import { useSelection } from "@/hooks/useSelection"
+import type { ClipboardData } from "@/hooks/useSelection"
+import { useImagePaste } from "@/hooks/useImagePaste"
 import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 import { computeCenterOfGravity } from "@/lib/gridpaint/cog"
 import { useExportRects } from "@/hooks/useExportRects"
@@ -35,9 +37,13 @@ import { registerThumbnailCanvas } from "@/lib/storage/thumbnail"
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
-import { layersToGridLayers } from "@/lib/blob-engine/convertLayers"
+import { layerToGridLayer } from "@/lib/blob-engine/convertLayers"
+import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 import type {
+  BlobGeometry,
+  CompositeGeometry,
   GridLayer as BlobGridLayer,
+  LayerGeometry,
   SpatialRegion,
 } from "@/lib/blob-engine/types"
 
@@ -238,16 +244,6 @@ export const GridPaintCanvas = forwardRef<
     [didInitialize],
   )
 
-  // Convert store layers to blob engine format
-  // Canonical Layer → GridLayer conversion (carries offsetPhase + scale). Using
-  // the shared helper rather than an inline copy ensures the live canvas sees
-  // every engine-consumed field — an inline copy previously dropped offsetPhase
-  // and scale, silently disabling half-offset and per-layer scale on screen.
-  const convertLayersToBlobFormat = useCallback(
-    (layers: Layer[]): BlobGridLayer[] => layersToGridLayers(layers),
-    [],
-  )
-
   // Helper: expand a viewport by N grid cells
   const expandViewport = useCallback(
     (vp: SpatialRegion, pad: number): SpatialRegion => ({
@@ -284,29 +280,99 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [canvasZoom, canvasPanOffset, canvasGridSize])
 
+  // Per-layer geometry cache. Store updates are immutable and preserve the
+  // object identity of untouched layers, so identity (+ grid settings) tells
+  // us exactly which layers need regeneration. During a paint stroke only the
+  // active layer is regenerated; the other layers keep their BlobGeometry
+  // identity, which also keeps the renderer's Path2D caches warm for them.
+  const layerGeometryCacheRef = useRef(
+    new Map<
+      number,
+      {
+        layer: Layer
+        gridSize: number
+        borderWidth: number
+        gridLayer: BlobGridLayer
+        geometry: BlobGeometry
+      }
+    >(),
+  )
+
   // Cache geometry generation - only regenerate when layers or settings change.
   // Zoom/pan do not trigger geometry regeneration; they are pure canvas transforms
   // applied at render time on top of already-cached geometry.
-  const cachedGeometry = useMemo(() => {
+  const cachedGeometry = useMemo((): CompositeGeometry | null => {
     if (!isReady) return null
 
-    console.log("Regenerating cached geometry - layers changed")
+    const gridSize = canvasView.gridSize
+    const borderWidth = canvasView.borderWidth
+    const cache = layerGeometryCacheRef.current
+    const seenLayerIds = new Set<number>()
 
-    // Convert layers to blob format
-    const blobLayers = convertLayersToBlobFormat(layersState.layers)
+    const layerGeometries: LayerGeometry[] = []
+    let totalPrimitives = 0
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity
 
-    // Generate geometry for all points (no viewport culling here — zoom/pan must
-    // not invalidate this cache, and typical drawings are small enough that full
-    // computation is fast).
-    return blobEngine.generateGeometry(
-      blobLayers,
-      canvasView.gridSize,
-      canvasView.borderWidth,
-    )
+    for (const layer of layersState.layers) {
+      if (!layer.isVisible) continue
+      seenLayerIds.add(layer.id)
+
+      let entry = cache.get(layer.id)
+      if (
+        !entry ||
+        entry.layer !== layer ||
+        entry.gridSize !== gridSize ||
+        entry.borderWidth !== borderWidth
+      ) {
+        const gridLayer = layerToGridLayer(layer)
+        const geometry = blobEngine.generateLayerGeometry(
+          gridLayer,
+          gridSize,
+          borderWidth,
+        )
+        entry = { layer, gridSize, borderWidth, gridLayer, geometry }
+        cache.set(layer.id, entry)
+      }
+
+      layerGeometries.push({
+        layer: entry.gridLayer,
+        geometry: entry.geometry,
+        renderOrder: 6 - layer.id, // Higher layer IDs render on top
+      })
+      totalPrimitives += entry.geometry.primitives.length
+
+      if (entry.geometry.primitives.length > 0) {
+        // Per-layer scale is applied about the origin at render time, so the
+        // scaled bbox is the unscaled bbox times the factor
+        const sf = scaleToFactor(layer.scale)
+        minX = Math.min(minX, entry.geometry.boundingBox.min.x * sf)
+        minY = Math.min(minY, entry.geometry.boundingBox.min.y * sf)
+        maxX = Math.max(maxX, entry.geometry.boundingBox.max.x * sf)
+        maxY = Math.max(maxY, entry.geometry.boundingBox.max.y * sf)
+      }
+    }
+
+    // Drop cache entries for deleted/hidden layers
+    for (const id of [...cache.keys()]) {
+      if (!seenLayerIds.has(id)) cache.delete(id)
+    }
+
+    layerGeometries.sort((a, b) => a.renderOrder - b.renderOrder)
+
+    return {
+      layers: layerGeometries,
+      boundingBox:
+        totalPrimitives > 0
+          ? { min: { x: minX, y: minY }, max: { x: maxX, y: maxY } }
+          : { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } },
+      totalPrimitives,
+    }
   }, [
     isReady,
     blobEngine,
-    convertLayersToBlobFormat,
     layersState.layers,
     canvasView.gridSize,
     canvasView.borderWidth,
@@ -329,42 +395,50 @@ export const GridPaintCanvas = forwardRef<
         ? activeGroup.points
         : getLayerPoints(activeLayer)
 
-      // Use current visible viewport for outline rendering
+      // Iterate the group's points (skipping offscreen ones) rather than every
+      // viewport cell — zoomed out, the viewport can span far more cells than
+      // the group has points
       const viewport = calculateCurrentViewport()
-      for (let x = viewport.minX; x <= viewport.maxX; x++) {
-        for (let y = viewport.minY; y <= viewport.maxY; y++) {
-          const pointKey = `${x},${y}`
-          if (outlinePoints.has(pointKey)) {
-            // Create temporary RasterPoint for compatibility
-            const point = {
-              x,
-              y,
-              neighbors: [
-                [false, false, false],
-                [false, false, false],
-                [false, false, false],
-              ],
-            }
+      const outlineColor = getCanvasColor("--canvas-outline-active")
+      for (const pointKey of outlinePoints) {
+        const [x, y] = pointKey.split(",").map(Number)
+        if (
+          x < viewport.minX ||
+          x > viewport.maxX ||
+          y < viewport.minY ||
+          y > viewport.maxY
+        ) {
+          continue
+        }
 
-            // Update neighbors
-            for (let dy = -1; dy <= 1; dy++) {
-              for (let dx = -1; dx <= 1; dx++) {
-                const nx = x + dx
-                const ny = y + dy
-                const nkey = `${nx},${ny}`
-                point.neighbors[dx + 1][dy + 1] = outlinePoints.has(nkey)
-              }
-            }
+        // Create temporary RasterPoint for compatibility
+        const point = {
+          x,
+          y,
+          neighbors: [
+            [false, false, false],
+            [false, false, false],
+            [false, false, false],
+          ],
+        }
 
-            drawActiveLayerOutline(
-              ctx,
-              point,
-              canvasView.gridSize,
-              getCanvasColor("--canvas-outline-active"),
-              2,
-            )
+        // Update neighbors
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx
+            const ny = y + dy
+            const nkey = `${nx},${ny}`
+            point.neighbors[dx + 1][dy + 1] = outlinePoints.has(nkey)
           }
         }
+
+        drawActiveLayerOutline(
+          ctx,
+          point,
+          canvasView.gridSize,
+          outlineColor,
+          2,
+        )
       }
 
       ctx.restore()
@@ -388,6 +462,21 @@ export const GridPaintCanvas = forwardRef<
     },
     [canvasView],
   )
+
+  // Native-paste dispatcher: gridpaint-JSON floats at viewport center, any tool.
+  const handleSelectionPaste = useCallback(
+    (data: ClipboardData) => {
+      const center =
+        getGridCoordinates(window.innerWidth / 2, window.innerHeight / 2) ?? {
+          x: 0,
+          y: 0,
+        }
+      selection.pasteData(data, center)
+    },
+    [getGridCoordinates, selection.pasteData],
+  )
+
+  useImagePaste({ onSelectionPaste: handleSelectionPaste })
 
   /**
    * Get sub-grid coordinates: which quadrant of which cell the cursor is in.
@@ -1369,21 +1458,16 @@ export const GridPaintCanvas = forwardRef<
       }
 
       // ── Copy ────────────────────────────────────────────────────────────
-      if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+      // cmd+c copies the active layer only; cmd+shift+c copies all layers.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "c" || e.key === "C")) {
         if (currentTool === "select" && selection.hasSelection) {
           e.preventDefault()
-          selection.copySelection()
+          selection.copySelection(!e.shiftKey)
         }
       }
 
-      // ── Paste (enters floating mode at cursor position) ─────────────────
-      if ((e.metaKey || e.ctrlKey) && e.key === "v") {
-        if (currentTool === "select") {
-          e.preventDefault()
-          const { x: mx, y: my } = lastMousePosRef.current
-          selection.pasteSelection(mx, my, getGridCoordinates)
-        }
-      }
+      // Paste is handled by the native `paste` event dispatcher (useImagePaste),
+      // so it works regardless of focus or active tool.
 
       // ── Arrow key move: lift-then-move (select tool with active selection) ─
       // The floating-paste arrow block above handles the case where floatingPaste
@@ -1443,7 +1527,6 @@ export const GridPaintCanvas = forwardRef<
     currentTool,
     selection.hasSelection,
     selection.copySelection,
-    selection.pasteSelection,
     selection.clearSelection,
     selection.deleteSelection,
     selection.liftSelection,
