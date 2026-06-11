@@ -155,3 +155,25 @@ export interface ValidationIssue {
   quadrant?: 0 | 1 | 2 | 3
   message: string
 }
+
+// === Shape Tool ===
+
+/** Primitive shapes the shape tool can draw */
+export type ShapeKind = "rectangle" | "ellipse"
+
+/** fill = every interior cell; edge = single-cell-wide outline */
+export type ShapeStyle = "fill" | "edge"
+
+/**
+ * Metadata carried by a floating paste when it represents a live shape preview.
+ * Width/height are in grid cells (>= 1). The float's cell data is derived from
+ * these params via rasterizeShape().
+ */
+export interface ShapeMeta {
+  kind: ShapeKind
+  style: ShapeStyle
+  width: number
+  height: number
+  /** Superellipse exponent n in |x/a|^n + |y/b|^n <= 1. */
+  exponent: number
+}
