@@ -1,4 +1,5 @@
 import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
+import type { ClipboardData } from "@/hooks/useSelection"
 
 /**
  * Rasterize a superellipse into relative grid-cell keys ("x,y"), bbox top-left
@@ -34,6 +35,28 @@ export function rasterizeShape(
     if (!interior) edge.push(key)
   }
   return edge
+}
+
+/**
+ * Build a single-layer/single-group ClipboardData from shape params, targeting
+ * the given layerId/groupId. Bounds cover the full bbox (origin 0,0).
+ */
+export function buildShapeClipboard(
+  kind: ShapeKind,
+  style: ShapeStyle,
+  width: number,
+  height: number,
+  exponent: number,
+  layerId: number,
+  groupId: string,
+): ClipboardData {
+  const w = Math.max(1, Math.round(width))
+  const h = Math.max(1, Math.round(height))
+  const points = rasterizeShape(kind, style, w, h, exponent)
+  return {
+    layers: [{ layerId, groups: [{ id: groupId, points }] }],
+    bounds: { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 },
+  }
 }
 
 /** Cells whose center satisfies |nx|^n + |ny|^n <= 1 for the w×h bbox. */

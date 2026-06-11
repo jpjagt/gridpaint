@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { rasterizeShape } from "@/lib/gridpaint/rasterizeShape"
+import { rasterizeShape, buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
 
 const sorted = (keys: string[]) => [...keys].sort()
 
@@ -86,5 +86,19 @@ describe("rasterizeShape — exponent controls squircliness", () => {
     expect(set.has("0,0")).toBe(false)
     expect(set.has("4,0")).toBe(true)
     expect(set.has("0,4")).toBe(true)
+  })
+})
+
+describe("buildShapeClipboard", () => {
+  it("wraps cells as a single-layer/single-group ClipboardData with bbox bounds", () => {
+    const clip = buildShapeClipboard("rectangle", "fill", 3, 2, 8, 5, "g1")
+    expect(clip.bounds).toEqual({ minX: 0, minY: 0, maxX: 2, maxY: 1 })
+    expect(clip.layers).toHaveLength(1)
+    expect(clip.layers[0].layerId).toBe(5)
+    expect(clip.layers[0].groups).toHaveLength(1)
+    expect(clip.layers[0].groups[0].id).toBe("g1")
+    expect(clip.layers[0].groups[0].points.sort()).toEqual(
+      ["0,0", "0,1", "1,0", "1,1", "2,0", "2,1"].sort(),
+    )
   })
 })
