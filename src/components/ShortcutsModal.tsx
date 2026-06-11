@@ -99,8 +99,9 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
           </Section>
 
           <Section title="Copy / Paste / Selection">
-            <KbdRow keys={["cmd/ctrl", "C"]} description="Copy selection (select tool)" />
-            <KbdRow keys={["cmd/ctrl", "V"]} description="Paste at cursor — enters floating mode (select tool)" />
+            <KbdRow keys={["cmd/ctrl", "C"]} description="Copy active layer's selection (select tool)" />
+            <KbdRow keys={["cmd/ctrl", "shift", "C"]} description="Copy all layers' selection (select tool)" />
+            <KbdRow keys={["cmd/ctrl", "V"]} description="Paste — floats at viewport center; paste to active layer for single-layer copies (any tool)" />
             <KbdRow keys="↑ ↓ ← →" description="Lift selection into floating mode and nudge 1 grid unit; or move floating paste 1 grid unit" />
             <KbdRow keys={["shift", "↑ ↓ ← →"]} description="Lift/move all layers (selection); or move floating paste 10 grid units" />
             <KbdRow keys={["alt", "↑ ↓ ← →"]} description="Lift and nudge 10 grid units" />
