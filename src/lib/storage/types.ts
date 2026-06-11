@@ -9,6 +9,7 @@
 
 import type { Layer, ExportMode, ExportFormat } from "@/stores/drawingStores"
 import type { CircularCutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
+import type { LayerRange } from "@/types/layers"
 
 // === Serialized Types (JSON-safe) ===
 
@@ -74,6 +75,8 @@ export interface DrawingDocument extends DrawingMetadata {
   zoom: number
   /** How many millimeters each grid unit represents */
   mmPerUnit: number
+  /** Configurable inclusive range of selectable layer ids. Absent ⇒ default 1..6. */
+  layerRange?: LayerRange
   /** All layers in this drawing */
   layers: Layer[]
   /** Export rectangles — regions of the grid to include in SVG export */

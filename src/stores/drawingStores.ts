@@ -9,6 +9,7 @@ import type {
 } from "@/types/gridpaint"
 import { pushHistory, clearHistory } from "@/stores/historyStore"
 import { captureThumbnail } from "@/lib/storage/thumbnail"
+import { DEFAULT_LAYER_RANGE, type LayerRange } from "@/types/layers"
 
 export interface Layer {
   id: number
@@ -41,6 +42,7 @@ export interface CanvasViewState {
   panOffset: { x: number; y: number }
   zoom: number
   mmPerUnit: number // How many millimeters each grid unit represents
+  layerRange: LayerRange // Inclusive range of selectable layer ids
 }
 
 export interface LayersState {
@@ -72,6 +74,7 @@ export const $canvasView = map<CanvasViewState>({
   panOffset: { x: 0, y: 0 },
   zoom: 1,
   mmPerUnit: DEFAULT_MM_PER_UNIT,
+  layerRange: DEFAULT_LAYER_RANGE,
 })
 
 export const $layersState = map<LayersState>({
@@ -172,6 +175,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         panOffset: stored.panOffset,
         zoom: stored.zoom,
         mmPerUnit: stored.mmPerUnit || DEFAULT_MM_PER_UNIT, // Default for legacy drawings
+        layerRange: stored.layerRange ?? DEFAULT_LAYER_RANGE,
       })
 
       $layersState.set({
@@ -201,6 +205,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         panOffset: { x: 0, y: 0 },
         zoom: 1,
         mmPerUnit: DEFAULT_MM_PER_UNIT,
+        layerRange: DEFAULT_LAYER_RANGE,
       })
 
       $layersState.set({
@@ -417,6 +422,11 @@ export function setLayerScale(
   $layersState.setKey("layers", layers)
 }
 
+/** Update the drawing's selectable layer range. */
+export function setLayerRange(range: LayerRange): void {
+  $canvasView.setKey("layerRange", range)
+}
+
 /**
  * Add a new interaction group to the active layer.
  * Returns the new group's id, or null if no active layer.
@@ -525,5 +535,6 @@ export function resetDrawing(): void {
     panOffset: { x: 0, y: 0 },
     zoom: 1,
     mmPerUnit: DEFAULT_MM_PER_UNIT,
+    layerRange: DEFAULT_LAYER_RANGE,
   })
 }
