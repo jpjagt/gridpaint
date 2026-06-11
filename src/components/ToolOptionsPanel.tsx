@@ -5,7 +5,12 @@ import {
   $cutoutToolSettings,
   $overrideToolSettings,
   $selectionState,
+  $shapeToolSettings,
+  activeShapeExponent,
 } from "@/stores/ui"
+import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
+import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
+import type { FloatingPaste } from "@/stores/ui"
 import {
   $exportRects,
   $exportMode,
@@ -225,6 +230,7 @@ export const ToolOptionsPanel = () => {
     currentTool !== "cutout" &&
     currentTool !== "override" &&
     currentTool !== "export" &&
+    currentTool !== "shape" &&
     !hasFloatingPaste
   ) {
     return null
@@ -238,6 +244,12 @@ export const ToolOptionsPanel = () => {
       )}
       {!hasFloatingPaste && currentTool === "override" && (
         <OverrideOptions settings={overrideSettings} />
+      )}
+      {!hasFloatingPaste && currentTool === "shape" && (
+        <ShapeOptions floatingPaste={null} />
+      )}
+      {hasFloatingPaste && selectionState.floatingPaste?.shape && (
+        <ShapeOptions floatingPaste={selectionState.floatingPaste} />
       )}
       {!hasFloatingPaste &&
         currentTool === "export" &&
@@ -790,6 +802,124 @@ function CutoutOptions({
               />
               <span className='text-xs text-muted-foreground font-mono'>%</span>
             </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }) {
+  const settings = useStore($shapeToolSettings)
+
+  // When a shape float is live, controls reflect the shape being edited;
+  // otherwise they reflect the persisted tool settings.
+  const kind = floatingPaste?.shape?.kind ?? settings.shape
+  const style = floatingPaste?.shape?.style ?? settings.style
+  const exponent =
+    floatingPaste?.shape?.exponent ?? activeShapeExponent(settings)
+
+  const sliderRange = kind === "rectangle" ? { min: 3, max: 8 } : { min: 1, max: 6 }
+  const sliderLabel = kind === "rectangle" ? "corners" : "squircle"
+
+  /** Rewrite the live float (if any) after a param change. No-op without a float. */
+  const rebuild = (
+    patch: Partial<{ kind: ShapeKind; style: ShapeStyle; width: number; height: number; exponent: number }>,
+  ) => {
+    const fp = $selectionState.get().floatingPaste
+    if (!fp || !fp.shape) return
+    const next = {
+      kind: patch.kind ?? fp.shape.kind,
+      style: patch.style ?? fp.shape.style,
+      width: Math.max(1, Math.round(patch.width ?? fp.shape.width)),
+      height: Math.max(1, Math.round(patch.height ?? fp.shape.height)),
+      exponent: patch.exponent ?? fp.shape.exponent,
+    }
+    const layerId = fp.data.layers[0]?.layerId ?? 0
+    const groupId = fp.data.layers[0]?.groups[0]?.id ?? "default"
+    $selectionState.setKey("floatingPaste", {
+      ...fp,
+      shape: next,
+      data: buildShapeClipboard(
+        next.kind, next.style, next.width, next.height, next.exponent, layerId, groupId,
+      ),
+    })
+  }
+
+  const setKind = (k: ShapeKind) => {
+    $shapeToolSettings.setKey("shape", k)
+    const exp = k === "rectangle" ? settings.rectExponent : settings.ellipseExponent
+    rebuild({ kind: k, exponent: exp })
+  }
+  const setStyle = (s: ShapeStyle) => {
+    $shapeToolSettings.setKey("style", s)
+    rebuild({ style: s })
+  }
+  const setExponent = (n: number) => {
+    $shapeToolSettings.setKey(kind === "rectangle" ? "rectExponent" : "ellipseExponent", n)
+    rebuild({ exponent: n })
+  }
+
+  const seg = (active: boolean) =>
+    cn(
+      "text-xs font-mono px-2 py-1 transition-colors",
+      active ? "bg-foreground text-background" : "bg-transparent text-muted-foreground hover:text-foreground",
+    )
+
+  return (
+    <div className='flex items-center gap-3'>
+      <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+        {(["rectangle", "ellipse"] as ShapeKind[]).map((k) => (
+          <button key={k} type='button' onClick={() => setKind(k)} className={seg(kind === k)}>
+            {k === "rectangle" ? "Rect" : "Ellipse"}
+          </button>
+        ))}
+      </div>
+
+      <div className='w-px h-5 bg-border' />
+
+      <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+        {(["fill", "edge"] as ShapeStyle[]).map((s) => (
+          <button key={s} type='button' onClick={() => setStyle(s)} className={seg(style === s)}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div className='w-px h-5 bg-border' />
+
+      <label className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground select-none'>
+        {sliderLabel}
+        <input
+          type='range'
+          min={sliderRange.min}
+          max={sliderRange.max}
+          step={0.1}
+          value={exponent}
+          onChange={(e) => setExponent(parseFloat(e.target.value))}
+          className='w-24 accent-foreground'
+        />
+      </label>
+
+      {floatingPaste?.shape && (
+        <>
+          <div className='w-px h-5 bg-border' />
+          <div className='flex items-center gap-2'>
+            {(["width", "height"] as const).map((dim) => (
+              <label key={dim} className='flex items-center gap-1 text-xs font-mono text-muted-foreground'>
+                {dim === "width" ? "W" : "H"}
+                <input
+                  type='number'
+                  min={1}
+                  value={floatingPaste.shape![dim]}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10)
+                    if (!isNaN(v)) rebuild({ [dim]: Math.max(1, v) })
+                  }}
+                  className='w-14 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-0.5 font-mono'
+                />
+              </label>
+            ))}
           </div>
         </>
       )}
