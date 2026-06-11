@@ -2,6 +2,8 @@ import { useCallback } from "react"
 import type { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
 import type { FloatingPaste } from "@/stores/ui"
 import { renderDashedRect } from "@/lib/gridpaint/renderDashedRect"
+import { $canvasView } from "@/stores/drawingStores"
+import { getLayerFillColor } from "@/lib/gridpaint/layerColors"
 
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
@@ -70,7 +72,7 @@ export const useSelectionRenderer = () => {
     let boundsMaxX = -Infinity, boundsMaxY = -Infinity
 
     data.layers.forEach(({ layerId, groups }) => {
-      const layerColor = getCanvasColor(`--canvas-layer-${layerId}`)
+      const layerColor = getLayerFillColor(layerId, $canvasView.get().layerRange)
 
       groups.forEach(({ points }) => {
         points.forEach((relKey) => {

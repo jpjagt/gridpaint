@@ -49,6 +49,7 @@ import type {
 
 // Existing imports for compatibility
 import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
+import { getLayerFillColor } from "@/lib/gridpaint/layerColors"
 import { clipLayersToSelection } from "@/lib/gridpaint/selectionUtils"
 import { getLayersWithPoint } from "@/lib/gridpaint/layerUtils"
 import { createRivetCutouts } from "@/lib/gridpaint/cutoutUtils"
@@ -846,7 +847,7 @@ export const GridPaintCanvas = forwardRef<
       if (!layer) return baseStyle
 
       return {
-        fillColor: getCanvasColor(`--canvas-layer-${layerId}`),
+        fillColor: getLayerFillColor(layerId, canvasView.layerRange),
         strokeColor:
           layer.renderStyle === "tiles"
             ? getCanvasColor("--canvas-layer-border")

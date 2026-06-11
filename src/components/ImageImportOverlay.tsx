@@ -9,6 +9,7 @@ import { BlobEngine } from '@/lib/blob-engine/BlobEngine'
 import { Canvas2DRenderer } from '@/lib/blob-engine/renderers/Canvas2DRenderer'
 import type { GridLayer as BlobGridLayer } from '@/lib/blob-engine/types'
 import { ImageCurveEditor } from '@/components/ImageCurveEditor'
+import { getLayerFillColor } from '@/lib/gridpaint/layerColors'
 
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
@@ -99,7 +100,7 @@ export function ImageImportOverlay() {
       const existing = $layersState.get().layers.find(l => l.id === layerId)
       const isTiles = existing?.renderStyle === 'tiles'
       return {
-        fillColor: getCanvasColor(`--canvas-layer-${layerId}`),
+        fillColor: getLayerFillColor(layerId, $canvasView.get().layerRange),
         strokeColor: isTiles ? getCanvasColor('--canvas-layer-border') : undefined,
         strokeWidth: isTiles ? borderWidth : 0,
         opacity: 1,
