@@ -83,9 +83,11 @@ function rasterizeShape(
   bbox: a cell `(x,y)` is inside if its center is within the ellipse,
   `((cx-a)/a)² + ((cy-b)/b)² <= 1` where `a=width/2`, `b=height/2`,
   `cx=x+0.5`, `cy=y+0.5`.
-- **Ellipse / edge:** **midpoint ellipse algorithm**, producing a connected
-  single-cell-wide outline. Degenerate cases (`width<=2` or `height<=2`) fall
-  back to the fill of that thin box.
+- **Ellipse / edge:** **fill minus eroded-fill** — a fill cell is on the edge if
+  any of its 4-neighbours is not filled. This yields a connected single-cell-wide
+  outline that is always a strict subset of the fill, so toggling fill→edge simply
+  hollows the shape out (visually consistent). Degenerate cases (`width<=2` or
+  `height<=2`) fall back to the fill of that thin box.
 
 This module is pure and unit-tested in isolation (no canvas). Built TDD.
 
@@ -191,7 +193,8 @@ Default remains union, so paste behavior is unchanged.
 ## Testing
 
 - **Unit (TDD):** `rasterizeShape` — rectangle fill/edge, ellipse fill/edge,
-  degenerate thin shapes, 1×1, symmetry of the ellipse outline, edge connectivity.
+  degenerate thin shapes, 1×1, symmetry of the ellipse fill, edge ⊆ fill, and
+  hollow interior for a large ellipse edge.
 - **Unit:** `rebuildShapeFloat` produces a single-layer/single-group
   `ClipboardData` with correct bounds and cell count for given params.
 - **Manual:** draw rect & ellipse in fill and edge; move with mouse and arrows;
