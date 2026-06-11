@@ -30,6 +30,35 @@ export interface ClipboardData {
   bounds: SelectionBounds
 }
 
+/**
+ * Parse clipboard text and, if it looks like a gridpaint selection, return the
+ * normalized { layers, bounds }. Lenient: accepts the canonical type tag OR any
+ * object whose `data` has an array `layers` and a `bounds`. Returns null otherwise.
+ */
+export function recognizeSelectionPayload(text: string): ClipboardData | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== "object") return null
+
+  const obj = parsed as { type?: unknown; data?: unknown }
+  const data = obj.data as { layers?: unknown; bounds?: unknown } | undefined
+  if (!data || typeof data !== "object") return null
+
+  const looksRight = Array.isArray(data.layers) && data.bounds != null
+  const taggedRight = obj.type === "gridpaint-selection"
+  if (!looksRight && !taggedRight) return null
+  if (!Array.isArray(data.layers) || data.bounds == null) return null
+
+  return {
+    layers: data.layers as ClipboardData["layers"],
+    bounds: data.bounds as ClipboardData["bounds"],
+  }
+}
+
 export const useSelection = () => {
   const layersState = useStore($layersState)
 
@@ -120,6 +149,7 @@ export const useSelection = () => {
     const fp = $selectionState.get().floatingPaste
     if (!fp) return
 
+    // Lifted floats always restore to their original layerId (never retargeted).
     if (fp.lifted) {
       // Restore points back to their original canvas position (origin, offset 0)
       const { data, origin } = fp
@@ -164,8 +194,16 @@ export const useSelection = () => {
 
     let totalPointsPasted = 0
 
+    // Single-layer clipboard pastes retarget onto the active layer (cross-layer
+    // duplication). Lifted floats and multi-layer clips keep their original layerId.
+    const retargetSingleLayer =
+      !fp.lifted && data.layers.length === 1 && layersState.activeLayerId != null
+    const resolveLayerId = (clipLayerId: number): number =>
+      retargetSingleLayer ? layersState.activeLayerId! : clipLayerId
+
     data.layers.forEach(({ layerId, groups, pointModifications }) => {
-      const layer = layersState.layers.find((l) => l.id === layerId)
+      const targetLayerId = resolveLayerId(layerId)
+      const layer = layersState.layers.find((l) => l.id === targetLayerId)
       if (!layer) return
 
       groups.forEach((clipGroup) => {
@@ -181,21 +219,21 @@ export const useSelection = () => {
           totalPointsPasted++
         })
 
-        updateGroupPoints(layerId, newPoints, targetGroup.id)
+        updateGroupPoints(targetLayerId, newPoints, targetGroup.id)
       })
 
       if (pointModifications) {
         Object.entries(pointModifications).forEach(([relativeKey, mod]) => {
           const [relativeX, relativeY] = relativeKey.split(",").map(Number)
           const absKey = `${targetX + relativeX},${targetY + relativeY}`
-          updatePointModifications(layerId, absKey, mod)
+          updatePointModifications(targetLayerId, absKey, mod)
         })
       }
     })
 
     $selectionState.setKey("floatingPaste", null)
     toast.success(`Placed ${totalPointsPasted} points`)
-  }, [layersState.layers])
+  }, [layersState.layers, layersState.activeLayerId])
 
   /**
    * Move the floating paste offset by (dx, dy) grid units.
@@ -211,7 +249,7 @@ export const useSelection = () => {
 
   // ─── Copy ─────────────────────────────────────────────────────────────────
 
-  const copySelection = useCallback(async () => {
+  const copySelection = useCallback(async (activeLayerOnly: boolean = false) => {
     if (!selectionStart || !selectionEnd) {
       toast.error("No selection to copy")
       return
@@ -229,7 +267,11 @@ export const useSelection = () => {
 
     let totalPointsCopied = 0
 
-    layersState.layers.forEach((layer) => {
+    const layersToCopy = activeLayerOnly
+      ? layersState.layers.filter((l) => l.id === layersState.activeLayerId)
+      : layersState.layers
+
+    layersToCopy.forEach((layer) => {
       const clipboardGroups: ClipboardGroup[] = []
 
       layer.groups.forEach((group) => {
@@ -291,9 +333,38 @@ export const useSelection = () => {
       console.error("Failed to copy to clipboard:", error)
       toast.error("Failed to copy selection to clipboard")
     }
-  }, [selectionStart, selectionEnd, layersState.layers])
+  }, [selectionStart, selectionEnd, layersState.layers, layersState.activeLayerId])
 
   // ─── Paste (enters floating state) ────────────────────────────────────────
+
+  /**
+   * Begin a floating paste from already-parsed clipboard data at a grid origin.
+   * Bakes any pending float first so we don't lose it.
+   */
+  const pasteData = useCallback(
+    (clipboardData: ClipboardData, atGrid: { x: number; y: number }) => {
+      if ($selectionState.get().floatingPaste) bakeFloatingPaste()
+
+      let totalPoints = 0
+      clipboardData.layers.forEach(({ groups }) => {
+        groups.forEach(({ points }) => {
+          totalPoints += points.length
+        })
+      })
+
+      $selectionState.setKey("floatingPaste", {
+        data: clipboardData,
+        origin: atGrid,
+        offset: { x: 0, y: 0 },
+      })
+
+      toast.info(
+        `Paste ready — use arrow keys to position, Enter to place, Esc to cancel`,
+      )
+      return totalPoints
+    },
+    [bakeFloatingPaste],
+  )
 
   const pasteSelection = useCallback(
     async (
@@ -304,56 +375,27 @@ export const useSelection = () => {
         clientY: number,
       ) => { x: number; y: number } | null,
     ) => {
-      // If there is already a floating paste pending, bake it first before
-      // starting a new one so we don't lose it.
-      const existing = $selectionState.get().floatingPaste
-      if (existing) {
-        bakeFloatingPaste()
-      }
-
       const targetGrid = getGridCoordinates(clientX, clientY)
       if (!targetGrid) return
 
-      let clipboardDataToPaste: ClipboardData | null = null
-
+      let clipboardText: string
       try {
-        const clipboardText = await navigator.clipboard.readText()
-        const parsed = JSON.parse(clipboardText)
-
-        if (parsed.type === "gridpaint-selection" && parsed.data) {
-          clipboardDataToPaste = {
-            layers: parsed.data.layers,
-            bounds: parsed.data.bounds,
-          }
-        }
+        clipboardText = await navigator.clipboard.readText()
       } catch (error) {
         console.error("Failed to read clipboard:", error)
         toast.error("Failed to read clipboard")
         return
       }
 
-      if (!clipboardDataToPaste) {
+      const clipboardData = recognizeSelectionPayload(clipboardText)
+      if (!clipboardData) {
         toast.error("Nothing to paste")
         return
       }
 
-      // Count total points
-      let totalPoints = 0
-      clipboardDataToPaste.layers.forEach(({ groups }) => {
-        groups.forEach(({ points }) => { totalPoints += points.length })
-      })
-
-      // Enter floating paste mode — origin is the cursor grid position,
-      // offset starts at zero
-      $selectionState.setKey("floatingPaste", {
-        data: clipboardDataToPaste,
-        origin: targetGrid,
-        offset: { x: 0, y: 0 },
-      })
-
-      toast.info(`Paste ready — use arrow keys to position, Enter to place, Esc to cancel`)
+      pasteData(clipboardData, targetGrid)
     },
-    [bakeFloatingPaste],
+    [pasteData],
   )
 
   // ─── Delete ───────────────────────────────────────────────────────────────
@@ -583,6 +625,7 @@ export const useSelection = () => {
     clearSelection,
     copySelection,
     pasteSelection,
+    pasteData,
     deleteSelection,
 
     // Lift selection into floating paste
