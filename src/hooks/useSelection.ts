@@ -2,33 +2,12 @@ import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import { useStore } from "@nanostores/react"
 import { $layersState, updateGroupPoints, updatePointModifications } from "@/stores/drawingStores"
-import { $selectionState } from "@/stores/ui"
+import { $selectionState, $shapeToolSettings, activeShapeExponent } from "@/stores/ui"
 import type { SerializedPointModifications } from "@/lib/storage/types"
+import { buildShapeClipboard } from "@/lib/gridpaint/rasterizeShape"
 
-export interface SelectionBounds {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
-}
-
-export interface ClipboardGroup {
-  id: string
-  name?: string
-  points: string[] // relative "x,y"
-}
-
-export interface ClipboardLayer {
-  layerId: number
-  groups: ClipboardGroup[]
-  /** Point modifications keyed by relative "x,y" */
-  pointModifications?: Record<string, SerializedPointModifications>
-}
-
-export interface ClipboardData {
-  layers: ClipboardLayer[]
-  bounds: SelectionBounds
-}
+export type { SelectionBounds, ClipboardGroup, ClipboardLayer, ClipboardData } from "@/types/gridpaint"
+import type { SelectionBounds, ClipboardGroup, ClipboardLayer, ClipboardData, ShapeMeta } from "@/types/gridpaint"
 
 /**
  * Parse clipboard text and, if it looks like a gridpaint selection, return the
@@ -183,8 +162,9 @@ export const useSelection = () => {
 
   /**
    * Bake the floating paste into the canvas at its current offset.
+   * When `subtract` is true, deletes cells instead of adding them (Alt-subtract).
    */
-  const bakeFloatingPaste = useCallback(() => {
+  const bakeFloatingPaste = useCallback((subtract: boolean = false) => {
     const fp = $selectionState.get().floatingPaste
     if (!fp) return
 
@@ -215,14 +195,18 @@ export const useSelection = () => {
         clipGroup.points.forEach((relativeKey: string) => {
           const [relativeX, relativeY] = relativeKey.split(",").map(Number)
           const absKey = `${targetX + relativeX},${targetY + relativeY}`
-          newPoints.add(absKey)
-          totalPointsPasted++
+          if (subtract) {
+            newPoints.delete(absKey)
+          } else {
+            newPoints.add(absKey)
+            totalPointsPasted++
+          }
         })
 
         updateGroupPoints(targetLayerId, newPoints, targetGroup.id)
       })
 
-      if (pointModifications) {
+      if (pointModifications && !subtract) {
         Object.entries(pointModifications).forEach(([relativeKey, mod]) => {
           const [relativeX, relativeY] = relativeKey.split(",").map(Number)
           const absKey = `${targetX + relativeX},${targetY + relativeY}`
@@ -232,7 +216,7 @@ export const useSelection = () => {
     })
 
     $selectionState.setKey("floatingPaste", null)
-    toast.success(`Placed ${totalPointsPasted} points`)
+    toast.success(subtract ? `Subtracted shape` : `Placed ${totalPointsPasted} points`)
   }, [layersState.layers, layersState.activeLayerId])
 
   /**
@@ -246,6 +230,76 @@ export const useSelection = () => {
       offset: { x: fp.offset.x + dx, y: fp.offset.y + dy },
     })
   }, [])
+
+  // ─── Shape float helpers ──────────────────────────────────────────────────
+
+  /**
+   * Create a shape float at a grid origin (top-left), using the current
+   * $shapeToolSettings and the given size in cells. Targets the active layer's
+   * active group at bake time (single-layer retarget).
+   */
+  const startShapeFloat = useCallback(
+    (origin: { x: number; y: number }, width: number, height: number) => {
+      if ($selectionState.get().floatingPaste) bakeFloatingPaste()
+      const { activeLayerId, layers } = layersState
+      if (activeLayerId == null) return
+      const layer = layers.find((l) => l.id === activeLayerId)
+      if (!layer) return
+      const groupId = layer.groups[0]?.id ?? "default"
+      const settings = $shapeToolSettings.get()
+      const { shape, style } = settings
+      const exponent = activeShapeExponent(settings)
+      const w = Math.max(1, Math.round(width))
+      const h = Math.max(1, Math.round(height))
+
+      $selectionState.setKey("floatingPaste", {
+        data: buildShapeClipboard(shape, style, w, h, exponent, activeLayerId, groupId),
+        origin,
+        offset: { x: 0, y: 0 },
+        shape: { kind: shape, style, width: w, height: h, exponent },
+      })
+    },
+    [bakeFloatingPaste, layersState],
+  )
+
+  /**
+   * Re-derive the active shape float's cells after a param change (kind, style,
+   * size, exponent). Optionally shift the origin (used when dragging NW/N/W
+   * handles so the opposite edge stays anchored).
+   */
+  const rebuildShapeFloat = useCallback(
+    (
+      patch: Partial<ShapeMeta>,
+      originDelta: { x: number; y: number } = { x: 0, y: 0 },
+    ) => {
+      const fp = $selectionState.get().floatingPaste
+      if (!fp || !fp.shape) return
+      const next: ShapeMeta = {
+        ...fp.shape,
+        ...patch,
+        width: Math.max(1, Math.round(patch.width ?? fp.shape.width)),
+        height: Math.max(1, Math.round(patch.height ?? fp.shape.height)),
+      }
+      const layerId = fp.data.layers[0]?.layerId ?? 0
+      const groupId = fp.data.layers[0]?.groups[0]?.id ?? "default"
+
+      $selectionState.setKey("floatingPaste", {
+        ...fp,
+        shape: next,
+        origin: { x: fp.origin.x + originDelta.x, y: fp.origin.y + originDelta.y },
+        data: buildShapeClipboard(
+          next.kind,
+          next.style,
+          next.width,
+          next.height,
+          next.exponent,
+          layerId,
+          groupId,
+        ),
+      })
+    },
+    [],
+  )
 
   // ─── Copy ─────────────────────────────────────────────────────────────────
 
@@ -638,6 +692,8 @@ export const useSelection = () => {
     bakeFloatingPaste,
     cancelFloatingPaste,
     moveFloatingPaste,
+    startShapeFloat,
+    rebuildShapeFloat,
 
     // Helper for checking if we have a selection
     hasSelection: !!(selectionStart && selectionEnd),

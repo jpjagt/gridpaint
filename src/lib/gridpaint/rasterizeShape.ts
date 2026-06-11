@@ -1,5 +1,5 @@
 import type { ShapeKind, ShapeStyle } from "@/types/gridpaint"
-import type { ClipboardData } from "@/hooks/useSelection"
+import type { ClipboardData } from "@/types/gridpaint"
 
 /**
  * Rasterize a superellipse into relative grid-cell keys ("x,y"), bbox top-left

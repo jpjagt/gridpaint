@@ -156,6 +156,35 @@ export interface ValidationIssue {
   message: string
 }
 
+// === Clipboard / Selection Types ===
+
+import type { SerializedPointModifications } from "@/lib/storage/types"
+
+export interface SelectionBounds {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+export interface ClipboardGroup {
+  id: string
+  name?: string
+  points: string[] // relative "x,y"
+}
+
+export interface ClipboardLayer {
+  layerId: number
+  groups: ClipboardGroup[]
+  /** Point modifications keyed by relative "x,y" */
+  pointModifications?: Record<string, SerializedPointModifications>
+}
+
+export interface ClipboardData {
+  layers: ClipboardLayer[]
+  bounds: SelectionBounds
+}
+
 // === Shape Tool ===
 
 /** Primitive shapes the shape tool can draw */

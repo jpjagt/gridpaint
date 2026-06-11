@@ -1,10 +1,9 @@
 import { atom, map } from 'nanostores'
-import type { CutoutAnchor, QuadrantState } from '@/types/gridpaint'
-import type { SelectionBounds, ClipboardData } from '@/hooks/useSelection'
+import type { CutoutAnchor, QuadrantState, SelectionBounds, ClipboardData, ShapeKind, ShapeStyle, ShapeMeta } from '@/types/gridpaint'
 
 // === Tool types ===
 
-export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure" | "export"
+export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure" | "export" | "shape"
 
 export const $currentTool = atom<Tool>("draw")
 
@@ -80,6 +79,11 @@ export interface FloatingPaste {
    * When false/absent the float came from a clipboard paste; cancelling discards it.
    */
   lifted?: boolean
+  /**
+   * When present, this float is a live shape preview. Its `data` cells are
+   * derived from these params via rasterizeShape; editing them re-rasterizes.
+   */
+  shape?: ShapeMeta
 }
 
 export interface SelectionState {
@@ -103,6 +107,27 @@ export interface OverrideToolSettings {
 export const $overrideToolSettings = map<OverrideToolSettings>({
   shape: "full",
 })
+
+// === Shape tool settings ===
+
+export interface ShapeToolSettings {
+  shape: ShapeKind
+  style: ShapeStyle
+  /** Superellipse exponent per kind so each remembers its own slider value. */
+  rectExponent: number    // default 8 (sharp corners); lower = rounder (min 3)
+  ellipseExponent: number // default 2 (true ellipse); 1 = diamond, up to 6 boxy
+}
+
+export const $shapeToolSettings = map<ShapeToolSettings>({
+  shape: "rectangle",
+  style: "fill",
+  rectExponent: 8,
+  ellipseExponent: 2,
+})
+
+/** Pick the active exponent for the currently-selected kind. */
+export const activeShapeExponent = (s: ShapeToolSettings): number =>
+  s.shape === "rectangle" ? s.rectExponent : s.ellipseExponent
 
 // === Measure tool state ===
 
