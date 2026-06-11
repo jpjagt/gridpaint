@@ -6,6 +6,7 @@ import {
   type GridPaintCanvasMethods,
 } from "@/components/GridPaintCanvas"
 import { GridPaintControls } from "@/components/GridPaintControls"
+import { DrawingSettingsModal } from "@/components/DrawingSettingsModal"
 import { ShortcutsModal } from "@/components/ShortcutsModal"
 import { LayerControls } from "@/components/LayerControls"
 import { ToolSelection } from "@/components/ToolSelection"
@@ -33,6 +34,7 @@ function EditorPage() {
   const canvasRef = useRef<GridPaintCanvasMethods>(null)
   const [showMeasuringBars, setShowMeasuringBars] = useState<boolean>(false)
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false)
+  const [showSettings, setShowSettings] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
   const drawingMeta = useStore($drawingMeta)
 
@@ -56,7 +58,6 @@ function EditorPage() {
 
   // Handlers
   const handleReset = () => canvasRef.current?.reset()
-  const handleDownload = () => canvasRef.current?.saveIMG()
   const handleGridSizeChange = (op: "+" | "-") =>
     canvasRef.current?.setGridSize(op)
   const handleBorderWidthChange = (w: number) =>
@@ -88,7 +89,6 @@ function EditorPage() {
       />
       <GridPaintControls
         onReset={handleReset}
-        onDownload={handleDownload}
         onGridSizeChange={handleGridSizeChange}
         onBorderWidthChange={handleBorderWidthChange}
         onMmPerUnitChange={handleMmPerUnitChange}
@@ -101,10 +101,18 @@ function EditorPage() {
         showMeasuringBars={showMeasuringBars}
         onToggleMeasuringBars={() => setShowMeasuringBars((v) => !v)}
         onShowShortcuts={() => setShowShortcuts(true)}
+        onShowSettings={() => setShowSettings(true)}
       />
       <ShortcutsModal
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
+      />
+      <DrawingSettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        drawingId={drawingId!}
+        drawingName={drawingMeta.name}
+        onDeleted={() => navigate("/")}
       />
       <ToolSelection />
       <ToolOptionsPanel />
