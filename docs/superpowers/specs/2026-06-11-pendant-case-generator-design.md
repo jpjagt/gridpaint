@@ -176,7 +176,7 @@ All lengths in mm. Defaults shown for the starflower-short case.
 | chain | `trough_offset` | 3.0 | ring distance from pocket outline |
 | chain | `channel_at` | "top" | channel exit point on pocket |
 | bolt | `bolt_hole_d` | 4.4 | through-hole (M4) |
-| bolt | `ring_z_top` | 13.5 | lid ring seat height |
+| bolt | `ring_z_top` | 14.5 | lid ring seat height |
 | bolt | `ring_d` | 11.0 | flat ring seat diameter |
 | bolt | `ring_blend_k` | 5.0 | dome→ring funnel sharpness |
 | bolt | `nut_recess_d`, `nut_recess_h` | 8.4, 3.5 | M4 nut pocket from below |
