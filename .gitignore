@@ -72,3 +72,5 @@ flycheck_*.el
 /network-security.data
 
 /.firebase/
+
+3d-models/case-*/output/
