@@ -89,6 +89,33 @@ describe("rasterizeShape — exponent controls squircliness", () => {
   })
 })
 
+describe("rasterizeShape — non-square ellipse & fractional exponent", () => {
+  it("9x5 ellipse edge is a true hollow outline (subset of fill, every cell on a boundary)", () => {
+    const fill = new Set(rasterizeShape("ellipse", "fill", 9, 5, 2))
+    const edge = new Set(rasterizeShape("ellipse", "edge", 9, 5, 2))
+    for (const key of edge) expect(fill.has(key)).toBe(true)
+    for (const key of edge) {
+      const [x, y] = key.split(",").map(Number)
+      const hasEmptyNeighbour =
+        !fill.has(`${x - 1},${y}`) ||
+        !fill.has(`${x + 1},${y}`) ||
+        !fill.has(`${x},${y - 1}`) ||
+        !fill.has(`${x},${y + 1}`)
+      expect(hasEmptyNeighbour).toBe(true)
+    }
+    expect(fill.has("4,2")).toBe(true)
+    expect(edge.has("4,2")).toBe(false)
+  })
+
+  it("fractional exponent (4.5) sits between ellipse and near-rect in cell count", () => {
+    const ellipse = new Set(rasterizeShape("ellipse", "fill", 11, 11, 2)).size
+    const squircle = new Set(rasterizeShape("ellipse", "fill", 11, 11, 4.5)).size
+    const nearRect = new Set(rasterizeShape("ellipse", "fill", 11, 11, 8)).size
+    expect(squircle).toBeGreaterThan(ellipse)
+    expect(squircle).toBeLessThanOrEqual(nearRect)
+  })
+})
+
 describe("buildShapeClipboard", () => {
   it("wraps cells as a single-layer/single-group ClipboardData with bbox bounds", () => {
     const clip = buildShapeClipboard("rectangle", "fill", 3, 2, 8, 5, "g1")
