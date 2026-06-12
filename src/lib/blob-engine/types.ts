@@ -159,6 +159,24 @@ export interface RenderStyle {
   holeStrokeColor?: string
 }
 
+/**
+ * Minimal path-building target for primitive emission. Satisfied by Path2D
+ * and CanvasRenderingContext2D, and by recording sinks in tests.
+ */
+export interface PathSink {
+  moveTo(x: number, y: number): void
+  lineTo(x: number, y: number): void
+  bezierCurveTo(
+    c1x: number,
+    c1y: number,
+    c2x: number,
+    c2y: number,
+    x: number,
+    y: number,
+  ): void
+  closePath(): void
+}
+
 export interface RenderContext {
   ctx: CanvasRenderingContext2D | null
   style: RenderStyle

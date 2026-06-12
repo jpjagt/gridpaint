@@ -21,6 +21,7 @@ import {
 } from "@/stores/ui"
 import { useSelection } from "@/hooks/useSelection"
 import type { ClipboardData } from "@/hooks/useSelection"
+import { rebuildShapeFloatState } from "@/lib/gridpaint/rasterizeShape"
 import { useImagePaste } from "@/hooks/useImagePaste"
 import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 import { computeCenterOfGravity } from "@/lib/gridpaint/cog"
@@ -79,7 +80,7 @@ import {
   addGroupToActiveLayer,
   resetDrawing,
 } from "@/stores/drawingStores"
-import type { CircularCutout, PointModifications, CutoutAnchor } from "@/types/gridpaint"
+import type { CircularCutout, PointModifications, CutoutAnchor, ShapeHandle } from "@/types/gridpaint"
 import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
 
 const CUTOUT_DUPLICATE_TOLERANCE_MM = 0.1
@@ -202,6 +203,35 @@ export const GridPaintCanvas = forwardRef<
     r: number
     cutout: CircularCutout
   } | null>(null)
+
+  /**
+   * Shape tool: in-progress rubber-band drag (before a float exists). Start/end
+   * are grid cells; kept in refs and painted via the `render()` rubber-band block.
+   */
+  const shapeDragStartRef = useRef<{ x: number; y: number } | null>(null)
+  const shapeDragEndRef = useRef<{ x: number; y: number } | null>(null)
+  /**
+   * Shape tool: active resize gesture on an existing shape float.
+   * - `fixed` is the anchored (opposite) grid corner in absolute coords.
+   * - `axes` says which axes the dragged handle controls: corner handles move
+   *   both ("x"+"y"); edge handles move only one, so the other axis is held at
+   *   the float's current extent (`heldX`/`heldY`).
+   */
+  const shapeResizeRef = useRef<{
+    handle: ShapeHandle
+    fixed: { x: number; y: number }
+    axes: { x: boolean; y: boolean }
+    heldX: { left: number; right: number }
+    heldY: { top: number; bottom: number }
+  } | null>(null)
+  /**
+   * Compass id of the resize handle currently hovered (or being dragged), or
+   * null. Drives the handle's hover highlight + grab cursor. State (not ref) so
+   * a hover change re-renders the canvas.
+   */
+  const [shapeHoverHandle, setShapeHoverHandle] = useState<ShapeHandle | null>(
+    null,
+  )
 
   // Selection hooks
   const selection = useSelection()
@@ -462,6 +492,57 @@ export const GridPaintCanvas = forwardRef<
       return { x: gridX, y: gridY }
     },
     [canvasView],
+  )
+
+  /**
+   * Shape tool: hit-test the 8 resize handles of the active shape float against a
+   * client-space point. Returns the handle id (compass direction) or null.
+   * `fixed`-corner resolution lives in the mousedown handler.
+   */
+  const hitShapeHandle = useCallback(
+    (clientX: number, clientY: number) => {
+      const fp = $selectionState.get().floatingPaste
+      if (!fp?.shape) return null
+      const canvas = canvasRef.current
+      if (!canvas) return null
+      const rect = canvas.getBoundingClientRect()
+      const view = $canvasView.get()
+      const gs = view.gridSize
+      const baseX = fp.origin.x + fp.offset.x
+      const baseY = fp.origin.y + fp.offset.y
+      // grid → client px
+      const sx = (gx: number) =>
+        rect.left + gx * gs * view.zoom + view.panOffset.x
+      const sy = (gy: number) =>
+        rect.top + gy * gs * view.zoom + view.panOffset.y
+      const x0 = sx(baseX)
+      const y0 = sy(baseY)
+      const x1 = sx(baseX + fp.shape.width)
+      const y1 = sy(baseY + fp.shape.height)
+      const cx = (x0 + x1) / 2
+      const cy = (y0 + y1) / 2
+      const handles: {
+        id: "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se"
+        x: number
+        y: number
+      }[] = [
+        { id: "nw", x: x0, y: y0 },
+        { id: "n", x: cx, y: y0 },
+        { id: "ne", x: x1, y: y0 },
+        { id: "w", x: x0, y: cy },
+        { id: "e", x: x1, y: cy },
+        { id: "sw", x: x0, y: y1 },
+        { id: "s", x: cx, y: y1 },
+        { id: "se", x: x1, y: y1 },
+      ]
+      const r = 10 // px hit radius
+      for (const h of handles) {
+        if (Math.abs(clientX - h.x) <= r && Math.abs(clientY - h.y) <= r)
+          return h.id
+      }
+      return null
+    },
+    [],
   )
 
   // Native-paste dispatcher: gridpaint-JSON floats at viewport center, any tool.
@@ -884,6 +965,22 @@ export const GridPaintCanvas = forwardRef<
       )
     }
 
+    // Render the in-progress shape rubber-band (before a float exists)
+    if (
+      currentTool === "shape" &&
+      !selectionState.floatingPaste &&
+      shapeDragStartRef.current &&
+      shapeDragEndRef.current &&
+      renderer
+    ) {
+      renderSelectionRectangle(
+        renderer,
+        shapeDragStartRef.current,
+        shapeDragEndRef.current,
+        canvasView,
+      )
+    }
+
     // Render export rects when export tool is active
     if (currentTool === "export" && renderer?.context) {
       renderExportRects(
@@ -896,7 +993,12 @@ export const GridPaintCanvas = forwardRef<
 
     // Render floating paste overlay if active
     if (selectionState.floatingPaste && renderer) {
-      renderFloatingPaste(renderer, selectionState.floatingPaste, canvasView)
+      renderFloatingPaste(
+        renderer,
+        selectionState.floatingPaste,
+        canvasView,
+        shapeHoverHandle,
+      )
     }
 
     // Render cutout hover overlay: border ring + label for the hovered cutout
@@ -1004,6 +1106,7 @@ export const GridPaintCanvas = forwardRef<
     renderSelectionRectangle,
     selectionState.floatingPaste,
     renderFloatingPaste,
+    shapeHoverHandle,
     exportRects,
     exportRectsHook.draftBounds,
     showCenterOfGravity,
@@ -1221,6 +1324,48 @@ export const GridPaintCanvas = forwardRef<
           moveDragStartRef.current = null
           selection.startSelection(e.clientX, e.clientY, getGridCoordinates)
         }
+      } else if (currentTool === "shape") {
+        const fp = $selectionState.get().floatingPaste
+        if (fp?.shape) {
+          const handle = hitShapeHandle(e.clientX, e.clientY)
+          if (handle) {
+            // bbox edges in absolute grid coords
+            const baseX = fp.origin.x + fp.offset.x
+            const baseY = fp.origin.y + fp.offset.y
+            const left = baseX
+            const right = baseX + fp.shape.width
+            const top = baseY
+            const bottom = baseY + fp.shape.height
+            // Which axes this handle controls: "n"/"s" → y only, "w"/"e" → x
+            // only, corners → both.
+            const movesX = handle.includes("w") || handle.includes("e")
+            const movesY = handle.includes("n") || handle.includes("s")
+            // Anchor the opposite edge on each controlled axis.
+            const fixedX = handle.includes("w") ? right : left
+            const fixedY = handle.includes("n") ? bottom : top
+            shapeResizeRef.current = {
+              handle,
+              fixed: { x: fixedX, y: fixedY },
+              axes: { x: movesX, y: movesY },
+              heldX: { left, right },
+              heldY: { top, bottom },
+            }
+            setShapeHoverHandle(handle)
+            const canvasEl = canvasRef.current
+            if (canvasEl) canvasEl.style.cursor = "grabbing"
+          } else {
+            // Body drag: reuse the float move machinery (same as select).
+            const grid = getGridCoordinates(e.clientX, e.clientY)
+            if (grid) moveDragStartRef.current = grid
+          }
+        } else {
+          // No float yet: begin a rubber-band create drag.
+          const grid = getGridCoordinates(e.clientX, e.clientY)
+          if (grid) {
+            shapeDragStartRef.current = grid
+            shapeDragEndRef.current = grid
+          }
+        }
       } else if (currentTool === "cutout") {
         pushHistory($layersState.get().layers)
         handleCutoutClick(e.clientX, e.clientY, isInvertHeld, e.shiftKey)
@@ -1259,6 +1404,18 @@ export const GridPaintCanvas = forwardRef<
         }
       }
 
+      // Shape-handle hover: only when not mid-gesture (resize sets it on down).
+      if (
+        currentTool === "shape" &&
+        !shapeResizeRef.current &&
+        !shapeDragStartRef.current
+      ) {
+        const hovered = hitShapeHandle(e.clientX, e.clientY)
+        setShapeHoverHandle((prev) => (prev === hovered ? prev : hovered))
+        const canvasEl = canvasRef.current
+        if (canvasEl) canvasEl.style.cursor = hovered ? "grab" : ""
+      }
+
       if (isDragging) {
         const isInvertHeld = e.altKey || !!(e.buttons & 2)
 
@@ -1286,6 +1443,53 @@ export const GridPaintCanvas = forwardRef<
             }
           } else {
             selection.updateSelection(e.clientX, e.clientY, getGridCoordinates)
+          }
+        } else if (currentTool === "shape") {
+          if (shapeResizeRef.current) {
+            // Resize: the dragged pointer moves only the handle's axis/axes;
+            // the other axis stays at its current (held) extent.
+            const grid = getGridCoordinates(e.clientX, e.clientY)
+            if (grid) {
+              const { fixed, axes, heldX, heldY } = shapeResizeRef.current
+              const newLeft = axes.x
+                ? Math.min(fixed.x, grid.x)
+                : heldX.left
+              const newRight = axes.x
+                ? Math.max(fixed.x, grid.x)
+                : heldX.right
+              const newTop = axes.y ? Math.min(fixed.y, grid.y) : heldY.top
+              const newBottom = axes.y
+                ? Math.max(fixed.y, grid.y)
+                : heldY.bottom
+              const newW = Math.max(1, newRight - newLeft)
+              const newH = Math.max(1, newBottom - newTop)
+              const fp = $selectionState.get().floatingPaste
+              if (fp?.shape) {
+                const next = rebuildShapeFloatState(
+                  { ...fp, origin: { x: newLeft, y: newTop }, offset: { x: 0, y: 0 } },
+                  { width: newW, height: newH },
+                )
+                if (next) $selectionState.setKey("floatingPaste", next)
+              }
+            }
+          } else if (moveDragStartRef.current) {
+            // Body move — same delta logic as the select tool's float move.
+            const grid = getGridCoordinates(e.clientX, e.clientY)
+            if (grid) {
+              const dx = grid.x - moveDragStartRef.current.x
+              const dy = grid.y - moveDragStartRef.current.y
+              if (dx !== 0 || dy !== 0) {
+                selection.moveFloatingPaste(dx, dy)
+                moveDragStartRef.current = grid
+              }
+            }
+          } else if (shapeDragStartRef.current) {
+            // Rubber-band create drag: update the live box and repaint.
+            const grid = getGridCoordinates(e.clientX, e.clientY)
+            if (grid) {
+              shapeDragEndRef.current = grid
+              render()
+            }
           }
         } else if (currentTool === "cutout") {
           // No drag behavior for cutout (click-only)
@@ -1321,6 +1525,26 @@ export const GridPaintCanvas = forwardRef<
       if (currentTool === "select" && moveDragStartRef.current) {
         // End the drag — leave the float in place so Enter/Escape can finish it
         moveDragStartRef.current = null
+      }
+      if (currentTool === "shape") {
+        if (shapeResizeRef.current) {
+          shapeResizeRef.current = null
+          // Drag ended; revert from grabbing to the hover cursor.
+          const canvasEl = canvasRef.current
+          if (canvasEl) canvasEl.style.cursor = "grab"
+        } else if (moveDragStartRef.current) {
+          moveDragStartRef.current = null
+        } else if (shapeDragStartRef.current && shapeDragEndRef.current) {
+          const a = shapeDragStartRef.current
+          const b = shapeDragEndRef.current
+          const left = Math.min(a.x, b.x)
+          const top = Math.min(a.y, b.y)
+          const w = Math.abs(b.x - a.x) + 1
+          const h = Math.abs(b.y - a.y) + 1
+          selection.startShapeFloat({ x: left, y: top }, w, h)
+        }
+        shapeDragStartRef.current = null
+        shapeDragEndRef.current = null
       }
       if (currentTool === "measure") {
         const current = $measureState.get()
@@ -1366,6 +1590,8 @@ export const GridPaintCanvas = forwardRef<
     selection.isInsideSelection,
     selection.liftSelection,
     selection.moveFloatingPaste,
+    selection.startShapeFloat,
+    hitShapeHandle,
     getGridCoordinates,
     getHoveredCutout,
     render,
@@ -1423,6 +1649,19 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [canvasView])
 
+  // Clear transient shape-tool drag state when leaving the shape tool, so a
+  // stale rubber-band or resize gesture never persists into another tool.
+  useEffect(() => {
+    if (currentTool !== "shape") {
+      shapeDragStartRef.current = null
+      shapeDragEndRef.current = null
+      shapeResizeRef.current = null
+      setShapeHoverHandle(null)
+      const canvasEl = canvasRef.current
+      if (canvasEl) canvasEl.style.cursor = ""
+    }
+  }, [currentTool])
+
   // Keyboard shortcuts for copy/paste/move
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1443,10 +1682,11 @@ export const GridPaintCanvas = forwardRef<
           return
         }
 
-        // Enter bakes the floating paste
+        // Enter bakes the floating paste. For shape floats, Alt subtracts.
         if (e.key === "Enter") {
           e.preventDefault()
-          selection.bakeFloatingPaste()
+          const subtract = !!floatingPaste.shape && e.altKey
+          selection.bakeFloatingPaste(subtract)
           return
         }
 

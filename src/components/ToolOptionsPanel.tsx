@@ -819,7 +819,8 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
   const exponent =
     floatingPaste?.shape?.exponent ?? activeShapeExponent(settings)
 
-  const sliderRange = kind === "rectangle" ? { min: 3, max: 8 } : { min: 1, max: 6 }
+  // Rectangle max = SHARP_RECT_EXPONENT (16): rightmost = true sharp corners.
+  const sliderRange = kind === "rectangle" ? { min: 3, max: 16 } : { min: 1, max: 6 }
   const sliderLabel = kind === "rectangle" ? "corners" : "squircle"
 
   /** Rewrite the live float (if any) after a param change. No-op without a float. */

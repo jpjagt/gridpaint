@@ -193,6 +193,19 @@ export type ShapeKind = "rectangle" | "ellipse"
 /** fill = every interior cell; edge = single-cell-wide outline */
 export type ShapeStyle = "fill" | "edge"
 
+/** Compass id of one of a shape float's 8 resize handles. */
+export type ShapeHandle = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se"
+
+/**
+ * Handle ids in render order (top row L→R, middle L→R, bottom L→R). The renderer
+ * and the canvas hit-test must use this same ordering.
+ */
+export const SHAPE_HANDLE_IDS: ShapeHandle[] = [
+  "nw", "n", "ne",
+  "w",       "e",
+  "sw", "s", "se",
+]
+
 /**
  * Metadata carried by a floating paste when it represents a live shape preview.
  * Width/height are in grid cells (>= 1). The float's cell data is derived from

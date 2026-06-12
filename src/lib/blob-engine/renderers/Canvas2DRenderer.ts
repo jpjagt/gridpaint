@@ -1,8 +1,22 @@
 /**
  * Canvas2DRenderer - High-performance Canvas 2D blob renderer
  *
- * This renderer converts blob primitives into Canvas 2D drawing operations
- * with optimizations for performance and visual quality.
+ * Rendering model (first principles):
+ *
+ * - Every primitive of a layer is appended into Path2D objects (world
+ *   coordinates, exact 90°-rotation math — see primitivePaths.ts) and the
+ *   layer is painted with ONE nonzero-winding fill. A single fill rasterizes
+ *   coincident subpath edges together, so abutting quadrant shapes produce no
+ *   antialiasing seams and need no outward "feather" expansion. With no
+ *   feather, quarter circles are exactly tangent to the straight edges they
+ *   continue (no corner points at the start of slopes).
+ *
+ * - Paths are cached per BlobGeometry identity in cell-aligned tiles
+ *   (TILE_CELLS × TILE_CELLS grid cells per tile). Pan/zoom never rebuilds
+ *   geometry or paths: each frame merges the tiles intersecting the viewport
+ *   (cached until the visible tile set changes) and issues one fill per
+ *   layer. Frame cost is therefore bounded by visible content, not by
+ *   drawing size.
  */
 
 import type {
@@ -11,7 +25,6 @@ import type {
   CompositeGeometry,
   GridLayer,
   RenderStyle,
-  GridPoint,
 } from "../types"
 import type { PointModifications } from "@/types/gridpaint"
 import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
@@ -20,17 +33,33 @@ import {
   Renderer,
   type ViewportTransform,
   type RenderOptions,
-  RenderUtils,
 } from "./Renderer"
-import { PrimitiveGenerator } from "../PrimitiveGenerator"
-import { magicNr } from "@/lib/constants"
+import { appendPrimitivePath } from "./primitivePaths"
 import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
 // Debug visualization constants
-let SHOW_SUBGRID = false // Set to true to show quadrant grid lines
+const SHOW_SUBGRID = false // Set to true to show quadrant grid lines
 
-// Border expansion control - positive values expand outward to create borders
-const FEATHER_FACTOR = 0.1 // Factor to expand primitives outward for border effect (0 = no border)
+/** Grid cells per cached path tile (matches GeometryCache region size) */
+const TILE_CELLS = 16
+
+interface PathTile {
+  path: Path2D
+  primitiveCount: number
+  tileX: number
+  tileY: number
+}
+
+interface LayerPathCache {
+  tiles: Map<string, PathTile>
+  /** Union of all tiles — used when everything is visible */
+  fullPath: Path2D
+  totalPrimitives: number
+  /** Cache of the last merged visible-tile path */
+  mergedKey: string | null
+  mergedPath: Path2D | null
+  mergedCount: number
+}
 
 interface RenderStats {
   primitivesRendered: number
@@ -41,6 +70,13 @@ interface RenderStats {
 
 export class Canvas2DRenderer extends Renderer {
   private ctx: CanvasRenderingContext2D | null = null
+  /**
+   * Path caches keyed by BlobGeometry object identity. Geometry objects are
+   * stable across pan/zoom (and, with per-layer geometry caching in the
+   * canvas component, across edits of other layers), so paths are only
+   * rebuilt when a layer's geometry actually changes.
+   */
+  private pathCaches = new WeakMap<BlobGeometry, LayerPathCache>()
   private stats: RenderStats = {
     primitivesRendered: 0,
     primitivesCulled: 0,
@@ -70,12 +106,8 @@ export class Canvas2DRenderer extends Renderer {
     this.ctx = canvas.getContext("2d")
 
     if (this.ctx) {
-      // Configure for crisp pixel rendering
+      // Crisp rendering for image overlays drawn through this context
       this.ctx.imageSmoothingEnabled = false
-
-      // Ensure sub-pixel precision for thin lines
-      this.ctx.lineJoin = "miter"
-      this.ctx.lineCap = "square"
     }
   }
 
@@ -132,6 +164,7 @@ export class Canvas2DRenderer extends Renderer {
         options.transform,
         layerGeometry.layer,
         options.mmPerUnit ?? 1,
+        scaleFactor,
       )
 
       if (scaleFactor !== 1) {
@@ -177,67 +210,166 @@ export class Canvas2DRenderer extends Renderer {
   }
 
   /**
-   * Render layer geometry with style
+   * Render layer geometry with a single fill of the cached, viewport-merged path
    */
   private renderLayerGeometry(
     geometry: BlobGeometry,
-    baseStyle: RenderStyle,
+    style: RenderStyle,
     transform: ViewportTransform,
     layer?: GridLayer,
     mmPerUnit: number = 1,
+    scaleFactor: number = 1,
   ): void {
     if (!this.ctx || geometry.primitives.length === 0) return
 
-    // Cull primitives outside viewport for performance
-    const visiblePrimitives = RenderUtils.cullPrimitives(
-      geometry.primitives,
-      geometry.gridSize,
-      transform,
-    )
+    const cache = this.getLayerPathCache(geometry)
+    const visible = this.getVisiblePath(cache, geometry, transform, scaleFactor)
 
-    this.stats.primitivesCulled +=
-      geometry.primitives.length - visiblePrimitives.length
-
-    // Batch primitives by type for better performance
-    const rectangles: BlobPrimitive[] = []
-    const roundedCorners: BlobPrimitive[] = []
-    const bridges: BlobPrimitive[] = []
-
-    for (const primitive of visiblePrimitives) {
-      switch (primitive.type) {
-        case "rectangle":
-          rectangles.push(primitive)
-          break
-        case "roundedCorner":
-          roundedCorners.push(primitive)
-          break
-        case "diagonalBridge":
-          bridges.push(primitive)
-          break
-      }
-    }
+    this.stats.primitivesCulled += cache.totalPrimitives - visible.count
+    if (visible.count === 0 || !visible.path) return
 
     // If this layer has cutouts, establish a clipping region that excludes them
-    // before painting any primitives. Using an even-odd clip (large rect covering
-    // world space with the cutout circles subtracted) means the paint never
-    // reaches those areas — no compositing tricks, no offscreen canvas needed.
+    // before painting. Using an even-odd clip (large rect covering world space
+    // with the cutout circles subtracted) means the paint never reaches those
+    // areas — no compositing tricks, no offscreen canvas needed.
     const hasCutouts =
       layer?.pointModifications && layer.pointModifications.size > 0
     if (hasCutouts) {
       this.ctx.save()
-      this.applyCutoutClip(layer!.pointModifications!, geometry.gridSize, mmPerUnit)
+      this.applyCutoutClip(
+        layer!.pointModifications!,
+        geometry.gridSize,
+        mmPerUnit,
+      )
     }
 
-    // Render each type in batch
-    this.renderRectangleBatch(rectangles, baseStyle, geometry.gridSize)
-    this.renderRoundedCornerBatch(roundedCorners, baseStyle, geometry.gridSize)
-    this.renderBridgeBatch(bridges, baseStyle, geometry.gridSize)
+    this.ctx.fillStyle = style.fillColor || "#000000"
+    this.ctx.fill(visible.path)
 
     if (hasCutouts) {
       this.ctx.restore()
     }
 
-    this.stats.primitivesRendered += visiblePrimitives.length
+    this.stats.primitivesRendered += visible.count
+  }
+
+  /**
+   * Get (or build) the tiled path cache for a geometry object
+   */
+  private getLayerPathCache(geometry: BlobGeometry): LayerPathCache {
+    let cache = this.pathCaches.get(geometry)
+    if (!cache) {
+      cache = this.buildLayerPathCache(geometry)
+      this.pathCaches.set(geometry, cache)
+    }
+    return cache
+  }
+
+  private buildLayerPathCache(geometry: BlobGeometry): LayerPathCache {
+    const tiles = new Map<string, PathTile>()
+
+    for (const primitive of geometry.primitives) {
+      const tileX = Math.floor(primitive.center.x / TILE_CELLS)
+      const tileY = Math.floor(primitive.center.y / TILE_CELLS)
+      const key = `${tileX},${tileY}`
+
+      let tile = tiles.get(key)
+      if (!tile) {
+        tile = { path: new Path2D(), primitiveCount: 0, tileX, tileY }
+        tiles.set(key, tile)
+      }
+
+      appendPrimitivePath(tile.path, primitive, geometry.gridSize)
+      tile.primitiveCount++
+    }
+
+    const fullPath = new Path2D()
+    for (const tile of tiles.values()) {
+      fullPath.addPath(tile.path)
+    }
+
+    return {
+      tiles,
+      fullPath,
+      totalPrimitives: geometry.primitives.length,
+      mergedKey: null,
+      mergedPath: null,
+      mergedCount: 0,
+    }
+  }
+
+  /**
+   * Select the cached path covering the current viewport: the full path when
+   * everything is visible, otherwise a merged path of the visible tiles
+   * (cached until the visible tile set changes).
+   */
+  private getVisiblePath(
+    cache: LayerPathCache,
+    geometry: BlobGeometry,
+    transform: ViewportTransform,
+    scaleFactor: number,
+  ): { path: Path2D | null; count: number } {
+    const { zoom, panOffset, viewportWidth, viewportHeight } = transform
+    const worldScale = zoom * scaleFactor
+
+    if (
+      !isFinite(viewportWidth) ||
+      !isFinite(viewportHeight) ||
+      !(worldScale > 0)
+    ) {
+      // Without a usable viewport, render everything
+      return { path: cache.fullPath, count: cache.totalPrimitives }
+    }
+
+    // Visible range in cell coordinates (+1 cell padding: a primitive extends
+    // up to one cell beyond its center coordinate)
+    const minCellX = Math.floor(-panOffset.x / worldScale / geometry.gridSize) - 1
+    const maxCellX =
+      Math.ceil((viewportWidth - panOffset.x) / worldScale / geometry.gridSize) + 1
+    const minCellY = Math.floor(-panOffset.y / worldScale / geometry.gridSize) - 1
+    const maxCellY =
+      Math.ceil((viewportHeight - panOffset.y) / worldScale / geometry.gridSize) + 1
+
+    const minTileX = Math.floor(minCellX / TILE_CELLS)
+    const maxTileX = Math.floor(maxCellX / TILE_CELLS)
+    const minTileY = Math.floor(minCellY / TILE_CELLS)
+    const maxTileY = Math.floor(maxCellY / TILE_CELLS)
+
+    const visibleTiles: PathTile[] = []
+    const keyParts: string[] = []
+    for (const [key, tile] of cache.tiles) {
+      if (
+        tile.tileX >= minTileX &&
+        tile.tileX <= maxTileX &&
+        tile.tileY >= minTileY &&
+        tile.tileY <= maxTileY
+      ) {
+        visibleTiles.push(tile)
+        keyParts.push(key)
+      }
+    }
+
+    if (visibleTiles.length === cache.tiles.size) {
+      return { path: cache.fullPath, count: cache.totalPrimitives }
+    }
+    if (visibleTiles.length === 0) {
+      return { path: null, count: 0 }
+    }
+
+    const mergedKey = keyParts.join(";")
+    if (cache.mergedKey !== mergedKey) {
+      const merged = new Path2D()
+      let count = 0
+      for (const tile of visibleTiles) {
+        merged.addPath(tile.path)
+        count += tile.primitiveCount
+      }
+      cache.mergedKey = mergedKey
+      cache.mergedPath = merged
+      cache.mergedCount = count
+    }
+
+    return { path: cache.mergedPath, count: cache.mergedCount }
   }
 
   /**
@@ -284,226 +416,18 @@ export class Canvas2DRenderer extends Renderer {
   }
 
   /**
-   * Render a batch of rectangle primitives
-   */
-  private renderRectangleBatch(
-    primitives: BlobPrimitive[],
-    style: RenderStyle,
-    gridSize: number,
-  ): void {
-    if (!this.ctx || primitives.length === 0) return
-
-    this.ctx.fillStyle = style.fillColor || "#000000"
-
-    for (const primitive of primitives) {
-      this.renderRectangle(primitive, gridSize)
-    }
-  }
-
-  /**
-   * Render a single rectangle primitive
-   */
-  private renderRectangle(primitive: BlobPrimitive, gridSize: number): void {
-    if (!this.ctx) return
-
-    const worldPos = this.gridToWorld(primitive.center, gridSize)
-
-    this.ctx.save()
-    this.ctx.translate(worldPos.x, worldPos.y)
-    this.ctx.rotate(this.getQuadrantRotation(primitive.quadrant))
-
-    // Expand primitive outward for border effect
-    const size = primitive.size
-    const borderExpansion = FEATHER_FACTOR
-    this.ctx.fillRect(
-      -borderExpansion,
-      -borderExpansion,
-      size + 2 * borderExpansion,
-      size + 2 * borderExpansion,
-    )
-
-    this.ctx.restore()
-  }
-
-  /**
-   * Render a batch of rounded corner primitives
-   */
-  private renderRoundedCornerBatch(
-    primitives: BlobPrimitive[],
-    style: RenderStyle,
-    gridSize: number,
-  ): void {
-    if (!this.ctx || primitives.length === 0) return
-
-    this.ctx.fillStyle = style.fillColor || "#000000"
-
-    for (const primitive of primitives) {
-      this.renderRoundedCorner(primitive, gridSize)
-    }
-  }
-
-  /**
-   * Render a single rounded corner primitive.
-   * If renderQuadrant is set and differs from quadrant, the curve is drawn
-   * with a different orientation within the physical quadrant area.
-   */
-  private renderRoundedCorner(
-    primitive: BlobPrimitive,
-    gridSize: number,
-  ): void {
-    if (!this.ctx) return
-
-    const worldPos = this.gridToWorld(primitive.center, gridSize)
-
-    this.ctx.save()
-    this.ctx.translate(worldPos.x, worldPos.y)
-    // Always position at the physical quadrant
-    this.ctx.rotate(this.getQuadrantRotation(primitive.quadrant))
-
-    const size = primitive.size
-    const b = FEATHER_FACTOR
-    const s = size + b
-    const cp = s * magicNr
-
-    // Compute relative rotation steps between desired and physical direction
-    const rq = primitive.renderQuadrant ?? primitive.quadrant
-    const relOffset = ((rq - primitive.quadrant) % 4 + 4) % 4
-
-    // Each offset replaces a different corner of the quadrant square with a curve.
-    // The curve bulges toward that corner; the two edges adjacent to the opposite
-    // corner remain straight.
-    //   offset 0 (SE): corner at (-b,-b), curve replaces (s,s) corner
-    //   offset 1 (SW): corner at (s,-b),  curve replaces (-b,s) corner
-    //   offset 2 (NW): corner at (s,s),   curve replaces (-b,-b) corner
-    //   offset 3 (NE): corner at (-b,s),  curve replaces (s,-b) corner
-    this.ctx.beginPath()
-    if (relOffset === 0) {
-      this.ctx.moveTo(-b, -b)
-      this.ctx.lineTo(s, -b)
-      this.ctx.bezierCurveTo(s, -b + cp, -b + cp, s, -b, s)
-      this.ctx.closePath()
-    } else if (relOffset === 1) {
-      this.ctx.moveTo(s, -b)
-      this.ctx.lineTo(-b, -b)
-      this.ctx.bezierCurveTo(-b, -b + cp, s - cp, s, s, s)
-      this.ctx.closePath()
-    } else if (relOffset === 2) {
-      this.ctx.moveTo(s, s)
-      this.ctx.lineTo(-b, s)
-      this.ctx.bezierCurveTo(-b, s - cp, s - cp, -b, s, -b)
-      this.ctx.closePath()
-    } else {
-      this.ctx.moveTo(-b, s)
-      this.ctx.lineTo(s, s)
-      this.ctx.bezierCurveTo(s, s - cp, -b + cp, -b, -b, -b)
-      this.ctx.closePath()
-    }
-
-    this.ctx.fill()
-    this.ctx.restore()
-  }
-
-  /**
-   * Render a batch of bridge primitives
-   */
-  private renderBridgeBatch(
-    primitives: BlobPrimitive[],
-    style: RenderStyle,
-    gridSize: number,
-  ): void {
-    if (!this.ctx || primitives.length === 0) return
-
-    this.ctx.fillStyle = style.fillColor || "#000000"
-
-    for (const primitive of primitives) {
-      this.renderBridge(primitive, gridSize)
-    }
-  }
-
-  /**
-   * Render a single bridge primitive.
-   * If renderQuadrant differs from quadrant, the concave curve is oriented
-   * differently within the physical quadrant area.
-   */
-  private renderBridge(primitive: BlobPrimitive, gridSize: number): void {
-    if (!this.ctx) return
-
-    const worldPos = this.gridToWorld(primitive.center, gridSize)
-
-    this.ctx.save()
-    this.ctx.translate(worldPos.x, worldPos.y)
-    // Always position at the physical quadrant
-    this.ctx.rotate(this.getQuadrantRotation(primitive.quadrant))
-
-    const size = primitive.size
-    const b = FEATHER_FACTOR
-    const s = size + b
-    const cp = s * magicNr
-
-    // Compute relative rotation steps between desired and physical direction
-    const rq = primitive.renderQuadrant ?? primitive.quadrant
-    const relOffset = ((rq - primitive.quadrant) % 4 + 4) % 4
-
-    // A bridge fills the triangular area between the curve and the corner it
-    // bulges toward. Same curve as roundedCorner but the filled region is
-    // on the opposite side.
-    //   offset 0 (SE): curve (s,-b)→(-b,s) bulging SE, fill triangle at (s,s)
-    //   offset 1 (SW): curve (-b,-b)→(s,s) bulging SW, fill triangle at (-b,s)
-    //   offset 2 (NW): curve (-b,s)→(s,-b) bulging NW, fill triangle at (-b,-b)
-    //   offset 3 (NE): curve (s,s)→(-b,-b) bulging NE, fill triangle at (s,-b)
-    this.ctx.beginPath()
-    if (relOffset === 0) {
-      this.ctx.moveTo(s, -b)
-      this.ctx.bezierCurveTo(s, -b + cp, -b + cp, s, -b, s)
-      this.ctx.lineTo(s, s)
-      this.ctx.closePath()
-    } else if (relOffset === 1) {
-      this.ctx.moveTo(-b, -b)
-      this.ctx.bezierCurveTo(-b, -b + cp, s - cp, s, s, s)
-      this.ctx.lineTo(-b, s)
-      this.ctx.closePath()
-    } else if (relOffset === 2) {
-      this.ctx.moveTo(-b, s)
-      this.ctx.bezierCurveTo(-b, s - cp, s - cp, -b, s, -b)
-      this.ctx.lineTo(-b, -b)
-      this.ctx.closePath()
-    } else {
-      this.ctx.moveTo(s, s)
-      this.ctx.bezierCurveTo(s, s - cp, -b + cp, -b, -b, -b)
-      this.ctx.lineTo(s, -b)
-      this.ctx.closePath()
-    }
-
-    this.ctx.fill()
-    this.ctx.restore()
-  }
-
-  /**
    * Render a single primitive (for individual rendering)
    */
-  renderPrimitive(
-    primitive: BlobPrimitive,
-    style: RenderStyle,
-    transform: ViewportTransform,
-  ): void {
+  renderPrimitive(primitive: BlobPrimitive, style: RenderStyle): void {
     if (!this.ctx) return
 
     this.ctx.save()
     this.ctx.fillStyle = style.fillColor || "#000000"
-    this.ctx.strokeStyle = style.strokeColor || "#000000"
-    this.ctx.lineWidth = style.strokeWidth || 0
 
-    switch (primitive.type) {
-      case "rectangle":
-        this.renderRectangle(primitive, 0) // gridSize 0 for direct rendering
-        break
-      case "roundedCorner":
-        this.renderRoundedCorner(primitive, 0)
-        break
-      case "diagonalBridge":
-        this.renderBridge(primitive, 0)
-        break
-    }
+    // gridSize 0 places the primitive's cell origin at (0,0) for direct rendering
+    const path = new Path2D()
+    appendPrimitivePath(path, primitive, 0)
+    this.ctx.fill(path)
 
     this.ctx.restore()
   }
@@ -515,15 +439,10 @@ export class Canvas2DRenderer extends Renderer {
     if (!this.ctx) return
 
     const canvas = this.ctx.canvas
+    this.ctx.save()
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
     this.ctx.clearRect(0, 0, canvas.width, canvas.height)
-  }
-
-  /**
-   * Get rotation angle for quadrant
-   */
-  private getQuadrantRotation(quadrant: 0 | 1 | 2 | 3): number {
-    const rotations = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
-    return rotations[quadrant]
+    this.ctx.restore()
   }
 
   /**

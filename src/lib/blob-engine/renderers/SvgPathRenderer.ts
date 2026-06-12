@@ -4,18 +4,25 @@
  * A clean-room SVG path renderer built around a simple edge-bag algorithm:
  *
  *  1. For every BlobPrimitive, emit the FULL perimeter of that primitive's shape
- *     as a list of oriented segments (lines and quarter-circle arcs).
+ *     as a list of oriented segments (lines and quarter-circle arcs), always
+ *     traversed CLOCKWISE in screen space (filled region on the right).
  *
  *  2. Collect all segments into a "bag".
- *     - Line segments are keyed canonically (smaller endpoint first); a segment
- *       that appears twice (contributed by two adjacent filled regions from
- *       opposite sides) is an internal edge → remove both occurrences.
- *     - Arc segments are keyed by their geometry; a convex arc and the matching
- *       concave arc at the same location cancel each other.
+ *     - Segments are keyed canonically (smaller endpoint first; arcs also by
+ *       geometric centre) and tallied by direction: a segment contributed by
+ *       two adjacent filled regions appears once in each direction → net zero
+ *       → internal edge, removed. Boundary edges keep their net direction.
  *
- *  3. Stitch the surviving segments into closed loops by chaining endpoints.
+ *  3. Stitch the surviving segments into closed loops by chaining endpoints
+ *     (following stored directions; flips are never needed for valid input).
  *
  *  4. Emit one SVG <path> subpath per loop (M … arc/line … Z).
+ *
+ * ORIENTATION GUARANTEE: because of (1) and (2), emitted loops have meaningful
+ * winding — outer boundaries are CW in screen coords (positive shoelace area),
+ * holes are CCW (negative). Downstream classification (createPathGroups, STL
+ * extrusion) relies on this instead of ray-cast heuristics. Cutout circles are
+ * emitted CCW to match.
  *
  * Because all endpoints live on a half-integer subgrid (multiples of 0.5) we
  * can represent coordinates exactly as multiples of 0.5 and use integer keys
@@ -44,13 +51,13 @@ import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 // ---------------------------------------------------------------------------
 
 /** A point stored as 2× the subgrid coordinate (always integers). */
-interface Pt {
+export interface Pt {
   x2: number // x * 2
   y2: number // y * 2
 }
 
 /** A straight line segment from `a` to `b`. */
-interface LineEdge {
+export interface LineEdge {
   kind: "line"
   a: Pt
   b: Pt
@@ -63,7 +70,7 @@ interface LineEdge {
  * `sweep` is the SVG sweep-flag (1 = CW, 0 = CCW in screen coordinates
  *  where y+ is down).
  */
-interface ArcEdge {
+export interface ArcEdge {
   kind: "arc"
   a: Pt
   b: Pt
@@ -71,7 +78,7 @@ interface ArcEdge {
   sweep: 0 | 1
 }
 
-type Edge = LineEdge | ArcEdge
+export type Edge = LineEdge | ArcEdge
 
 // ---------------------------------------------------------------------------
 // Debug info
@@ -146,28 +153,23 @@ function edgeToString(e: Edge): string {
 // Arc sweep calculation
 //
 // In SVG / screen space (y+ down), sweep-flag=1 means clockwise.
-// Given arc center, start point, and end point, compute the sweep flag
-// such that the arc traverses the shorter quarter of the circle in the
-// direction consistent with the CW perimeter we want.
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the SVG sweep flag for an arc going from `a` to `b` around `center`.
+ * Compute the SVG sweep flag for the MINOR arc from `a` to `b` around the
+ * geometric circle centre `center`.
  *
- * The cross-product of (a→center) × (a→b) tells us which side of the line AB
- * the center is on. If center is to the LEFT of a→b the arc is CCW (sweep=0);
- * if center is to the RIGHT the arc is CW (sweep=1).
+ * The cross product of (center − a) × (b − a) tells us which side of the
+ * chord a→b the centre is on. If the centre is to the left (cross < 0 in
+ * y-down screen coords), the short way around it is clockwise (sweep=1).
  */
-function arcSweep(a: Pt, b: Pt, center: Pt): 0 | 1 {
-  // Cross product of (center - a) × (b - a), z-component.
-  // In screen space (y+ down), positive cross product means center is to the RIGHT
-  // of the directed line a→b, which corresponds to CW traversal (sweep=1 in SVG).
+function minorArcSweep(a: Pt, b: Pt, center: Pt): 0 | 1 {
   const acx = center.x2 - a.x2
   const acy = center.y2 - a.y2
   const abx = b.x2 - a.x2
   const aby = b.y2 - a.y2
   const cross = acx * aby - acy * abx
-  return cross > 0 ? 1 : 0
+  return cross < 0 ? 1 : 0
 }
 
 // ---------------------------------------------------------------------------
@@ -237,21 +239,35 @@ function getQuadrantCorners(
 // ---------------------------------------------------------------------------
 // Primitive → perimeter edges
 //
-// For each BlobPrimitive, emit the CW-oriented perimeter of the filled shape.
+// ORIENTATION INVARIANT: every primitive emits the perimeter of its filled
+// region traversed CLOCKWISE in screen coordinates (y+ down), i.e. with the
+// filled region on the RIGHT of the direction of travel.
 //
-// relOffset = (renderQuadrant - quadrant) mod 4 determines which corner of the
-// local quadrant box is the "outer" (arc) corner:
-//   relOffset 0 → outer = BR  (natural orientation)
-//   relOffset 1 → outer = BL
-//   relOffset 2 → outer = TL
-//   relOffset 3 → outer = TR
+// Because boundary edges survive deduplication exactly once (in their emitted
+// direction) and stitching follows stored directions, the final loops carry
+// meaningful winding: outer boundaries are CW (positive shoelace area in SVG
+// coords) and hole boundaries are CCW (negative). Downstream consumers
+// (createPathGroups, the STL extruder) classify outer-vs-hole purely from
+// this winding — no ray-cast heuristics.
 //
-// roundedCorner (convex): arc from TR→BL curving toward the outer corner;
-//   two straight edges TL→TR and BL→TL.
+// Corner roles per quadrant (see getQuadrantCorners): TL is the cell centre,
+// BR the outer corner, TR/BL the two edge midpoints. In screen space the
+// cycle TL→TR→BR→BL is clockwise for every quadrant.
 //
-// diagonalBridge (concave): same arc geometry as convex but OPPOSITE sweep
-//   (fills the triangular corner region); two straight edges through the
-//   outer corner: BL→BR and BR→TR (at relOffset 0, etc.)
+// relOffset = (renderQuadrant - quadrant) mod 4 rotates which corner plays
+// the "disc centre" role c — the corner the quarter-circle arc is centred on:
+//   relOffset 0 → c=TL, 1 → c=TR, 2 → c=BR, 3 → c=BL
+//
+// roundedCorner: fills the quarter-disc centred on c.
+//   CW perimeter: line c→next(c), arc next(c)→prev(c) around c, line prev(c)→c
+// diagonalBridge: fills the quadrant box MINUS that same quarter-disc (the
+//   concave wedge at the corner opposite c).
+//   CW perimeter: arc prev(c)→next(c) around c, line next(c)→opposite(c),
+//   line opposite(c)→prev(c)
+//
+// A roundedCorner arc and an adjacent diagonalBridge arc at the same location
+// are the same quarter-circle traversed in opposite directions, so they
+// cancel during deduplication.
 // ---------------------------------------------------------------------------
 
 function getRelOffset(primitive: BlobPrimitive): number {
@@ -260,9 +276,13 @@ function getRelOffset(primitive: BlobPrimitive): number {
 }
 
 /**
- * Emit the CW-oriented perimeter edges for a single BlobPrimitive.
+ * Emit the CW-oriented (filled-on-the-right) perimeter edges for a single
+ * BlobPrimitive. ArcEdge.center is always the geometric circle centre.
+ *
+ * Exported for the winding-orientation tests, which assert the CW invariant
+ * for every primitive type × quadrant × relOffset combination.
  */
-function primitiveToEdges(primitive: BlobPrimitive): Edge[] {
+export function primitiveToEdges(primitive: BlobPrimitive): Edge[] {
   const { TL, TR, BR, BL } = getQuadrantCorners(
     primitive.center.x,
     primitive.center.y,
@@ -270,7 +290,7 @@ function primitiveToEdges(primitive: BlobPrimitive): Edge[] {
   )
 
   if (primitive.type === "rectangle") {
-    // Full quadrant box: TL→TR→BR→BL→TL
+    // Full quadrant box: TL→TR→BR→BL→TL (CW)
     return [
       { kind: "line", a: TL, b: TR },
       { kind: "line", a: TR, b: BR },
@@ -280,125 +300,40 @@ function primitiveToEdges(primitive: BlobPrimitive): Edge[] {
   }
 
   const relOffset = getRelOffset(primitive)
+  const cycle = [TL, TR, BR, BL] // clockwise corner cycle
+  const c = cycle[relOffset] // disc centre (geometric arc centre)
+  const next = cycle[(relOffset + 1) % 4]
+  const prev = cycle[(relOffset + 3) % 4]
 
   if (primitive.type === "roundedCorner") {
-    // Convex arc: the arc bulges outward (away from TL, toward BR).
-    // Arc center is BR (the outer corner), radius = 0.5.
-    // arcSweep(TR, BL, BR) returns 1 (CW = concave), so we XOR to get 0 (CCW = convex).
-    switch (relOffset) {
-      case 0:
-        // outer=BR: arc TR→BL (CCW, convex toward BR), lines TL→TR and BL→TL
-        return [
-          { kind: "line", a: TL, b: TR },
-          {
-            kind: "arc",
-            a: TR,
-            b: BL,
-            center: BR,
-            sweep: (1 - (arcSweep(TR, BL, BR) ^ 1)) as 0 | 1,
-          },
-          { kind: "line", a: BL, b: TL },
-        ]
-      case 1:
-        // outer=BL: arc TL→BR (CCW, convex toward BL), lines TR→TL and BR→TR
-        return [
-          { kind: "line", a: TR, b: TL },
-          {
-            kind: "arc",
-            a: TL,
-            b: BR,
-            center: BL,
-            sweep: (1 - (arcSweep(TL, BR, BL) ^ 1)) as 0 | 1,
-          },
-          { kind: "line", a: BR, b: TR },
-        ]
-      case 2:
-        // outer=TL: arc BL→TR (CCW, convex toward TL), lines BR→BL and TR→BR
-        return [
-          { kind: "line", a: BR, b: BL },
-          {
-            kind: "arc",
-            a: BL,
-            b: TR,
-            center: TL,
-            sweep: (1 - (arcSweep(BL, TR, TL) ^ 1)) as 0 | 1,
-          },
-          { kind: "line", a: TR, b: BR },
-        ]
-      case 3:
-        // outer=TR: arc BR→TL (CCW, convex toward TR), lines BL→BR and TL→BL
-        return [
-          { kind: "line", a: BL, b: BR },
-          {
-            kind: "arc",
-            a: BR,
-            b: TL,
-            center: TR,
-            sweep: (1 - (arcSweep(BR, TL, TR) ^ 1)) as 0 | 1,
-          },
-          { kind: "line", a: TL, b: BL },
-        ]
-    }
+    // Quarter-disc centred on c, traversed CW.
+    return [
+      { kind: "line", a: c, b: next },
+      {
+        kind: "arc",
+        a: next,
+        b: prev,
+        center: c,
+        sweep: minorArcSweep(next, prev, c),
+      },
+      { kind: "line", a: prev, b: c },
+    ]
   }
 
   if (primitive.type === "diagonalBridge") {
-    // Concave: fills the outer triangular corner region.
-    // Arc center is BR (the outer corner); arcSweep returns 1 (CW = concave inward).
-    // Then two straight lines through the outer corner complete the shape.
-    switch (relOffset) {
-      case 0:
-        // outer=BR: arc TR→BL (CW, concave toward BR), then BL→BR→TR
-        return [
-          {
-            kind: "arc",
-            a: TR,
-            b: BL,
-            center: BR,
-            sweep: arcSweep(TR, BL, BR),
-          },
-          { kind: "line", a: BL, b: BR },
-          { kind: "line", a: BR, b: TR },
-        ]
-      case 1:
-        // outer=BL: arc TL→BR (CW, concave toward BL), then BR→BL→TL
-        return [
-          {
-            kind: "arc",
-            a: TL,
-            b: BR,
-            center: BL,
-            sweep: arcSweep(TL, BR, BL),
-          },
-          { kind: "line", a: BR, b: BL },
-          { kind: "line", a: BL, b: TL },
-        ]
-      case 2:
-        // outer=TL: arc BL→TR (CW, concave toward TL), then TR→TL→BL
-        return [
-          {
-            kind: "arc",
-            a: BL,
-            b: TR,
-            center: TL,
-            sweep: arcSweep(BL, TR, TL),
-          },
-          { kind: "line", a: TR, b: TL },
-          { kind: "line", a: TL, b: BL },
-        ]
-      case 3:
-        // outer=TR: arc BR→TL (CW, concave toward TR), then TL→TR→BR
-        return [
-          {
-            kind: "arc",
-            a: BR,
-            b: TL,
-            center: TR,
-            sweep: arcSweep(BR, TL, TR),
-          },
-          { kind: "line", a: TL, b: TR },
-          { kind: "line", a: TR, b: BR },
-        ]
-    }
+    // Quadrant box minus the quarter-disc centred on c, traversed CW.
+    const outer = cycle[(relOffset + 2) % 4]
+    return [
+      {
+        kind: "arc",
+        a: prev,
+        b: next,
+        center: c,
+        sweep: minorArcSweep(prev, next, c),
+      },
+      { kind: "line", a: next, b: outer },
+      { kind: "line", a: outer, b: prev },
+    ]
   }
 
   return []
@@ -407,9 +342,11 @@ function primitiveToEdges(primitive: BlobPrimitive): Edge[] {
 // ---------------------------------------------------------------------------
 // Edge deduplication
 //
-// Each edge is keyed canonically (sorted endpoints). A line appearing twice
-// (contributed by two adjacent filled regions in opposite orientations) is an
-// internal edge → cancel both. Similarly for arcs.
+// Each edge is keyed canonically (sorted endpoints; arcs also by geometric
+// centre). Because primitives emit filled-on-the-right perimeters, an edge
+// shared by two adjacent filled regions is contributed once in each direction
+// — net zero → internal, removed. A boundary edge has a non-zero net and is
+// emitted in its net direction, preserving the orientation invariant.
 // ---------------------------------------------------------------------------
 
 function lineKey(a: Pt, b: Pt): string {
@@ -426,50 +363,56 @@ function arcKey(a: Pt, b: Pt, center: Pt): string {
 }
 
 /**
- * Deduplicate edges: cancel internal edges that appear an even number of times.
- * Returns only boundary edges (odd count).
+ * Deduplicate edges by net orientation: an edge traversed equally often in
+ * both directions is internal (cancelled); otherwise it is a boundary edge,
+ * emitted once in its net direction. This preserves the filled-on-the-right
+ * orientation invariant established by primitiveToEdges.
  */
 function deduplicateEdges(edges: Edge[], debugMode: boolean): Edge[] {
-  const counts = new Map<string, number>()
-  const representatives = new Map<string, Edge>()
+  interface Tally {
+    net: number
+    /** Representative oriented in the canonical (+1) direction. */
+    forward: Edge
+  }
+  const tallies = new Map<string, Tally>()
 
   for (const edge of edges) {
-    let key: string
+    const key =
+      edge.kind === "line"
+        ? lineKey(edge.a, edge.b)
+        : arcKey(edge.a, edge.b, edge.center)
+    const sign = ptKey(edge.a) < ptKey(edge.b) ? 1 : -1
 
-    if (edge.kind === "line") {
-      key = lineKey(edge.a, edge.b)
-    } else {
-      key = arcKey(edge.a, edge.b, edge.center)
+    let tally = tallies.get(key)
+    if (!tally) {
+      tally = { net: 0, forward: sign === 1 ? edge : orientEdgeFrom(edge, true) }
+      tallies.set(key, tally)
     }
-
-    const prev = counts.get(key) ?? 0
-    counts.set(key, prev + 1)
-
-    if (!representatives.has(key)) {
-      representatives.set(key, edge)
-    }
-  }
-
-  if (debugMode) {
-    let cancelled = 0
-    for (const [key, count] of counts) {
-      if (count % 2 === 0) {
-        cancelled += count
-        console.log(
-          `[SvgPathRenderer] CANCEL (×${count}): ${edgeToString(representatives.get(key)!)}`,
-        )
-      }
-    }
-    console.log(
-      `[SvgPathRenderer] dedup: ${edges.length} total → ${cancelled} cancelled → ${edges.length - cancelled} boundary`,
-    )
+    tally.net += sign
   }
 
   const result: Edge[] = []
-  for (const [key, count] of counts) {
-    if (count % 2 === 1) {
-      result.push(representatives.get(key)!)
+  let cancelled = 0
+  for (const { net, forward } of tallies.values()) {
+    if (net === 0) {
+      cancelled++
+      if (debugMode) {
+        console.log(`[SvgPathRenderer] CANCEL: ${edgeToString(forward)}`)
+      }
+      continue
     }
+    if (debugMode && Math.abs(net) > 1) {
+      console.warn(
+        `[SvgPathRenderer] edge with |net|=${Math.abs(net)} (overlapping primitives?): ${edgeToString(forward)}`,
+      )
+    }
+    result.push(net > 0 ? forward : orientEdgeFrom(forward, true))
+  }
+
+  if (debugMode) {
+    console.log(
+      `[SvgPathRenderer] dedup: ${edges.length} total → ${cancelled} cancelled keys → ${result.length} boundary`,
+    )
   }
 
   return result
@@ -619,14 +562,29 @@ function stitchEdgesIntoPaths(edges: Edge[], debugMode: boolean): Edge[][] {
         const incomingAngle = edgeDepartureAngle(path[path.length - 1])
 
         // Collect all unused candidates as oriented edges with their CW turn.
-        type Candidate = { idx: number; oriented: Edge; turn: number }
-        const viable: Candidate[] = []
+        //
+        // Orientation invariant: boundary edges are stored filled-on-the-right,
+        // so the correct continuation always departs from currentEnd without
+        // flipping. Flipped candidates are kept only as a defensive fallback
+        // (they indicate an orientation bug upstream).
+        type Candidate = { idx: number; oriented: Edge; turn: number; flip: boolean }
+        let viable: Candidate[] = []
 
         for (const { idx, flip } of candidates) {
           if (used[idx]) continue
           const oriented = orientEdgeFrom(edges[idx], flip)
           const turn = cwTurnAngle(incomingAngle, edgeDepartureAngle(oriented))
-          viable.push({ idx, oriented, turn })
+          viable.push({ idx, oriented, turn, flip })
+        }
+
+        const unflipped = viable.filter((v) => !v.flip)
+        if (unflipped.length > 0 && unflipped.length < viable.length) {
+          if (debugMode) {
+            console.warn(
+              `[SvgPathRenderer] ignoring ${viable.length - unflipped.length} flipped candidate(s) at ${ptToString(currentEnd)}`,
+            )
+          }
+          viable = unflipped
         }
 
         if (viable.length > 0) {

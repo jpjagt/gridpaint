@@ -77,7 +77,16 @@ function EditorPage() {
   return (
     <div className='w-screen h-screen overflow-hidden relative'>
       <SaveStatusBanner />
-      <GridPaintCanvas ref={canvasRef} drawingId={drawingId!} />
+      {/*
+        key={drawingId} forces a full remount when switching between drawings.
+        GridPaintCanvas (and its hooks) hold per-instance state that is NOT
+        re-initialized on a prop change alone — notably useDrawingState's
+        initRef guard, which only ever calls initializeDrawingState once, plus
+        non-React state like the blob engine cache and renderer. Without the key,
+        opening a second drawing reuses the first instance, skips re-init, and
+        leaves the canvas blank/dark. Remounting resets all of it cleanly.
+      */}
+      <GridPaintCanvas key={drawingId} ref={canvasRef} drawingId={drawingId!} />
       {/* Image import overlay renders above the canvas when active */}
       <ImageImportOverlay />
       <LayerControls

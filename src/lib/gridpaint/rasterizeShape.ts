@@ -111,11 +111,25 @@ export function rebuildShapeFloatState<T extends ShapeFloatState>(
   }
 }
 
+/**
+ * At/above this exponent the superellipse is treated as a true sharp rectangle
+ * (full bbox). A finite `Math.pow` superellipse never fully includes the corners
+ * for large shapes — the required n grows with size — so a sharp rectangle needs
+ * this explicit cutoff rather than "a big number".
+ */
+export const SHARP_RECT_EXPONENT = 16
+
 /** Cells whose center satisfies |nx|^n + |ny|^n <= 1 for the w×h bbox. */
 function superellipseFillCells(w: number, h: number, n: number): Set<string> {
+  const cells = new Set<string>()
+  // Sharp rectangle: fill the whole bbox (corners included at any size).
+  if (n >= SHARP_RECT_EXPONENT) {
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) cells.add(`${x},${y}`)
+    return cells
+  }
   const a = w / 2
   const b = h / 2
-  const cells = new Set<string>()
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const nx = Math.abs((x + 0.5 - a) / a)

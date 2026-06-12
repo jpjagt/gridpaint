@@ -1,6 +1,8 @@
 import { useCallback } from "react"
 import type { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
 import type { FloatingPaste } from "@/stores/ui"
+import type { ShapeHandle } from "@/types/gridpaint"
+import { SHAPE_HANDLE_IDS } from "@/types/gridpaint"
 import { renderDashedRect } from "@/lib/gridpaint/renderDashedRect"
 import { $canvasView } from "@/stores/drawingStores"
 import { getLayerFillColor } from "@/lib/gridpaint/layerColors"
@@ -52,7 +54,9 @@ export const useSelectionRenderer = () => {
   const renderFloatingPaste = useCallback((
     renderer: Canvas2DRenderer,
     floatingPaste: FloatingPaste,
-    canvasView: { zoom: number, panOffset: { x: number, y: number }, gridSize: number }
+    canvasView: { zoom: number, panOffset: { x: number, y: number }, gridSize: number },
+    /** Compass id of the handle currently hovered or being dragged, if any. */
+    activeHandle: ShapeHandle | null = null,
   ) => {
     if (!renderer.context) return
 
@@ -110,7 +114,8 @@ export const useSelectionRenderer = () => {
 
     // Resize handles — only for shape floats.
     if (floatingPaste.shape && boundsMinX !== Infinity) {
-      const handleColor = getCanvasColor("--canvas-outline-active")
+      const borderColor = getCanvasColor("--canvas-outline-active")
+      const insideColor = getCanvasColor("--foreground")
       const hx0 = boundsMinX * gs
       const hy0 = boundsMinY * gs
       const hx1 = (boundsMaxX + 1) * gs
@@ -119,15 +124,32 @@ export const useSelectionRenderer = () => {
       const hcy = (hy0 + hy1) / 2
       const handleSize = 8 / canvasView.zoom
       const handleHalf = handleSize / 2
+      const border = 2 / canvasView.zoom
+      // Ordered to match SHAPE_HANDLE_IDS.
       const handlePositions: [number, number][] = [
         [hx0, hy0], [hcx, hy0], [hx1, hy0],
         [hx0, hcy],             [hx1, hcy],
         [hx0, hy1], [hcx, hy1], [hx1, hy1],
       ]
-      ctx.fillStyle = handleColor
-      for (const [px, py] of handlePositions) {
-        ctx.fillRect(px - handleHalf, py - handleHalf, handleSize, handleSize)
-      }
+      handlePositions.forEach(([px, py], i) => {
+        const x = px - handleHalf
+        const y = py - handleHalf
+        if (SHAPE_HANDLE_IDS[i] === activeHandle) {
+          // Hovered/active: foreground fill on the inside with a 2px border.
+          ctx.fillStyle = borderColor
+          ctx.fillRect(x, y, handleSize, handleSize)
+          ctx.fillStyle = insideColor
+          ctx.fillRect(
+            x + border,
+            y + border,
+            handleSize - border * 2,
+            handleSize - border * 2,
+          )
+        } else {
+          ctx.fillStyle = borderColor
+          ctx.fillRect(x, y, handleSize, handleSize)
+        }
+      })
     }
 
     ctx.restore()

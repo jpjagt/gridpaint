@@ -56,12 +56,13 @@ export default function Home() {
       // Get the drawing from Firestore
       const drawing = await drawingStore.get(drawingId)
       if (!drawing) {
-        toast.error('Drawing not found')
+        toast.error("Drawing not found")
         return
       }
 
       // Create a new ID for the duplicate
-      const newId = crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
+      const newId =
+        crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
       const newDrawing = {
         ...drawing,
         id: newId,
@@ -76,13 +77,13 @@ export default function Home() {
       // Reload drawings list (sorted)
       await refreshDrawings()
 
-      toast.success('Drawing imported successfully!')
-      
+      toast.success("Drawing imported successfully!")
+
       // Navigate to the new drawing
       window.location.hash = `/grids/${newId}`
     } catch (error) {
-      console.error('Error importing drawing:', error)
-      toast.error('Failed to import drawing')
+      console.error("Error importing drawing:", error)
+      toast.error("Failed to import drawing")
     }
   }
 
@@ -92,22 +93,26 @@ export default function Home() {
         <h1 className='text-2xl font-medium'>your grids</h1>
         <div className='flex gap-2'>
           {authState.isAuthenticated && (
-            <Button 
-              onClick={() => setShowImportDialog(true)} 
+            <Button
+              onClick={() => setShowImportDialog(true)}
               variant='outline'
               className='flex items-center'
             >
               <Download className='mr-2 w-4 h-4' /> import
             </Button>
           )}
-          <Button 
+          <Button
             onClick={() => setShowPassphraseModal(true)}
             variant='outline'
             className='flex items-center'
-            title={authState.isAuthenticated ? 'Change passphrase' : 'Set passphrase for cloud sync'}
+            title={
+              authState.isAuthenticated
+                ? "Change passphrase"
+                : "Set passphrase for cloud sync"
+            }
           >
             <User className='mr-2 w-4 h-4' />
-            {authState.isAuthenticated ? 'account' : 'login'}
+            {authState.isAuthenticated ? "account" : "login"}
           </Button>
           <Button onClick={createNew} className='flex items-center'>
             <Plus className='mr-2 w-4 h-4' /> new grid
@@ -122,7 +127,7 @@ export default function Home() {
                 key={key}
                 className='rounded-lg border border-border bg-card shadow-sm'
               >
-                <div className='aspect-square p-4'>
+                <div className='aspect-[16/9] p-4'>
                   <Skeleton className='w-full h-full rounded' />
                 </div>
                 <div className='p-3 border-t border-border space-y-2'>
@@ -138,7 +143,7 @@ export default function Home() {
                   className='group relative bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow'
                 >
                   {/* Preview */}
-                  <div className='aspect-square p-4'>
+                  <div className='aspect-[16/9] p-4'>
                     {drawing.thumbnail ? (
                       <img
                         src={drawing.thumbnail}
@@ -167,7 +172,7 @@ export default function Home() {
 
                   {/* Delete button */}
                   <button
-                    type="button"
+                    type='button'
                     onClick={(e) => {
                       e.preventDefault()
                       setDeleteDialogId(drawing.id)
@@ -230,17 +235,17 @@ export default function Home() {
         onSuccess={async (result) => {
           enableCloudSync(result.userId, result.writeToken)
           setShowPassphraseModal(false)
-          
+
           // Sync existing LocalStorage drawings to cloud
           try {
-            toast.info('Syncing drawings to cloud...')
+            toast.info("Syncing drawings to cloud...")
             await forceSyncNow()
-            toast.success('Drawings synced successfully!')
+            toast.success("Drawings synced successfully!")
           } catch (error) {
-            console.error('Failed to sync drawings:', error)
-            toast.error('Failed to sync some drawings')
+            console.error("Failed to sync drawings:", error)
+            toast.error("Failed to sync some drawings")
           }
-          
+
           // Reload drawings to include cloud drawings
           await refreshDrawings()
         }}

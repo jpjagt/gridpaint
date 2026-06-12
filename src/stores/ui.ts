@@ -114,14 +114,14 @@ export interface ShapeToolSettings {
   shape: ShapeKind
   style: ShapeStyle
   /** Superellipse exponent per kind so each remembers its own slider value. */
-  rectExponent: number    // default 8 (sharp corners); lower = rounder (min 3)
+  rectExponent: number    // default 16 = sharp rect; lower = rounder corners (min 3)
   ellipseExponent: number // default 2 (true ellipse); 1 = diamond, up to 6 boxy
 }
 
 export const $shapeToolSettings = map<ShapeToolSettings>({
   shape: "rectangle",
   style: "fill",
-  rectExponent: 8,
+  rectExponent: 16, // SHARP_RECT_EXPONENT — a true sharp-cornered rectangle
   ellipseExponent: 2,
 })
 

@@ -2,12 +2,12 @@ import { useState, useCallback } from "react"
 import { toast } from "sonner"
 import { useStore } from "@nanostores/react"
 import { $layersState, updateGroupPoints, updatePointModifications } from "@/stores/drawingStores"
-import { $selectionState, $shapeToolSettings, activeShapeExponent } from "@/stores/ui"
+import { $selectionState, $shapeToolSettings, activeShapeExponent, $activeGroupIndex } from "@/stores/ui"
 import type { SerializedPointModifications } from "@/lib/storage/types"
 import { buildShapeClipboard, rebuildShapeFloatState } from "@/lib/gridpaint/rasterizeShape"
 
 export type { SelectionBounds, ClipboardGroup, ClipboardLayer, ClipboardData } from "@/types/gridpaint"
-import type { SelectionBounds, ClipboardGroup, ClipboardLayer, ClipboardData, ShapeMeta } from "@/types/gridpaint"
+import type { ClipboardGroup, ClipboardLayer, ClipboardData, ShapeMeta } from "@/types/gridpaint"
 
 /**
  * Parse clipboard text and, if it looks like a gridpaint selection, return the
@@ -245,7 +245,13 @@ export const useSelection = () => {
       if (activeLayerId == null) return
       const layer = layers.find((l) => l.id === activeLayerId)
       if (!layer) return
-      const groupId = layer.groups[0]?.id ?? "default"
+      // Target the active group (same resolution as the draw tool) so the
+      // committed shape lands where the user is working.
+      const groupIdx = Math.min(
+        $activeGroupIndex.get(),
+        layer.groups.length - 1,
+      )
+      const groupId = layer.groups[Math.max(0, groupIdx)]?.id ?? "default"
       const settings = $shapeToolSettings.get()
       const { shape, style } = settings
       const exponent = activeShapeExponent(settings)

@@ -14,9 +14,9 @@ import { createExtrudeGeometryFromSvg } from "./pathToShape"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 
-export type LayerThickness = 0.5 | 1 | 1.5
+export type LayerThickness = 0.5 | 1 | 1.5 | 2.0
 
-export const LAYER_THICKNESS_OPTIONS: LayerThickness[] = [0.5, 1, 1.5]
+export const LAYER_THICKNESS_OPTIONS: LayerThickness[] = [0.5, 1, 1.5, 2.0]
 
 export interface LayeredModelOptions {
   layers: Layer[]
@@ -37,8 +37,14 @@ export interface LayeredModelResult {
 export function createLayeredModel(
   options: LayeredModelOptions,
 ): LayeredModelResult | null {
-  const { layers, exportRect, canvasView, layerThickness, reverseLayers, includeCutouts = true } =
-    options
+  const {
+    layers,
+    exportRect,
+    canvasView,
+    layerThickness,
+    reverseLayers,
+    includeCutouts = true,
+  } = options
   const { gridSize, borderWidth, mmPerUnit } = canvasView
 
   const effectiveMmPerUnit =
@@ -72,7 +78,12 @@ export function createLayeredModel(
       gridLayer,
       gridSize,
       borderWidth,
-      { strokeColor: "#000", strokeWidth: 0.1, fillColor: "transparent", includeCutouts },
+      {
+        strokeColor: "#000",
+        strokeWidth: 0.1,
+        fillColor: "transparent",
+        includeCutouts,
+      },
       effectiveMmPerUnit,
     )
 
@@ -110,7 +121,6 @@ export function createLayeredModel(
     group.add(mesh)
 
     currentZ += scaledThickness
-    console.log({ currentZ, scaledThickness })
   }
 
   const boundingBox = new THREE.Box3().setFromObject(group)

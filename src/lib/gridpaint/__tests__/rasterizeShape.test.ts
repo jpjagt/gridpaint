@@ -15,9 +15,9 @@ const makeShapeFloat = () => ({
   lifted: false,
 })
 
-describe("rasterizeShape — rectangle (high exponent)", () => {
-  it("fills every cell of the bbox at n=8", () => {
-    expect(sorted(rasterizeShape("rectangle", "fill", 4, 4, 8))).toEqual(
+describe("rasterizeShape — sharp rectangle (n >= SHARP_RECT_EXPONENT)", () => {
+  it("fills every cell of the bbox at the sharp exponent", () => {
+    expect(sorted(rasterizeShape("rectangle", "fill", 4, 4, 16))).toEqual(
       sorted([
         "0,0","1,0","2,0","3,0",
         "0,1","1,1","2,1","3,1",
@@ -27,12 +27,23 @@ describe("rasterizeShape — rectangle (high exponent)", () => {
     )
   })
 
-  it("1x1 fill is a single cell", () => {
-    expect(rasterizeShape("rectangle", "fill", 1, 1, 8)).toEqual(["0,0"])
+  it("includes the corners even for a LARGE bbox (the rounded-corner bug fix)", () => {
+    // A finite-pow superellipse drops corners as size grows; the sharp cutoff
+    // must keep them. 41x41 corner cell (0,0) was the regression.
+    const set = new Set(rasterizeShape("rectangle", "fill", 41, 41, 16))
+    expect(set.size).toBe(41 * 41)
+    expect(set.has("0,0")).toBe(true)
+    expect(set.has("40,0")).toBe(true)
+    expect(set.has("0,40")).toBe(true)
+    expect(set.has("40,40")).toBe(true)
   })
 
-  it("edge of a full bbox (n=8) equals the rectangle perimeter", () => {
-    expect(sorted(rasterizeShape("rectangle", "edge", 4, 3, 8))).toEqual(
+  it("1x1 fill is a single cell", () => {
+    expect(rasterizeShape("rectangle", "fill", 1, 1, 16)).toEqual(["0,0"])
+  })
+
+  it("edge of a sharp bbox equals the rectangle perimeter", () => {
+    expect(sorted(rasterizeShape("rectangle", "edge", 4, 3, 16))).toEqual(
       sorted([
         "0,0", "1,0", "2,0", "3,0",
         "0,1", "3,1",
@@ -42,9 +53,16 @@ describe("rasterizeShape — rectangle (high exponent)", () => {
   })
 
   it("edge of a thin (height<=2) box equals fill", () => {
-    expect(sorted(rasterizeShape("rectangle", "edge", 4, 2, 8))).toEqual(
-      sorted(rasterizeShape("rectangle", "fill", 4, 2, 8)),
+    expect(sorted(rasterizeShape("rectangle", "edge", 4, 2, 16))).toEqual(
+      sorted(rasterizeShape("rectangle", "fill", 4, 2, 16)),
     )
+  })
+
+  it("a lowered rectangle exponent rounds the corners (slider does something)", () => {
+    const sharp = new Set(rasterizeShape("rectangle", "fill", 11, 11, 16))
+    const rounded = new Set(rasterizeShape("rectangle", "fill", 11, 11, 3))
+    expect(sharp.has("0,0")).toBe(true)    // sharp keeps the corner
+    expect(rounded.has("0,0")).toBe(false) // rounded drops it
   })
 })
 
