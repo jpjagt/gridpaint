@@ -6,6 +6,7 @@ import {
   type GridPaintCanvasMethods,
 } from "@/components/GridPaintCanvas"
 import { GridPaintControls } from "@/components/GridPaintControls"
+import { DrawingSettingsModal } from "@/components/DrawingSettingsModal"
 import { ShortcutsModal } from "@/components/ShortcutsModal"
 import { LayerControls } from "@/components/LayerControls"
 import { ToolSelection } from "@/components/ToolSelection"
@@ -13,7 +14,7 @@ import { ToolOptionsPanel } from "@/components/ToolOptionsPanel"
 import { MeasuringBars } from "@/components/MeasuringBars"
 import { MeasuringTapeOverlay } from "@/components/MeasuringTapeOverlay"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
-import { useImagePaste } from "@/hooks/useImagePaste"
+import { SaveStatusBanner } from "@/components/SaveStatusBanner"
 import { useAuthInit } from "@/hooks/useAuthInit"
 import { drawingStore } from "@/lib/storage/store"
 import {
@@ -33,11 +34,9 @@ function EditorPage() {
   const canvasRef = useRef<GridPaintCanvasMethods>(null)
   const [showMeasuringBars, setShowMeasuringBars] = useState<boolean>(false)
   const [showShortcuts, setShowShortcuts] = useState<boolean>(false)
+  const [showSettings, setShowSettings] = useState<boolean>(false)
   const canvasView = useStore($canvasView)
   const drawingMeta = useStore($drawingMeta)
-
-  // Enable paste-to-import
-  useImagePaste()
 
   // M key: toggle measuring bars overlay
   useEffect(() => {
@@ -59,7 +58,6 @@ function EditorPage() {
 
   // Handlers
   const handleReset = () => canvasRef.current?.reset()
-  const handleDownload = () => canvasRef.current?.saveIMG()
   const handleGridSizeChange = (op: "+" | "-") =>
     canvasRef.current?.setGridSize(op)
   const handleBorderWidthChange = (w: number) =>
@@ -78,7 +76,17 @@ function EditorPage() {
 
   return (
     <div className='w-screen h-screen overflow-hidden relative'>
-      <GridPaintCanvas ref={canvasRef} drawingId={drawingId!} />
+      <SaveStatusBanner />
+      {/*
+        key={drawingId} forces a full remount when switching between drawings.
+        GridPaintCanvas (and its hooks) hold per-instance state that is NOT
+        re-initialized on a prop change alone — notably useDrawingState's
+        initRef guard, which only ever calls initializeDrawingState once, plus
+        non-React state like the blob engine cache and renderer. Without the key,
+        opening a second drawing reuses the first instance, skips re-init, and
+        leaves the canvas blank/dark. Remounting resets all of it cleanly.
+      */}
+      <GridPaintCanvas key={drawingId} ref={canvasRef} drawingId={drawingId!} />
       {/* Image import overlay renders above the canvas when active */}
       <ImageImportOverlay />
       <LayerControls
@@ -90,7 +98,6 @@ function EditorPage() {
       />
       <GridPaintControls
         onReset={handleReset}
-        onDownload={handleDownload}
         onGridSizeChange={handleGridSizeChange}
         onBorderWidthChange={handleBorderWidthChange}
         onMmPerUnitChange={handleMmPerUnitChange}
@@ -103,10 +110,18 @@ function EditorPage() {
         showMeasuringBars={showMeasuringBars}
         onToggleMeasuringBars={() => setShowMeasuringBars((v) => !v)}
         onShowShortcuts={() => setShowShortcuts(true)}
+        onShowSettings={() => setShowSettings(true)}
       />
       <ShortcutsModal
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
+      />
+      <DrawingSettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        drawingId={drawingId!}
+        drawingName={drawingMeta.name}
+        onDeleted={() => navigate("/")}
       />
       <ToolSelection />
       <ToolOptionsPanel />

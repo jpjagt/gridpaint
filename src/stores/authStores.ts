@@ -5,7 +5,7 @@
  */
 
 import { atom } from 'nanostores'
-import type { AuthState, SyncStatus } from '@/types/auth'
+import type { AuthState, SyncStatus, SaveStatus } from '@/types/auth'
 
 /**
  * Authentication state
@@ -27,6 +27,20 @@ export const $syncStatus = atom<SyncStatus>({
   lastSyncAt: null,
   error: null,
 })
+
+/**
+ * Local save status. `failed: true` means the latest local (IndexedDB) write
+ * did not persist. Drives a persistent editor banner so a failed save is never
+ * silent; it clears when a subsequent save succeeds.
+ */
+export const $saveStatus = atom<SaveStatus>({
+  failed: false,
+  error: null,
+})
+
+export function setSaveStatus(status: Partial<SaveStatus>): void {
+  $saveStatus.set({ ...$saveStatus.get(), ...status })
+}
 
 /**
  * Update auth state (helper)

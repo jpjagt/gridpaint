@@ -24,6 +24,8 @@ export interface ExportStlOptions {
   canvasView: CanvasViewState
   layerThickness: LayerThickness
   reverseLayers: boolean
+  /** When false, cutout holes are omitted from the extruded geometry. Defaults to true. */
+  includeCutouts?: boolean
   /** Base filename (without extension). Defaults to "model". */
   fileName?: string
 }
@@ -43,6 +45,7 @@ export function exportStl(options: ExportStlOptions): boolean {
     canvasView,
     layerThickness,
     reverseLayers,
+    includeCutouts = true,
     fileName = "model",
   } = options
 
@@ -73,6 +76,7 @@ export function exportStl(options: ExportStlOptions): boolean {
     canvasView: scaledCanvasView,
     layerThickness,
     reverseLayers,
+    includeCutouts,
   })
 
   if (!result) return false

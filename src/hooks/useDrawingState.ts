@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react"
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import {
   $loadingState,
   $drawingMeta,
@@ -22,8 +22,15 @@ function useDrawingState(drawingId: string) {
   const initRef = useRef(false)
   const persistenceEnabledRef = useRef(false)
 
-  // Initialize drawing state on mount
-  useEffect(() => {
+  // Initialize drawing state on mount.
+  //
+  // useLayoutEffect (not useEffect) so that when this hook mounts for a new
+  // drawing — e.g. after the key-driven remount that happens when switching
+  // drawings — initializeDrawingState() flips the global loadingState store to
+  // "loading" before the browser paints. The store may still read "ready" from
+  // the previously-open drawing, and a plain useEffect would let the canvas
+  // paint that stale state for one frame first.
+  useLayoutEffect(() => {
     if (!initRef.current && drawingId) {
       initRef.current = true
       initializeDrawingState(drawingId).then(() => {

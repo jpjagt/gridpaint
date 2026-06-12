@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { drawingStore } from "@/lib/storage/store"
-import type { DrawingMetadata, DrawingDocument } from "@/lib/storage/types"
+import type { DrawingMetadata } from "@/lib/storage/types"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Trash2, Download, User } from "lucide-react"
@@ -10,90 +10,6 @@ import { useStore } from "@nanostores/react"
 import { $authState } from "@/stores/authStores"
 import { enableCloudSync, forceSyncNow } from "@/lib/storage/storage-manager"
 import { toast } from "sonner"
-
-// Generate a simple preview thumbnail from drawing data
-function generatePreview(drawing: DrawingDocument): string {
-  try {
-    const size = 120
-    const canvas = document.createElement("canvas")
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext("2d")!
-
-    // Background
-    ctx.fillStyle = "#ffffff"
-    ctx.fillRect(0, 0, size, size)
-
-    // Find bounds of all points
-    const allPoints: string[] = drawing.layers
-      .filter((layer) => layer.isVisible)
-      .flatMap((layer) => {
-        const pts: string[] = []
-        for (const group of layer.groups) {
-          for (const p of group.points) pts.push(p)
-        }
-        return pts
-      })
-
-    if (allPoints.length === 0) {
-      // Empty drawing - show grid pattern
-      ctx.strokeStyle = "#f0f0f0"
-      ctx.lineWidth = 1
-      const gridSpacing = size / 8
-      for (let i = 0; i <= 8; i++) {
-        const pos = i * gridSpacing
-        ctx.beginPath()
-        ctx.moveTo(pos, 0)
-        ctx.lineTo(pos, size)
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(0, pos)
-        ctx.lineTo(size, pos)
-        ctx.stroke()
-      }
-      return canvas.toDataURL()
-    }
-
-    const coords = allPoints.map((point) => {
-      const [x, y] = point.split(",").map(Number)
-      return { x, y }
-    })
-
-    // Use reduce instead of spread to avoid call stack overflow on large drawings
-    let minX = coords[0].x, maxX = coords[0].x
-    let minY = coords[0].y, maxY = coords[0].y
-    for (const { x, y } of coords) {
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-    }
-
-    const rangeX = maxX - minX || 1
-    const rangeY = maxY - minY || 1
-    const padding = 10
-    const scale = (size - padding * 2) / Math.max(rangeX, rangeY)
-
-    // Draw points
-    ctx.fillStyle = "#000000"
-    coords.forEach(({ x, y }) => {
-      const pixelX = padding + (x - minX) * scale
-      const pixelY = padding + (y - minY) * scale
-      ctx.fillRect(
-        pixelX,
-        pixelY,
-        Math.max(1, scale * 0.8),
-        Math.max(1, scale * 0.8),
-      )
-    })
-
-    return canvas.toDataURL()
-  } catch (err) {
-    console.error("Failed to generate preview", err)
-    // Return a blank 1x1 transparent PNG as fallback
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-  }
-}
 
 /**
  * Home
@@ -107,33 +23,22 @@ function generatePreview(drawing: DrawingDocument): string {
  */
 export default function Home() {
   const [drawings, setDrawings] = useState<DrawingMetadata[]>([])
-  const [fullDrawings, setFullDrawings] = useState<DrawingDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [showPassphraseModal, setShowPassphraseModal] = useState(false)
   const authState = useStore($authState)
 
-  useEffect(() => {
-    async function loadDrawings() {
-      setIsLoading(true)
-      const metadata = await drawingStore.list()
-      // Sort by last modified descending
-      const sorted = [...metadata].sort((a, b) => b.updatedAt - a.updatedAt)
-      setDrawings(sorted)
-
-      // Load full drawing documents for previews
-      const fullDocs = await Promise.all(
-        sorted.map(async (meta) => {
-          const doc = await drawingStore.get(meta.id)
-          return doc
-        }),
-      )
-      setFullDrawings(fullDocs.filter(Boolean) as DrawingDocument[])
-      setIsLoading(false)
-    }
-    loadDrawings()
+  // Load metadata and set the list sorted by last-modified descending.
+  const refreshDrawings = useCallback(async () => {
+    const metadata = await drawingStore.list()
+    setDrawings([...metadata].sort((a, b) => b.updatedAt - a.updatedAt))
   }, [])
+
+  useEffect(() => {
+    setIsLoading(true)
+    refreshDrawings().finally(() => setIsLoading(false))
+  }, [refreshDrawings])
 
   const createNew = () => {
     const id = crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
@@ -143,7 +48,6 @@ export default function Home() {
   const handleDelete = async (id: string) => {
     await drawingStore.delete(id)
     setDrawings(drawings.filter((d) => d.id !== id))
-    setFullDrawings(fullDrawings.filter((d) => d.id !== id))
     setDeleteDialogId(null)
   }
 
@@ -152,12 +56,13 @@ export default function Home() {
       // Get the drawing from Firestore
       const drawing = await drawingStore.get(drawingId)
       if (!drawing) {
-        toast.error('Drawing not found')
+        toast.error("Drawing not found")
         return
       }
 
       // Create a new ID for the duplicate
-      const newId = crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
+      const newId =
+        crypto.randomUUID?.() ?? Math.random().toString(36).substr(2, 9)
       const newDrawing = {
         ...drawing,
         id: newId,
@@ -168,18 +73,17 @@ export default function Home() {
 
       // Save the duplicate
       await drawingStore.save(newDrawing)
-      
-      // Reload drawings list
-      const metadata = await drawingStore.list()
-      setDrawings(metadata)
-      
-      toast.success('Drawing imported successfully!')
-      
+
+      // Reload drawings list (sorted)
+      await refreshDrawings()
+
+      toast.success("Drawing imported successfully!")
+
       // Navigate to the new drawing
       window.location.hash = `/grids/${newId}`
     } catch (error) {
-      console.error('Error importing drawing:', error)
-      toast.error('Failed to import drawing')
+      console.error("Error importing drawing:", error)
+      toast.error("Failed to import drawing")
     }
   }
 
@@ -189,22 +93,26 @@ export default function Home() {
         <h1 className='text-2xl font-medium'>your grids</h1>
         <div className='flex gap-2'>
           {authState.isAuthenticated && (
-            <Button 
-              onClick={() => setShowImportDialog(true)} 
+            <Button
+              onClick={() => setShowImportDialog(true)}
               variant='outline'
               className='flex items-center'
             >
               <Download className='mr-2 w-4 h-4' /> import
             </Button>
           )}
-          <Button 
+          <Button
             onClick={() => setShowPassphraseModal(true)}
             variant='outline'
             className='flex items-center'
-            title={authState.isAuthenticated ? 'Change passphrase' : 'Set passphrase for cloud sync'}
+            title={
+              authState.isAuthenticated
+                ? "Change passphrase"
+                : "Set passphrase for cloud sync"
+            }
           >
             <User className='mr-2 w-4 h-4' />
-            {authState.isAuthenticated ? 'account' : 'login'}
+            {authState.isAuthenticated ? "account" : "login"}
           </Button>
           <Button onClick={createNew} className='flex items-center'>
             <Plus className='mr-2 w-4 h-4' /> new grid
@@ -219,7 +127,7 @@ export default function Home() {
                 key={key}
                 className='rounded-lg border border-border bg-card shadow-sm'
               >
-                <div className='aspect-square p-4'>
+                <div className='aspect-[16/9] p-4'>
                   <Skeleton className='w-full h-full rounded' />
                 </div>
                 <div className='p-3 border-t border-border space-y-2'>
@@ -229,22 +137,23 @@ export default function Home() {
               </div>
             ))
           : drawings.map((drawing) => {
-              const fullDrawing = fullDrawings.find((fd) => fd.id === drawing.id)
               return (
                 <div
                   key={drawing.id}
                   className='group relative bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow'
                 >
                   {/* Preview */}
-                  <div className='aspect-square p-4'>
-                    {fullDrawing ? (
+                  <div className='aspect-[16/9] p-4'>
+                    {drawing.thumbnail ? (
                       <img
-                        src={generatePreview(fullDrawing)}
+                        src={drawing.thumbnail}
                         alt={`Preview of ${drawing.name}`}
                         className='w-full h-full object-contain bg-muted rounded border border-border'
                       />
                     ) : (
-                      <Skeleton className='w-full h-full rounded' />
+                      <div className='w-full h-full rounded border border-border bg-muted flex items-center justify-center text-xs text-muted-foreground'>
+                        no preview
+                      </div>
                     )}
                   </div>
 
@@ -263,7 +172,7 @@ export default function Home() {
 
                   {/* Delete button */}
                   <button
-                    type="button"
+                    type='button'
                     onClick={(e) => {
                       e.preventDefault()
                       setDeleteDialogId(drawing.id)
@@ -326,19 +235,19 @@ export default function Home() {
         onSuccess={async (result) => {
           enableCloudSync(result.userId, result.writeToken)
           setShowPassphraseModal(false)
-          
+
           // Sync existing LocalStorage drawings to cloud
           try {
-            toast.info('Syncing drawings to cloud...')
+            toast.info("Syncing drawings to cloud...")
             await forceSyncNow()
-            toast.success('Drawings synced successfully!')
+            toast.success("Drawings synced successfully!")
           } catch (error) {
-            console.error('Failed to sync drawings:', error)
-            toast.error('Failed to sync some drawings')
+            console.error("Failed to sync drawings:", error)
+            toast.error("Failed to sync some drawings")
           }
-          
+
           // Reload drawings to include cloud drawings
-          drawingStore.list().then(setDrawings)
+          await refreshDrawings()
         }}
       />
     </div>

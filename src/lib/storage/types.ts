@@ -9,6 +9,7 @@
 
 import type { Layer, ExportMode, ExportFormat } from "@/stores/drawingStores"
 import type { CircularCutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
+import type { LayerRange } from "@/types/layers"
 
 // === Serialized Types (JSON-safe) ===
 
@@ -16,6 +17,7 @@ export interface SerializedInteractionGroup {
   id: string
   name?: string
   points: string[]
+  offsetPhase?: "normal" | "half"
 }
 
 export interface SerializedPointModifications {
@@ -37,6 +39,8 @@ export interface LayerData {
   groups?: SerializedInteractionGroup[]
   /** Per-point modifications keyed by "x,y" */
   pointModifications?: Record<string, SerializedPointModifications>
+  /** Per-layer uniform scale; one of num/den is always 1. Absent ⇒ 1/1. */
+  scale?: { num: number; den: number }
   /** @deprecated Legacy format: flat array/set of "x,y" strings. Migrated to groups on load. */
   points?: string[] | Set<string>
 }
@@ -53,6 +57,8 @@ export interface DrawingMetadata {
   createdAt: number
   /** Timestamp (ms since epoch) when last updated */
   updatedAt: number
+  /** Small viewport PNG dataURL for the gallery; refreshed only on content changes */
+  thumbnail?: string
 }
 
 /**
@@ -69,6 +75,8 @@ export interface DrawingDocument extends DrawingMetadata {
   zoom: number
   /** How many millimeters each grid unit represents */
   mmPerUnit: number
+  /** Configurable inclusive range of selectable layer ids. Absent ⇒ default 1..6. */
+  layerRange?: LayerRange
   /** All layers in this drawing */
   layers: Layer[]
   /** Export rectangles — regions of the grid to include in SVG export */

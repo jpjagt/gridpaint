@@ -29,3 +29,10 @@ export interface SyncStatus {
   lastSyncAt: number | null
   error: string | null
 }
+
+export interface SaveStatus {
+  /** True when the most recent local save failed and has not yet succeeded. */
+  failed: boolean
+  /** Human-readable reason for the failure (e.g. quota exceeded). */
+  error: string | null
+}

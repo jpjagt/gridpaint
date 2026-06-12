@@ -165,7 +165,11 @@ export class GroupMerger {
         analysis,
       )
 
+      const shift = group.offsetPhase === "half" ? 0.5 : 0
       for (const prim of pointPrimitives) {
+        if (shift !== 0) {
+          prim.center = { x: prim.center.x + shift, y: prim.center.y + shift }
+        }
         const key = `${prim.center.x},${prim.center.y}:${prim.quadrant}`
         result.set(key, prim)
       }

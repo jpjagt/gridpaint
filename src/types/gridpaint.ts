@@ -119,6 +119,11 @@ export interface InteractionGroup {
   id: string
   name?: string
   points: Set<string> // "x,y" format
+  /**
+   * Lattice phase for this group. "half" shifts every point by +0.5 in both
+   * dimensions at render time (occupying a quadrant boundary). Absent ⇒ "normal".
+   */
+  offsetPhase?: "normal" | "half"
 }
 
 // === Export Rects ===
@@ -149,4 +154,68 @@ export interface ValidationIssue {
   pointKey: string
   quadrant?: 0 | 1 | 2 | 3
   message: string
+}
+
+// === Clipboard / Selection Types ===
+
+import type { SerializedPointModifications } from "@/lib/storage/types"
+
+export interface SelectionBounds {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+export interface ClipboardGroup {
+  id: string
+  name?: string
+  points: string[] // relative "x,y"
+}
+
+export interface ClipboardLayer {
+  layerId: number
+  groups: ClipboardGroup[]
+  /** Point modifications keyed by relative "x,y" */
+  pointModifications?: Record<string, SerializedPointModifications>
+}
+
+export interface ClipboardData {
+  layers: ClipboardLayer[]
+  bounds: SelectionBounds
+}
+
+// === Shape Tool ===
+
+/** Primitive shapes the shape tool can draw */
+export type ShapeKind = "rectangle" | "ellipse"
+
+/** fill = every interior cell; edge = single-cell-wide outline */
+export type ShapeStyle = "fill" | "edge"
+
+/** Compass id of one of a shape float's 8 resize handles. */
+export type ShapeHandle = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se"
+
+/**
+ * Handle ids in render order (top row L→R, middle L→R, bottom L→R). The renderer
+ * and the canvas hit-test must use this same ordering.
+ */
+export const SHAPE_HANDLE_IDS: ShapeHandle[] = [
+  "nw", "n", "ne",
+  "w",       "e",
+  "sw", "s", "se",
+]
+
+/**
+ * Metadata carried by a floating paste when it represents a live shape preview.
+ * Width/height are in grid cells (>= 1). The float's cell data is derived from
+ * these params via rasterizeShape().
+ */
+export interface ShapeMeta {
+  kind: ShapeKind
+  style: ShapeStyle
+  width: number
+  height: number
+  /** Superellipse exponent n in |x/a|^n + |y/b|^n <= 1. */
+  exponent: number
 }

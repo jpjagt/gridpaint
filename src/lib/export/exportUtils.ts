@@ -21,12 +21,14 @@ function convertPointsForExport(layers: Layer[]): LayerData[] {
       id: g.id,
       name: g.name,
       points: Array.from(g.points),
+      ...(g.offsetPhase !== undefined ? { offsetPhase: g.offsetPhase } : {}),
     })),
     ...(layer.pointModifications && layer.pointModifications.size > 0
       ? {
           pointModifications: Object.fromEntries(layer.pointModifications),
         }
       : {}),
+    ...(layer.scale ? { scale: layer.scale } : {}),
   }))
 }
 

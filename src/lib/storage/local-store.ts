@@ -1,172 +1,120 @@
 /**
- * LocalStorage implementation of DrawingStore
+ * LocalStorage implementation of DrawingStore — now backed by IndexedDB.
+ *
+ * Each drawing is stored as its own record so a single large drawing can never
+ * block saves for the others (the old single-blob design hit the localStorage
+ * ~5MB quota and silently dropped writes). A metadata index keeps list() fast.
+ *
+ * On first use it migrates any drawings from the legacy `gridpaint:drawings`
+ * localStorage blob into IndexedDB.
  */
 
-import type { DrawingStore } from './store'
+import type { DrawingStore } from "./store"
 import type {
   DrawingMetadata,
   DrawingDocument,
   InnerDrawingDocument,
-  LayerData,
-} from './types'
-import type { Layer } from '@/stores/drawingStores'
-import type { CircularCutout, PointModifications } from '@/types/gridpaint'
+} from "./types"
+import { serializeDocument, deserializeDocument } from "./serialization"
+import {
+  idbGetDrawing,
+  idbGetIndex,
+  idbPutDrawing,
+  idbDeleteDrawing,
+  idbClear,
+} from "./idb"
 
-const STORAGE_KEY = 'gridpaint:drawings'
+const LEGACY_KEY = "gridpaint:drawings"
+const MIGRATION_FLAG = "gridpaint:migrated-to-idb"
 
-/**
- * LocalStorage-backed implementation of DrawingStore
- */
 export class LocalStorageDrawingStore implements DrawingStore {
-  private storageKey: string
+  private migrated = false
 
-  constructor(storageKey: string = STORAGE_KEY) {
-    this.storageKey = storageKey
-  }
-
-  private readStorage(): Record<string, InnerDrawingDocument> {
-    const json = localStorage.getItem(this.storageKey)
-    if (!json) {
-      console.log(
-        `[LocalStore] readStorage: no data for key ${this.storageKey}`,
-      )
-      return {}
+  /** One-time migration of the legacy single-blob localStorage store. */
+  private async migrateLegacyIfNeeded(): Promise<void> {
+    if (this.migrated) return
+    if (typeof localStorage === "undefined") {
+      this.migrated = true
+      return
     }
-    try {
-      const data = JSON.parse(json) as Record<string, InnerDrawingDocument>
-      console.log('[LocalStore] readStorage:', data)
-      return data
-    } catch {
-      console.warn(
-        'Failed to parse drawings from localStorage, resetting storage',
-      )
-      localStorage.removeItem(this.storageKey)
-      return {}
+    if (localStorage.getItem(MIGRATION_FLAG)) {
+      this.migrated = true
+      return
     }
-  }
 
-  private writeStorage(data: Record<string, InnerDrawingDocument>): void {
-    console.log('[LocalStore] writeStorage:', data)
-    localStorage.setItem(this.storageKey, JSON.stringify(data))
+    const json = localStorage.getItem(LEGACY_KEY)
+    let entries: InnerDrawingDocument[] = []
+    if (json) {
+      try {
+        const data = JSON.parse(json) as Record<string, InnerDrawingDocument>
+        // Skip malformed entries rather than writing broken records.
+        entries = Object.values(data).filter(
+          (d): d is InnerDrawingDocument =>
+            !!d && typeof d.id === "string" && Array.isArray(d.layers),
+        )
+      } catch {
+        console.warn("[LocalStore] Failed to parse legacy storage; skipping migration")
+        // A syntactically broken blob is unrecoverable — mark migrated so we
+        // don't retry forever, and leave the legacy key in place.
+        localStorage.setItem(MIGRATION_FLAG, "1")
+        this.migrated = true
+        return
+      }
+    }
+
+    // Writes are outside the parse try/catch: if one fails, the exception
+    // propagates and neither flag is set, so a later call/reload retries.
+    for (const inner of entries) {
+      await idbPutDrawing(inner, metaFromInner(inner))
+    }
+    if (entries.length > 0) {
+      console.log(`[LocalStore] Migrated ${entries.length} legacy drawings to IndexedDB`)
+    }
+    // Keep the legacy key in place as a fallback (do not remove yet).
+    localStorage.setItem(MIGRATION_FLAG, "1")
+    this.migrated = true
   }
 
   async list(): Promise<DrawingMetadata[]> {
-    const data = this.readStorage()
-    return Object.values(data).map(({ id, name, createdAt, updatedAt }) => ({
-      id,
-      name,
-      createdAt,
-      updatedAt,
-    }))
+    await this.migrateLegacyIfNeeded()
+    const index = await idbGetIndex()
+    return Object.values(index)
   }
 
   async get(id: string): Promise<DrawingDocument | null> {
-    const data = this.readStorage()
-    const doc = data[id]
-    if (!doc) return null
-
-    // Deserialize layers, migrating legacy "points" format to "groups"
-    const layers: Layer[] = doc.layers.map((layer) => {
-      let groups: Layer["groups"]
-      if (layer.groups && layer.groups.length > 0) {
-        // New format: deserialize groups (points array -> Set)
-        groups = layer.groups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          points: new Set(g.points),
-        }))
-      } else if (layer.points) {
-        // Legacy format: migrate flat points to a single default group
-        const pointsArray = Array.isArray(layer.points)
-          ? layer.points
-          : Array.from(layer.points)
-        groups = [{ id: "default", points: new Set(pointsArray) }]
-      } else {
-        groups = [{ id: "default", points: new Set<string>() }]
-      }
-
-      // Deserialize pointModifications (Record -> Map), with migration for
-      // old CircularCutout formats:
-      //   v1: `radius` (grid units) → v2: `radiusMm` (mm) → v3: `diameterMm` (mm)
-      let pointModifications: Map<string, PointModifications> | undefined
-      if (layer.pointModifications) {
-        const mmPerUnit: number = (doc as { mmPerUnit?: number }).mmPerUnit ?? 5
-        pointModifications = new Map(
-          Object.entries(layer.pointModifications).map(([key, mods]) => {
-            const migratedMods: PointModifications = { ...mods }
-            if (mods.cutouts) {
-              migratedMods.cutouts = mods.cutouts.map((c) => {
-                const legacy = c as unknown as Record<string, unknown>
-                // v1→v2: old format had `radius` in grid units
-                if (!('radiusMm' in legacy) && !('diameterMm' in legacy) && typeof legacy.radius === 'number') {
-                  return { ...c, diameterMm: legacy.radius * mmPerUnit * 2 }
-                }
-                // v2→v3: old format used `radiusMm`; new format uses `diameterMm`
-                if ('radiusMm' in legacy && !('diameterMm' in legacy) && typeof legacy.radiusMm === 'number') {
-                  return { ...c, diameterMm: (legacy.radiusMm as number) * 2 } as CircularCutout
-                }
-                return c
-              })
-            }
-            return [key, migratedMods]
-          })
-        )
-      }
-
-      return {
-        id: layer.id,
-        isVisible: layer.isVisible,
-        renderStyle: layer.renderStyle,
-        groups,
-        pointModifications,
-      }
-    })
-
-    return { ...doc, layers }
+    await this.migrateLegacyIfNeeded()
+    const inner = await idbGetDrawing(id)
+    if (!inner) return null
+    return deserializeDocument(inner)
   }
 
   async save(doc: DrawingDocument): Promise<void> {
-    console.log('[LocalStore] save:', doc)
-    const data = this.readStorage()
-
-    // Serialize layers (groups with Set -> array, Map -> Record)
-    const serializedDoc: InnerDrawingDocument = {
-      ...doc,
-      updatedAt: Date.now(),
-      layers: doc.layers.map((layer): LayerData => {
-        const serialized: LayerData = {
-          id: layer.id,
-          isVisible: layer.isVisible,
-          renderStyle: layer.renderStyle,
-          groups: layer.groups.map((g) => ({
-            id: g.id,
-            name: g.name,
-            points: Array.from(g.points),
-          })),
-        }
-        if (layer.pointModifications && layer.pointModifications.size > 0) {
-          serialized.pointModifications = Object.fromEntries(layer.pointModifications)
-        }
-        return serialized
-      }),
-    }
-
-    data[doc.id] = serializedDoc
-    this.writeStorage(data)
-    console.log('[LocalStore] saved:', doc.id)
+    await this.migrateLegacyIfNeeded()
+    const inner = serializeDocument(doc)
+    // Cloud-only credentials have no business in local storage — strip them so
+    // a write token is never persisted at rest in IndexedDB.
+    delete inner.ownerId
+    delete inner.writeToken
+    await idbPutDrawing(inner, metaFromInner(inner))
   }
 
   async delete(id: string): Promise<void> {
-    console.log('[LocalStore] delete:', id)
-    const data = this.readStorage()
-    if (data[id]) {
-      delete data[id]
-      this.writeStorage(data)
-      console.log('[LocalStore] deleted:', id)
-    }
+    await this.migrateLegacyIfNeeded()
+    await idbDeleteDrawing(id)
   }
 
   async clear(): Promise<void> {
-    localStorage.removeItem(this.storageKey)
+    await idbClear()
+  }
+}
+
+/** Build the metadata index entry from a serialized doc. */
+function metaFromInner(inner: InnerDrawingDocument): DrawingMetadata {
+  return {
+    id: inner.id,
+    name: inner.name,
+    createdAt: inner.createdAt,
+    updatedAt: inner.updatedAt,
+    ...(inner.thumbnail !== undefined ? { thumbnail: inner.thumbnail } : {}),
   }
 }

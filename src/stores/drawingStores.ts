@@ -1,6 +1,6 @@
 import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
-import type { DrawingDocument, LayerData } from "@/lib/storage/types"
+import type { DrawingDocument } from "@/lib/storage/types"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
 import type {
   InteractionGroup,
@@ -8,6 +8,8 @@ import type {
   ExportRect,
 } from "@/types/gridpaint"
 import { pushHistory, clearHistory } from "@/stores/historyStore"
+import { captureThumbnail } from "@/lib/storage/thumbnail"
+import { DEFAULT_LAYER_RANGE, type LayerRange } from "@/types/layers"
 
 export interface Layer {
   id: number
@@ -17,6 +19,12 @@ export interface Layer {
   groups: InteractionGroup[]
   /** Per-point modifications keyed by "x,y". Only points with mods need entries. */
   pointModifications?: Map<string, PointModifications>
+  /**
+   * Per-layer uniform scale applied to the layer's finished render output.
+   * One of num/den is always 1: `{num:2,den:1}` = 2× bigger cell,
+   * `{num:1,den:2}` = 2× smaller. Absent ⇒ 1/1.
+   */
+  scale?: { num: number; den: number }
 }
 
 /** Derive the union of all points across all groups in a layer */
@@ -34,6 +42,7 @@ export interface CanvasViewState {
   panOffset: { x: number; y: number }
   zoom: number
   mmPerUnit: number // How many millimeters each grid unit represents
+  layerRange: LayerRange // Inclusive range of selectable layer ids
 }
 
 export interface LayersState {
@@ -65,6 +74,7 @@ export const $canvasView = map<CanvasViewState>({
   panOffset: { x: 0, y: 0 },
   zoom: 1,
   mmPerUnit: DEFAULT_MM_PER_UNIT,
+  layerRange: DEFAULT_LAYER_RANGE,
 })
 
 export const $layersState = map<LayersState>({
@@ -75,8 +85,8 @@ export const $layersState = map<LayersState>({
 /** Export rectangles — persisted with the drawing, rendered when export tool is active */
 export const $exportRects = atom<ExportRect[]>([])
 
-/** Export mode (separate files vs combined vs holder) — persisted with the drawing */
-export type ExportMode = "separate" | "combined" | "holder"
+/** Export mode (separate files vs combined vs holder vs 3d stl) — persisted with the drawing */
+export type ExportMode = "separate" | "combined" | "holder" | "3d"
 export const $exportMode = atom<ExportMode>("separate")
 
 /** Export format (svg vs dxf) — only used for combined/holder modes, persisted with the drawing */
@@ -144,6 +154,9 @@ export function createDefaultLayer(id: number = 1): Layer {
 export async function initializeDrawingState(drawingId: string): Promise<void> {
   $loadingState.set("loading")
 
+  lastContentSignature = ""
+  lastThumbnail = undefined
+
   try {
     const stored = await drawingStore.get(drawingId)
 
@@ -162,6 +175,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         panOffset: stored.panOffset,
         zoom: stored.zoom,
         mmPerUnit: stored.mmPerUnit || DEFAULT_MM_PER_UNIT, // Default for legacy drawings
+        layerRange: stored.layerRange ?? DEFAULT_LAYER_RANGE,
       })
 
       $layersState.set({
@@ -191,6 +205,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         panOffset: { x: 0, y: 0 },
         zoom: 1,
         mmPerUnit: DEFAULT_MM_PER_UNIT,
+        layerRange: DEFAULT_LAYER_RANGE,
       })
 
       $layersState.set({
@@ -212,28 +227,70 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
   }
 }
 
+/** Last persisted content signature, to decide when to refresh the thumbnail. */
+let lastContentSignature = ""
+/** Last captured thumbnail, reused across position-only saves. */
+let lastThumbnail: string | undefined
+
+/**
+ * Cheap signature of content that affects the rendered drawing. Excludes
+ * pan/zoom so position-only saves don't trigger a thumbnail refresh. Includes
+ * the actual pointModifications payload so edits to cutouts/overrides (which
+ * don't change the map size) still refresh the thumbnail.
+ */
+function contentSignature(layers: Layer[], exportRects: ExportRect[]): string {
+  const layerPart = layers
+    .map((l) => {
+      const groups = l.groups
+        .map((g) => `${g.id}#${Array.from(g.points).sort().join(",")}`)
+        .join("|")
+      const mods = l.pointModifications
+        ? JSON.stringify(Array.from(l.pointModifications.entries()).sort())
+        : ""
+      return `${l.id}:${l.isVisible}:${l.renderStyle}:${groups}:${mods}`
+    })
+    .join(";")
+  return `${layerPart}__${JSON.stringify(exportRects)}`
+}
+
 export async function saveDrawingState(): Promise<void> {
   const meta = $drawingMeta.get()
   const canvasView = $canvasView.get()
   const layersState = $layersState.get()
+  const exportRects = $exportRects.get()
 
   if (!meta.id) return
 
+  // Refresh the thumbnail only when content (not pan/zoom) changed. Advance the
+  // signature only on a successful capture so a failed/early capture retries on
+  // the next save instead of pinning a stale thumbnail.
+  const sig = contentSignature(layersState.layers, exportRects)
+  if (sig !== lastContentSignature) {
+    const captured = captureThumbnail()
+    if (captured !== undefined) {
+      lastThumbnail = captured
+      lastContentSignature = sig
+    }
+  }
+
+  const updatedAt = Date.now()
   const document: DrawingDocument = {
     ...meta,
     ...canvasView,
     layers: layersState.layers,
-    exportRects: $exportRects.get(),
+    exportRects,
     exportMode: $exportMode.get(),
     exportFormat: $exportFormat.get(),
     deselectedExportRectIds: Array.from($selectedExportRectIds.get()),
-    updatedAt: Date.now(),
+    updatedAt,
+    thumbnail: lastThumbnail,
   }
 
   try {
     await drawingStore.save(document)
-    $drawingMeta.setKey("updatedAt", document.updatedAt)
+    $drawingMeta.setKey("updatedAt", updatedAt)
   } catch (error) {
+    // hybrid-store already set $saveStatus.failed; do not swallow silently.
     console.error("Failed to save drawing:", error)
   }
 }
@@ -323,6 +380,51 @@ export function updateGroupPoints(
  */
 export function updateLayerPoints(layerId: number, points: Set<string>): void {
   updateGroupPoints(layerId, points)
+}
+
+/**
+ * Toggle a group's offset phase between "normal" and "half".
+ * Half shifts the group's rendered points by +0.5 in both dimensions.
+ */
+export function toggleGroupOffsetPhase(layerId: number, groupId: string): void {
+  const current = $layersState.get()
+  pushHistory(current.layers)
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== layerId) return layer
+    const groups = layer.groups.map((g) =>
+      g.id === groupId
+        ? {
+            ...g,
+            offsetPhase: (g.offsetPhase === "half" ? "normal" : "half") as
+              | "normal"
+              | "half",
+          }
+        : g,
+    )
+    return { ...layer, groups }
+  })
+  $layersState.setKey("layers", layers)
+}
+
+/**
+ * Set (or clear, with undefined) a layer's uniform scale.
+ * One of num/den is expected to be 1.
+ */
+export function setLayerScale(
+  layerId: number,
+  scale: { num: number; den: number } | undefined,
+): void {
+  const current = $layersState.get()
+  pushHistory(current.layers)
+  const layers = current.layers.map((layer) =>
+    layer.id === layerId ? { ...layer, scale } : layer,
+  )
+  $layersState.setKey("layers", layers)
+}
+
+/** Update the drawing's selectable layer range. */
+export function setLayerRange(range: LayerRange): void {
+  $canvasView.setKey("layerRange", range)
 }
 
 /**
@@ -433,5 +535,6 @@ export function resetDrawing(): void {
     panOffset: { x: 0, y: 0 },
     zoom: 1,
     mmPerUnit: DEFAULT_MM_PER_UNIT,
+    layerRange: DEFAULT_LAYER_RANGE,
   })
 }

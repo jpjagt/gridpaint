@@ -3,7 +3,6 @@ import { useState } from "react"
 import { useStore } from "@nanostores/react"
 import {
   RefreshCcw,
-  Download,
   HelpCircle,
   Plus,
   Minus,
@@ -13,15 +12,14 @@ import {
   AlertCircle,
   Undo2,
   Redo2,
+  Settings,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ModeToggle"
 import { $syncStatus, $authState } from "@/stores/authStores"
-import { $selectionState, $currentTool } from "@/stores/ui"
 import { $history, undo, redo } from "@/stores/historyStore"
 
 interface GridPaintControlsProps {
   onReset: () => void
-  onDownload: () => void
   onGridSizeChange: (operation: "+" | "-") => void
   onBorderWidthChange: (width: number) => void
   onMmPerUnitChange: (mmPerUnit: number) => void
@@ -39,11 +37,12 @@ interface GridPaintControlsProps {
   onToggleMeasuringBars: () => void
   /** Callback to open the shortcuts help modal */
   onShowShortcuts: () => void
+  /** Open the grid settings modal */
+  onShowSettings: () => void
 }
 
 export const GridPaintControls = ({
   onReset,
-  onDownload,
   onGridSizeChange,
   onBorderWidthChange,
   onMmPerUnitChange,
@@ -54,13 +53,11 @@ export const GridPaintControls = ({
   showMeasuringBars,
   onToggleMeasuringBars,
   onShowShortcuts,
+  onShowSettings,
 }: GridPaintControlsProps) => {
   const [borderWidth, setBorderWidth] = useState(2)
   const syncStatus = useStore($syncStatus)
   const authState = useStore($authState)
-  const selectionState = useStore($selectionState)
-  const currentTool = useStore($currentTool)
-  const hasActiveSelection = currentTool === "select" && selectionState.bounds !== null
   const history = useStore($history)
   const canUndoNow = history.cursor > 0
   const canRedoNow = history.cursor < history.snapshots.length - 1
@@ -153,15 +150,11 @@ export const GridPaintControls = ({
         <Button
           size='icon'
           variant='ghost'
-          onClick={onDownload}
-          title={hasActiveSelection ? "Download selection" : "Download"}
-          className={`w-8 h-8 backdrop-blur-sm ${
-            hasActiveSelection
-              ? "bg-primary/20 hover:bg-primary/30 text-primary ring-1 ring-primary/50"
-              : "bg-white/10 hover:bg-white/20"
-          }`}
+          onClick={onShowSettings}
+          title='Grid settings'
+          className='w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm'
         >
-          <Download className='w-4 h-4' />
+          <Settings className='w-4 h-4' />
         </Button>
 
         <Button
