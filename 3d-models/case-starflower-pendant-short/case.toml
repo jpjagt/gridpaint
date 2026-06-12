@@ -1,0 +1,65 @@
+# Case parameters for the starflower pendant (short).
+# All lengths in mm. Groups are cosmetic; keys must match CaseParams fields.
+
+[input]
+footprint_path = "dxfs/starflower-pendant - starflower-short-footprint - layer-1.dxf"
+
+[shape]
+stack_height = 4.0            # 4 layers x 1mm
+
+[pocket]
+pocket_clearance = 0.5        # radial play around the footprint
+pocket_clearance_z = 0.5      # vertical play
+pocket_body_fraction = 0.66   # share of pocket depth in the body
+rim_flat_width = 1.0          # flat shelf around the pocket before the slope
+
+[plan]
+margin_x = 9.0                # silhouette half-axis margin beyond footprint
+margin_y = 9.0
+n_plan = 2.3                  # 2 = ellipse, higher = squircle
+
+[tabs]
+tab_radius = 7.0
+tab_offset = 2.0              # tab center beyond the oval end
+neck_k = 6.0                  # smooth-union sharpness (higher = tighter neck)
+
+[heights]
+z_rim = 6.0                   # parting surface at the pocket rim
+slope_drop = 6.0              # rise rim -> seam (seam = z_rim + slope_drop)
+lid_height = 9.0              # dome above the seam
+belly_depth = 16.0            # > seam height => flat bottom appears
+
+[profile]
+profile_axis_a = 2.5          # axis sigmoid exponent
+profile_diag_b = 2.2          # diagonal profile exponent
+quarter_sharpness = 1.5       # pillow quarter blend
+pillow_center_offset = [0.0, 0.0]
+
+[side]
+p_side = 2.5                  # dome/belly superellipse exponents
+q_side = 2.5
+
+[fit]
+fit_gap = 0.15                # lid/body clearance along the surface normal
+
+[chain]
+chain_width = 2.4
+chain_depth = 2.0
+trough_offset = 3.0           # ring distance from the pocket hull
+
+[bolt]
+bolt_hole_d = 4.4             # M4 clearance
+ring_z_top = 14.5             # lid ring seat height
+ring_d = 11.0
+ring_blend_k = 5.0
+funnel_grade = 1.2
+nut_recess_d = 8.4            # M4 nut + play
+nut_recess_h = 3.5
+tab_flat_blend = 4.0
+
+[magnets]
+magnets_enabled = false
+
+[mesh]
+mesh_size = 0.5
+lid_print_orientation = "dome_down"
