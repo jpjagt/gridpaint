@@ -97,11 +97,17 @@ export function createLayeredModel(
 
     if (!geometry) continue
 
-    const material = new THREE.MeshStandardMaterial({
+    // Glossy metal ("wet chrome") material ported from the flowers repo.
+    // metalness=1 + roughness~0 makes the surface a near-mirror, so the look
+    // comes almost entirely from the scene's HDRI environment map (see
+    // sceneSetup.ts). Per-layer grey tints the reflection subtly per layer.
+    const material = new THREE.MeshPhysicalMaterial({
       color: getLayerGrey(layer.id),
-      roughness: 0.2,
-      metalness: 0.8,
-      envMapIntensity: 0.9,
+      metalness: 1,
+      roughness: 0.12, // slightly softened reflections (was 0.02 mirror)
+      envMapIntensity: 1.6,
+      clearcoat: 1,
+      clearcoatRoughness: 0.06, // faint clearcoat blur to match
       side: THREE.DoubleSide,
     })
 

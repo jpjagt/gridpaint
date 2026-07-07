@@ -6,11 +6,19 @@
 
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
-import { CubeTextureLoader } from "three"
+import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js"
+
+// Field of view for the isometric-style perspective camera. A perspective
+// camera (unlike a true orthographic one) makes view rays diverge, so the
+// near-mirror metal reflects a *range* of the env map across each flat face
+// instead of a single flat colour. Lower FOV = flatter/more orthographic look
+// but flatter reflections; higher = richer reflections but more perspective
+// distortion. 10° reads as strongly isometric (near-parallel projection).
+export const ISO_CAMERA_FOV = 10
 
 export interface SceneSetup {
   scene: THREE.Scene
-  camera: THREE.OrthographicCamera
+  camera: THREE.PerspectiveCamera
   renderer: THREE.WebGLRenderer
   controls: OrbitControls
   dispose: () => void
@@ -25,26 +33,47 @@ function getThemeBackgroundColor(): number {
   return isDark ? 0x27272a : 0xf4f4f5
 }
 
-let cachedEnvMap: THREE.CubeTexture | null = null
+// HDRI used for image-based reflections on the glossy metal material. With the
+// material at metalness=1 / roughness~0, the surface is a near-mirror, so this
+// reflection IS most of the look — a DARK hdri makes the object read as black.
+// Swap the constant below to change the reflected scene (all ported from the
+// flowers repo). What matters for a near-mirror is how much of the sphere is
+// bright vs dark (measured median luminance / % dark pixels in parens):
+//   kloppenheim_06_2k  – bright open sky; brightest & most even (25% dark)  ← default
+//   studio_small_08_1k – soft studio softbox, product look (dark surround, 47% dark)
+//   quattro_canti_2k   – sunlit city street; moodier, feature-rich (49% dark)
+//   potsdamer_platz_2k – night city; mostly black (59% dark — flowers "wet-black" look)
+const HDRI_URL = "/three-assets/hdri/potsdamer_platz_2k.hdr"
 
-function getEnvMap(): THREE.CubeTexture | null {
-  if (cachedEnvMap) return cachedEnvMap
+// PMREM-processed environment map, cached across scene setups. Loaded async
+// (needs a renderer for PMREM), so scene.environment is set in the callback;
+// the render loop picks it up on the next frame.
+let cachedEnvMap: THREE.Texture | null = null
 
-  const loader = new CubeTextureLoader()
-  const basePath = "/three-assets/textures/cube/myskybox/"
-  const urls = [
-    "px.jpg", "nx.jpg",
-    "py.jpg", "ny.jpg",
-    "pz.jpg", "nz.jpg",
-  ]
-  
-  try {
-    cachedEnvMap = loader.load(urls.map(u => basePath + u))
-  } catch {
-    console.warn("Failed to load environment map, using fallback")
+function applyEnvMap(scene: THREE.Scene, renderer: THREE.WebGLRenderer): void {
+  if (cachedEnvMap) {
+    scene.environment = cachedEnvMap
+    return
   }
-  
-  return cachedEnvMap
+
+  const pmrem = new THREE.PMREMGenerator(renderer)
+  pmrem.compileEquirectangularShader()
+
+  new HDRLoader().load(
+    HDRI_URL,
+    (hdr) => {
+      const envMap = pmrem.fromEquirectangular(hdr).texture
+      hdr.dispose()
+      pmrem.dispose()
+      cachedEnvMap = envMap
+      scene.environment = envMap
+    },
+    undefined,
+    (err) => {
+      console.warn("Failed to load HDRI environment map", err)
+      pmrem.dispose()
+    },
+  )
 }
 
 export function createSceneSetup(options: SceneSetupOptions): SceneSetup {
@@ -53,25 +82,13 @@ export function createSceneSetup(options: SceneSetupOptions): SceneSetup {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(getThemeBackgroundColor())
 
-  const envMap = getEnvMap()
-  if (cachedEnvMap) {
-    scene.environment = cachedEnvMap
-  }
-
   const aspect = container.clientWidth / container.clientHeight
-  const frustumSize = 100
-  const camera = new THREE.OrthographicCamera(
-    (frustumSize * aspect) / -2,
-    (frustumSize * aspect) / 2,
-    frustumSize / 2,
-    frustumSize / -2,
-    0.1,
-    1000,
-  )
+  const camera = new THREE.PerspectiveCamera(ISO_CAMERA_FOV, aspect, 0.1, 5000)
 
+  // Isometric viewing direction (equal x/y/z); distance is set by
+  // fitCameraToContent once the model bounds are known.
   camera.position.set(100, 100, 100)
   camera.lookAt(0, 0, 0)
-  camera.zoom = 1
   camera.updateProjectionMatrix()
 
   const renderer = new THREE.WebGLRenderer({
@@ -83,6 +100,9 @@ export function createSceneSetup(options: SceneSetupOptions): SceneSetup {
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.0
   container.appendChild(renderer.domElement)
+
+  // Image-based reflections for the glossy metal material (needs the renderer).
+  applyEnvMap(scene, renderer)
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.9)
   scene.add(ambientLight)
@@ -125,7 +145,7 @@ export function createSceneSetup(options: SceneSetupOptions): SceneSetup {
 }
 
 export function fitCameraToContent(
-  camera: THREE.OrthographicCamera,
+  camera: THREE.PerspectiveCamera,
   controls: OrbitControls,
   boundingBox: THREE.Box3,
   offset: number = 1.5,
@@ -136,17 +156,23 @@ export function fitCameraToContent(
   const center = new THREE.Vector3()
   boundingBox.getCenter(center)
 
-  const maxDim = Math.max(size.x, size.y, size.z)
-  const aspect = camera.right / camera.top
-  const frustumHeight = maxDim * offset
-  const frustumWidth = frustumHeight * aspect
+  // Fit the bounding sphere so framing is stable as the model is orbited.
+  const radius = size.length() / 2
+  const vFov = (camera.fov * Math.PI) / 180
+  const fitHeightDist = radius / Math.sin(vFov / 2)
+  // Horizontal FOV is derived from the vertical FOV and aspect ratio.
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect)
+  const fitWidthDist = radius / Math.sin(hFov / 2)
+  const distance = offset * Math.max(fitHeightDist, fitWidthDist)
 
-  camera.left = -frustumWidth / 2
-  camera.right = frustumWidth / 2
-  camera.top = frustumHeight / 2
-  camera.bottom = -frustumHeight / 2
-  camera.near = 0.1
-  camera.far = 1000
+  // Keep the current viewing direction (the isometric angle), just re-distance.
+  const dir = camera.position.clone().sub(center)
+  if (dir.lengthSq() === 0) dir.set(1, 1, 1)
+  dir.normalize()
+
+  camera.position.copy(center).addScaledVector(dir, distance)
+  camera.near = Math.max(distance / 100, 0.01)
+  camera.far = distance * 100
   camera.updateProjectionMatrix()
 
   controls.target.copy(center)

@@ -110,14 +110,8 @@ export function ModelViewerCanvas({
       const { clientWidth, clientHeight } = containerRef.current
       const { camera, renderer } = setupRef.current
 
-      const aspect = clientWidth / clientHeight
-      const frustumSize = 100
-
-      if (camera instanceof THREE.OrthographicCamera) {
-        camera.left = (frustumSize * aspect) / -2
-        camera.right = (frustumSize * aspect) / 2
-        camera.top = frustumSize / 2
-        camera.bottom = frustumSize / -2
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = clientWidth / clientHeight
         camera.updateProjectionMatrix()
       }
 
