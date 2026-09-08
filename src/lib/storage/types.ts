@@ -17,7 +17,8 @@ export interface SerializedInteractionGroup {
   id: string
   name?: string
   points: string[]
-  offsetPhase?: "normal" | "half"
+  offsetPhaseX?: "normal" | "half"
+  offsetPhaseY?: "normal" | "half"
 }
 
 export interface SerializedPointModifications {

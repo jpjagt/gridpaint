@@ -21,7 +21,8 @@ function convertPointsForExport(layers: Layer[]): LayerData[] {
       id: g.id,
       name: g.name,
       points: Array.from(g.points),
-      ...(g.offsetPhase !== undefined ? { offsetPhase: g.offsetPhase } : {}),
+      ...(g.offsetPhaseX !== undefined ? { offsetPhaseX: g.offsetPhaseX } : {}),
+      ...(g.offsetPhaseY !== undefined ? { offsetPhaseY: g.offsetPhaseY } : {}),
     })),
     ...(layer.pointModifications && layer.pointModifications.size > 0
       ? {

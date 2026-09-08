@@ -250,23 +250,39 @@ export const LayerControls = ({
                     )}
                   </Button>
 
-                  {/* Half-offset toggle: operates on the active group when layer is active,
-                      otherwise the first group */}
+                  {/* Half-offset toggles (per axis): operate on the active group
+                      when layer is active, otherwise the first group */}
                   {(() => {
                     const groupIdx = isActive ? activeGroupIndex : 0
                     const group = layer?.groups[groupIdx]
                     if (!group) return null
-                    const isHalf = group.offsetPhase === "half"
+                    const isHalfX = group.offsetPhaseX === "half"
+                    const isHalfY = group.offsetPhaseY === "half"
                     return (
-                      <Button
-                        size='icon'
-                        variant={isHalf ? "default" : "ghost"}
-                        onClick={() => toggleGroupOffsetPhase(layerId, group.id)}
-                        className='size-5 text-xs font-mono'
-                        title='Half-grid offset'
-                      >
-                        ½
-                      </Button>
+                      <div className='flex gap-0.5'>
+                        <Button
+                          size='icon'
+                          variant={isHalfX ? "default" : "ghost"}
+                          onClick={() =>
+                            toggleGroupOffsetPhase(layerId, group.id, "x")
+                          }
+                          className='size-5 text-[10px] leading-none font-mono'
+                          title='Half-grid offset on X axis'
+                        >
+                          ½x
+                        </Button>
+                        <Button
+                          size='icon'
+                          variant={isHalfY ? "default" : "ghost"}
+                          onClick={() =>
+                            toggleGroupOffsetPhase(layerId, group.id, "y")
+                          }
+                          className='size-5 text-[10px] leading-none font-mono'
+                          title='Half-grid offset on Y axis'
+                        >
+                          ½y
+                        </Button>
+                      </div>
                     )
                   })()}
 

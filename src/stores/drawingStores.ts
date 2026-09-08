@@ -383,19 +383,24 @@ export function updateLayerPoints(layerId: number, points: Set<string>): void {
 }
 
 /**
- * Toggle a group's offset phase between "normal" and "half".
- * Half shifts the group's rendered points by +0.5 in both dimensions.
+ * Toggle a group's offset phase on a single axis between "normal" and "half".
+ * Half shifts the group's rendered points by +0.5 along that axis.
  */
-export function toggleGroupOffsetPhase(layerId: number, groupId: string): void {
+export function toggleGroupOffsetPhase(
+  layerId: number,
+  groupId: string,
+  axis: "x" | "y",
+): void {
   const current = $layersState.get()
   pushHistory(current.layers)
+  const key = axis === "x" ? "offsetPhaseX" : "offsetPhaseY"
   const layers = current.layers.map((layer) => {
     if (layer.id !== layerId) return layer
     const groups = layer.groups.map((g) =>
       g.id === groupId
         ? {
             ...g,
-            offsetPhase: (g.offsetPhase === "half" ? "normal" : "half") as
+            [key]: (g[key] === "half" ? "normal" : "half") as
               | "normal"
               | "half",
           }

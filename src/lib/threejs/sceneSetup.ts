@@ -43,7 +43,7 @@ function getThemeBackgroundColor(): number {
 //   studio_small_08_1k – soft studio softbox, product look (dark surround, 47% dark)
 //   quattro_canti_2k   – sunlit city street; moodier, feature-rich (49% dark)
 //   potsdamer_platz_2k – night city; mostly black (59% dark — flowers "wet-black" look)
-const HDRI_URL = "/three-assets/hdri/potsdamer_platz_2k.hdr"
+const HDRI_URL = "/three-assets/hdri/kloppenheim_06_2k.hdr"
 
 // PMREM-processed environment map, cached across scene setups. Loaded async
 // (needs a renderer for PMREM), so scene.environment is set in the callback;

@@ -9,16 +9,17 @@ import { convertLayerToGridLayer } from "@/lib/export/svgUtils"
 import type { Layer } from "@/stores/drawingStores"
 
 describe("convertLayerToGridLayer", () => {
-  it("preserves group offsetPhase and layer scale", () => {
+  it("preserves group offset phases and layer scale", () => {
     const layer: Layer = {
       id: 1,
       isVisible: true,
       renderStyle: "default",
-      groups: [{ id: "h", points: new Set(["1,1"]), offsetPhase: "half" }],
+      groups: [{ id: "h", points: new Set(["1,1"]), offsetPhaseX: "half", offsetPhaseY: "normal" }],
       scale: { num: 2, den: 1 },
     }
     const grid = convertLayerToGridLayer(layer)
-    expect(grid.groups[0].offsetPhase).toBe("half")
+    expect(grid.groups[0].offsetPhaseX).toBe("half")
+    expect(grid.groups[0].offsetPhaseY).toBe("normal")
     expect(grid.scale).toEqual({ num: 2, den: 1 })
   })
 })

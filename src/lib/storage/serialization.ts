@@ -33,7 +33,8 @@ export function serializeDocument(doc: DrawingDocument): InnerDrawingDocument {
           id: g.id,
           ...(g.name !== undefined ? { name: g.name } : {}),
           points: Array.from(g.points),
-          ...(g.offsetPhase !== undefined ? { offsetPhase: g.offsetPhase } : {}),
+          ...(g.offsetPhaseX !== undefined ? { offsetPhaseX: g.offsetPhaseX } : {}),
+          ...(g.offsetPhaseY !== undefined ? { offsetPhaseY: g.offsetPhaseY } : {}),
         })),
       }
       if (layer.pointModifications && layer.pointModifications.size > 0) {
@@ -60,7 +61,8 @@ export function deserializeDocument(doc: InnerDrawingDocument): DrawingDocument 
         id: g.id,
         name: g.name,
         points: new Set(g.points),
-        offsetPhase: g.offsetPhase,
+        offsetPhaseX: g.offsetPhaseX,
+        offsetPhaseY: g.offsetPhaseY,
       }))
     } else if (layer.points) {
       // Legacy format: migrate flat points to a single default group

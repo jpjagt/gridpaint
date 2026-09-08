@@ -17,12 +17,16 @@ describe("offset/scale store actions", () => {
     $layersState.set({ layers: [layer], activeLayerId: 1 })
   })
 
-  it("toggleGroupOffsetPhase flips a group between normal and half", () => {
+  it("toggleGroupOffsetPhase flips each axis independently between normal and half", () => {
     const groupId = $layersState.get().layers[0].groups[0].id
-    toggleGroupOffsetPhase(1, groupId)
-    expect($layersState.get().layers[0].groups[0].offsetPhase).toBe("half")
-    toggleGroupOffsetPhase(1, groupId)
-    expect($layersState.get().layers[0].groups[0].offsetPhase).toBe("normal")
+    toggleGroupOffsetPhase(1, groupId, "x")
+    expect($layersState.get().layers[0].groups[0].offsetPhaseX).toBe("half")
+    expect($layersState.get().layers[0].groups[0].offsetPhaseY).toBeUndefined()
+    toggleGroupOffsetPhase(1, groupId, "y")
+    expect($layersState.get().layers[0].groups[0].offsetPhaseY).toBe("half")
+    toggleGroupOffsetPhase(1, groupId, "x")
+    expect($layersState.get().layers[0].groups[0].offsetPhaseX).toBe("normal")
+    expect($layersState.get().layers[0].groups[0].offsetPhaseY).toBe("half")
   })
 
   it("setLayerScale sets and clears a layer's scale", () => {

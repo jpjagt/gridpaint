@@ -182,7 +182,9 @@ export class BlobEngine {
     return (
       layer.groups.length > 1 ||
       (layer.pointModifications !== undefined && layer.pointModifications.size > 0) ||
-      layer.groups.some((g) => g.offsetPhase === "half")
+      layer.groups.some(
+        (g) => g.offsetPhaseX === "half" || g.offsetPhaseY === "half",
+      )
     )
   }
 

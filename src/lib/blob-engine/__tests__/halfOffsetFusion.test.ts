@@ -21,7 +21,7 @@ describe("half-offset fusion", () => {
       id: 1,
       isVisible: true,
       renderStyle: "default",
-      groups: [{ id: "h", points: new Set(["3,3"]), offsetPhase: "half" }],
+      groups: [{ id: "h", points: new Set(["3,3"]), offsetPhaseX: "half", offsetPhaseY: "half" }],
     }
     const svg = renderLayerSvg(layer)
     const nums = Array.from(svg.matchAll(/-?\d+(\.\d+)?/g)).map((m) => parseFloat(m[0]))
@@ -39,8 +39,8 @@ describe("half-offset fusion", () => {
       isVisible: true,
       renderStyle: "default",
       groups: [
-        { id: "n", points: new Set(["4,4"]), offsetPhase: "normal" },
-        { id: "h", points: new Set(["3,3"]), offsetPhase: "half" },
+        { id: "n", points: new Set(["4,4"]), offsetPhaseX: "normal", offsetPhaseY: "normal" },
+        { id: "h", points: new Set(["3,3"]), offsetPhaseX: "half", offsetPhaseY: "half" },
       ],
     }
     const svg = renderLayerSvg(layer)

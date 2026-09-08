@@ -3,7 +3,8 @@
  *
  * Lives in blob-engine (no export/SVG deps) so both the live canvas and the
  * export paths can share one converter. Must carry EVERY field the engine and
- * renderers consume — notably per-group `offsetPhase` and per-layer `scale`.
+ * renderers consume — notably per-group `offsetPhaseX`/`offsetPhaseY` and
+ * per-layer `scale`.
  * A converter that drops a field silently disables that feature on whichever
  * path uses it (this is exactly how half-offset/scale once failed to render on
  * the live canvas).
@@ -19,7 +20,8 @@ export function layerToGridLayer(layer: Layer): GridLayer {
       id: g.id,
       name: g.name,
       points: new Set(g.points),
-      offsetPhase: g.offsetPhase,
+      offsetPhaseX: g.offsetPhaseX,
+      offsetPhaseY: g.offsetPhaseY,
     })),
     isVisible: layer.isVisible,
     renderStyle: layer.renderStyle || "default",
