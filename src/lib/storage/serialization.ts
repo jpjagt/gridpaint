@@ -10,7 +10,7 @@
  */
 
 import type { Layer } from "@/stores/drawingStores"
-import type { CircularCutout, PointModifications } from "@/types/gridpaint"
+import type { Cutout, PointModifications } from "@/types/gridpaint"
 import type {
   DrawingDocument,
   InnerDrawingDocument,
@@ -75,7 +75,7 @@ export function deserializeDocument(doc: InnerDrawingDocument): DrawingDocument 
     }
 
     // Deserialize pointModifications (Record -> Map), with migration for
-    // old CircularCutout formats:
+    // old Cutout formats:
     //   v1: `radius` (grid units) → v2: `radiusMm` (mm) → v3: `diameterMm` (mm)
     let pointModifications: Map<string, PointModifications> | undefined
     if (layer.pointModifications) {
@@ -92,7 +92,7 @@ export function deserializeDocument(doc: InnerDrawingDocument): DrawingDocument 
               }
               // v2→v3: old format used `radiusMm`; new format uses `diameterMm`
               if ('radiusMm' in legacy && !('diameterMm' in legacy) && typeof legacy.radiusMm === 'number') {
-                return { ...c, diameterMm: (legacy.radiusMm as number) * 2 } as CircularCutout
+                return { ...c, diameterMm: (legacy.radiusMm as number) * 2 } as Cutout
               }
               return c
             })

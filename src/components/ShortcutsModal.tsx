@@ -58,7 +58,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys="E" description="Erase — remove points (also clears overrides + cutouts)" />
             <KbdRow keys="P" description="Pan — drag to pan the canvas" />
             <KbdRow keys="S" description="Select — rectangle select, copy/paste/delete" />
-            <KbdRow keys="O" description="Cutout — add circular cutouts to existing points" />
+            <KbdRow keys="O" description="Cutout — add circle or pill cutouts to existing points" />
             <KbdRow keys="V" description="Override — paint per-quadrant shape overrides" />
             <KbdRow keys="T" description="Measure — drag to measure distance in mm" />
             <KbdRow keys="X" description="Export — draw rects to define SVG export regions" />
@@ -120,7 +120,8 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys="Z" description="Anchor: SW" />
             <KbdRow keys="A" description="Anchor: NW" />
             <KbdRow keys="W" description="Anchor: NE" />
-            <KbdRow keys="click" description="Add cutout to active layer" />
+            <KbdRow keys="click" description="Place circle, or set first / second pill center" />
+            <KbdRow keys="Escape" description="Cancel unfinished pill" />
             <KbdRow keys={["shift", "click"]} description="Add cutout to all layers with point" />
             <KbdRow keys={["alt", "click"]} description="Remove hovered cutout from active layer" />
             <KbdRow keys={["alt", "shift", "click"]} description="Clear all cutouts at point from all layers" />

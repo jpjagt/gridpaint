@@ -1,5 +1,5 @@
 import { atom, map } from 'nanostores'
-import type { CutoutAnchor, QuadrantState, SelectionBounds, ClipboardData, ShapeKind, ShapeStyle, ShapeMeta } from '@/types/gridpaint'
+import type { CutoutToolSettings, QuadrantState, SelectionBounds, ClipboardData, ShapeKind, ShapeStyle, ShapeMeta } from '@/types/gridpaint'
 
 // === Tool types ===
 
@@ -47,15 +47,10 @@ export const toggleActiveLayerOutline = () => {
 
 // === Cutout tool settings ===
 
-export interface CutoutToolSettings {
-  anchor: CutoutAnchor
-  diameterMm: number // diameter in mm, converted to grid units using mmPerUnit
-  customOffset: { x: number; y: number }
-  mode: "single" | "rivet"
-  rivetScalePercent: number
-}
-
 export const $cutoutToolSettings = map<CutoutToolSettings>({
+  shape: "circle",
+  sizeUnit: "mm",
+  diameterGrid: 0.5,
   anchor: "center",
   diameterMm: 2.0,
   customOffset: { x: 0, y: 0 },

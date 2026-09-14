@@ -11,7 +11,7 @@ curves.
 - blob rendering engine that analyzes 3x3 neighborhoods to generate smooth connected shapes
 - interaction groups within a layer (independent blobification, merged via union)
 - per-quadrant shape overrides (convex, concave, full, empty)
-- circular cutouts with configurable anchor + radius
+- circle and pill cutouts with configurable anchors and diameter
 - SVG export (outlines-only for laser cutting)
 - localStorage persistence with auto-save
 
@@ -32,7 +32,7 @@ pnpm dev
 | =E= | erase    | remove points (also clears overrides + cutouts)       |
 | =P= | pan      | drag to pan the canvas                                |
 | =S= | select   | rectangle select, copy/paste/delete                   |
-| =O= | cutout   | add circular cutouts to existing points               |
+| =O= | cutout   | add circle or pill cutouts to existing points               |
 | =V= | override | paint per-quadrant shape overrides                    |
 | =T= | measure  | drag to measure distance in mm                        |
 | =X= | export   | draw rects to define SVG export regions               |
@@ -79,9 +79,14 @@ union. shared internal edges between groups are eliminated in SVG export.
 
 when the cutout tool is active, an options panel appears above the toolbar:
 
+- *shape*: circle (one click) or pill (click the first circle center, then the second; live preview between clicks)
 - *anchor positions*: 3×3 grid (center, N, NE, E, SE, S, SW, W, NW) plus custom offset
   - keyboard shortcuts: =Q= (center), =X= (SE), =Z= (SW), =A= (NW), =W= (NE)
-- *diameter input*: in millimeters (converted to grid units using the drawing's mm/unit scale)
+- *diameter input*: choose millimeters or grid units; each remembers its own value (defaults: 2 mm / 0.5 grid units)
+  - millimeters stay physically fixed; grid units scale with the drawing or export rectangle's mm/unit override
+  - pill diameter controls both rounded ends and the width; the two centers remain at their chosen grid positions
+  - the anchor setting applies to each click; the first center stays fixed if you change anchor for the second
+  - the first click must be on an existing point; the second may be anywhere
 - *mode toggle*: single or rivet
   - *single*: add cutout to selected layer(s)
   - *rivet*: add cutouts to all layers with the point; top/bottom layers get scaled diameter
@@ -89,12 +94,13 @@ when the cutout tool is active, an options panel appears above the toolbar:
 
 | action              | effect                                              |
 |---------------------+-----------------------------------------------------|
-| click               | add cutout to active layer                          |
+| click               | place circle, or set first / second pill center     |
+| =Escape=            | cancel unfinished pill                             |
 | shift + click       | add cutout to all layers with that point            |
 | alt + click         | remove hovered cutout from active layer             |
 | alt + shift + click | clear all cutouts at point from all layers          |
 
-cutouts render as transparent holes on canvas (destination-out compositing)
+cutouts render as transparent holes on canvas and in SVG/DXF exports and 3D preview
 and as separate CCW-wound circular paths in SVG export.
 
 ** override tool (=V=)

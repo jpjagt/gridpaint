@@ -30,7 +30,7 @@
  */
 
 import type { BlobGeometry, BlobPrimitive, GridLayer } from "../types"
-import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
+import { getCutoutGeometry, getCutoutVertices } from "@/lib/gridpaint/cutoutGeometry"
 import type { PointModifications } from "@/types/gridpaint"
 import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
@@ -578,38 +578,17 @@ function generateCutoutLwpolylines(
     const [px, py] = pointKey.split(",").map(Number)
 
     for (const cutout of mods.cutouts) {
-      const anchorOffset =
-        cutout.anchor === "custom"
-          ? (cutout.customOffset ?? { x: 0, y: 0 })
-          : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
-      // Translate same as polyline vertices: subtract origin, flip Y, convert to mm
-      const cx =
-        (px + anchorOffset.x + (cutout.offset?.x ?? 0) - originX2 / 2) *
-          mmPerUnit +
-        offsetXMm
-      const cy =
-        bboxHeightMm -
-        (py + anchorOffset.y + (cutout.offset?.y ?? 0) - originY2 / 2) *
-          mmPerUnit +
-        offsetYMm
-      const r = cutout.diameterMm / 2
-
-      // Two-vertex closed LWPOLYLINE circle using bulge=1 (semicircle).
-      // Coordinates are in DXF Y-up space. CW hole winding in Y-up DXF space
-      // uses negative bulge (CW semicircle).
-      const lines: string[] = []
-      lines.push("0\nLWPOLYLINE")
-      lines.push("8\nCUTOUTS")
-      lines.push("70\n1") // closed
-      lines.push("90\n2") // 2 vertices
-      // vertex 1: right side (cx+r, cy)
-      lines.push("10\n" + fmtMm(cx + r))
-      lines.push("20\n" + fmtMm(cy))
-      lines.push("42\n-1") // bulge=-1: CW semicircle (hole winding in Y-up)
-      // vertex 2: left side (cx-r, cy)
-      lines.push("10\n" + fmtMm(cx - r))
-      lines.push("20\n" + fmtMm(cy))
-      lines.push("42\n-1") // bulge=-1: CW semicircle (hole winding in Y-up)
+      const geometry = getCutoutGeometry(cutout, px, py, mmPerUnit)
+      const vertices = getCutoutVertices(geometry)
+      const lines = ["0\nLWPOLYLINE", "8\nCUTOUTS", "70\n1", `90\n${vertices.length}`]
+      // Reverse the SVG outline before flipping Y to retain the DXF hole winding.
+      for (let i = vertices.length - 1; i >= 0; i--) {
+        const vertex = vertices[i]
+        const previous = vertices[(i + vertices.length - 1) % vertices.length]
+        lines.push("10\n" + fmtMm((vertex.x - originX2 / 2) * mmPerUnit + offsetXMm))
+        lines.push("20\n" + fmtMm(bboxHeightMm - (vertex.y - originY2 / 2) * mmPerUnit + offsetYMm))
+        lines.push("42\n" + previous.bulge)
+      }
 
       results.push(lines.join("\n"))
     }
@@ -641,49 +620,36 @@ function generateCutoutLegacyPolylines(
     const [px, py] = pointKey.split(",").map(Number)
 
     for (const cutout of mods.cutouts) {
-      const anchorOffset =
-        cutout.anchor === "custom"
-          ? (cutout.customOffset ?? { x: 0, y: 0 })
-          : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
-      const cx =
-        (px + anchorOffset.x + (cutout.offset?.x ?? 0) - originX2 / 2) *
-          mmPerUnit +
-        offsetXMm
-      // Flip Y: DXF uses Y-up coordinate system
-      const cy =
-        bboxHeightMm -
-        (py + anchorOffset.y + (cutout.offset?.y ?? 0) - originY2 / 2) *
-          mmPerUnit +
-        offsetYMm
-      const r = cutout.diameterMm / 2
+      const geometry = getCutoutGeometry(cutout, px, py, mmPerUnit)
+      const vertices = getCutoutVertices(geometry)
+      const arcSegments = segmentsForRadius(geometry.radius * mmPerUnit) * 2
+      const points: Array<{ x: number; y: number }> = []
+      vertices.forEach((vertex, index) => {
+        if (!vertex.bulge) {
+          points.push(vertex)
+          return
+        }
+        const next = vertices[(index + 1) % vertices.length]
+        const cx = (vertex.x + next.x) / 2
+        const cy = (vertex.y + next.y) / 2
+        const startAngle = Math.atan2(vertex.y - cy, vertex.x - cx)
+        for (let i = 0; i < arcSegments; i++) {
+          const angle = startAngle - Math.PI * i / arcSegments
+          points.push({
+            x: cx + geometry.radius * Math.cos(angle),
+            y: cy + geometry.radius * Math.sin(angle),
+          })
+        }
+      })
 
-      // Full circle: 4 quarter-circles, each tessellated.
-      // CW hole winding in DXF Y-up space → angle decreases (negative step).
-      const quarterSegs = segmentsForRadius(r)
-      const totalSegs = quarterSegs * 4
-
-      const lines: string[] = []
-      lines.push("0\nPOLYLINE")
-      lines.push("8\nCUTOUTS")
-      lines.push("66\n1") // vertices-follow
-      lines.push("70\n1") // closed
-      lines.push("10\n0")
-      lines.push("20\n0")
-      lines.push("30\n0")
-
-      for (let i = 0; i < totalSegs; i++) {
-        // CW winding (hole) in DXF Y-up space → angle decreases
-        const angle = -(2 * Math.PI * i) / totalSegs
-        lines.push("0\nVERTEX")
-        lines.push("8\nCUTOUTS")
-        lines.push("10\n" + fmtMm(cx + r * Math.cos(angle)))
-        lines.push("20\n" + fmtMm(cy + r * Math.sin(angle)))
-        lines.push("30\n0")
-        lines.push("42\n0")
+      const lines = ["0\nPOLYLINE", "8\nCUTOUTS", "66\n1", "70\n1", "10\n0", "20\n0", "30\n0"]
+      for (const point of points.reverse()) {
+        lines.push("0\nVERTEX", "8\nCUTOUTS")
+        lines.push("10\n" + fmtMm((point.x - originX2 / 2) * mmPerUnit + offsetXMm))
+        lines.push("20\n" + fmtMm(bboxHeightMm - (point.y - originY2 / 2) * mmPerUnit + offsetYMm))
+        lines.push("30\n0", "42\n0")
       }
-
-      lines.push("0\nSEQEND")
-      lines.push("8\nCUTOUTS")
+      lines.push("0\nSEQEND", "8\nCUTOUTS")
 
       results.push(lines.join("\n"))
     }

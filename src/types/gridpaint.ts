@@ -59,7 +59,7 @@ export interface QuadrantOverrides {
   3?: QuadrantState
 }
 
-// === Circular Cutouts ===
+// === Cutouts ===
 
 /** Anchor position for a cutout center relative to the grid point */
 export type CutoutAnchor =
@@ -74,14 +74,50 @@ export type CutoutAnchor =
   | "se"
   | "custom"
 
-export interface CircularCutout {
+export interface Cutout {
+  /** Missing on legacy drawings, which contain circles in millimetres. */
+  shape?: "circle" | "pill"
+  sizeUnit?: "mm" | "grid"
+  diameterGrid?: number
+  /** Second circle center relative to the first, in grid units. */
+  endOffset?: { x: number; y: number }
   anchor: CutoutAnchor
-  /** Diameter in millimetres (primary/leading value; converted to grid units via mmPerUnit at render time) */
+  /** Used for mm sizing (also the default for legacy cutouts); resolved at render time. */
   diameterMm: number
   /** Optional fine offset from anchor position, in grid units */
   offset?: { x: number; y: number }
   /** Custom anchor position in grid units (used when anchor === "custom") */
   customOffset?: { x: number; y: number }
+}
+
+export interface CutoutToolSettings {
+  shape: "circle" | "pill"
+  anchor: CutoutAnchor
+  sizeUnit: "mm" | "grid"
+  diameterMm: number
+  diameterGrid: number
+  customOffset: { x: number; y: number }
+  mode: "single" | "rivet"
+  rivetScalePercent: number
+}
+
+export interface CutoutGeometry {
+  start: { x: number; y: number }
+  end: { x: number; y: number }
+  radius: number
+}
+
+export interface CutoutVertex {
+  x: number
+  y: number
+  /** Outgoing semicircle (-1) or straight side (0), in SVG coordinates. */
+  bulge: number
+}
+
+export interface CutoutDraft {
+  point: { x: number; y: number }
+  layerId: number
+  cutout: Cutout
 }
 
 /** Offsets from grid point center for each cutout anchor, in grid units */
@@ -104,7 +140,7 @@ export const CUTOUT_ANCHOR_OFFSETS: Record<Exclude<CutoutAnchor, "custom">, { x:
  * Stored sparsely: only points with modifications have entries.
  */
 export interface PointModifications {
-  cutouts?: CircularCutout[]
+  cutouts?: Cutout[]
   quadrantOverrides?: QuadrantOverrides
 }
 

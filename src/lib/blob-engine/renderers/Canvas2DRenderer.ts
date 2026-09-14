@@ -27,7 +27,7 @@ import type {
   RenderStyle,
 } from "../types"
 import type { PointModifications } from "@/types/gridpaint"
-import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
+import { appendCutoutPath, getCutoutGeometry } from "@/lib/gridpaint/cutoutGeometry"
 
 import {
   Renderer,
@@ -230,7 +230,7 @@ export class Canvas2DRenderer extends Renderer {
 
     // If this layer has cutouts, establish a clipping region that excludes them
     // before painting. Using an even-odd clip (large rect covering world space
-    // with the cutout circles subtracted) means the paint never reaches those
+    // with the cutout shapes subtracted) means the paint never reaches those
     // areas — no compositing tricks, no offscreen canvas needed.
     const hasCutouts =
       layer?.pointModifications && layer.pointModifications.size > 0
@@ -373,7 +373,7 @@ export class Canvas2DRenderer extends Renderer {
   }
 
   /**
-   * Apply an even-odd clipping region that excludes cutout circles.
+   * Apply an even-odd clipping region that excludes cutout shapes.
    * Draws a large rect covering all world space, then subtracts each cutout
    * circle using the even-odd rule so those areas are clipped out.
    * Must be called inside a ctx.save()/ctx.restore() pair.
@@ -392,23 +392,23 @@ export class Canvas2DRenderer extends Renderer {
     // Outer rect (clockwise) — this is the "paintable" area
     this.ctx.rect(-BIG, -BIG, BIG * 2, BIG * 2)
 
-    // Each cutout circle (also clockwise in canvas default) — even-odd rule
-    // means overlapping regions cancel, so circles become holes
+    // Closed cutout outlines become holes through the even-odd fill rule.
     for (const [pointKey, mods] of pointModifications) {
       if (!mods.cutouts || mods.cutouts.length === 0) continue
 
       const [px, py] = pointKey.split(",").map(Number)
 
       for (const cutout of mods.cutouts) {
-        const anchorOffset = cutout.anchor === "custom"
-          ? (cutout.customOffset ?? { x: 0, y: 0 })
-          : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
-        const cx = (px + anchorOffset.x + (cutout.offset?.x ?? 0)) * gridSize + gridSize / 2
-        const cy = (py + anchorOffset.y + (cutout.offset?.y ?? 0)) * gridSize + gridSize / 2
-        const r = (cutout.diameterMm / 2 / mmPerUnit) * gridSize
-
-        this.ctx.moveTo(cx + r, cy)
-        this.ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        const geometry = getCutoutGeometry(cutout, px, py, mmPerUnit)
+        const toWorld = (p: { x: number; y: number }) => ({
+          x: (p.x + 0.5) * gridSize,
+          y: (p.y + 0.5) * gridSize,
+        })
+        appendCutoutPath(this.ctx, {
+          start: toWorld(geometry.start),
+          end: toWorld(geometry.end),
+          radius: geometry.radius * gridSize,
+        })
       }
     }
 

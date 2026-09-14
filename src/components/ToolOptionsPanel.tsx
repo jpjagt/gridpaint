@@ -24,7 +24,7 @@ import {
   selectAllExportRects,
   deselectAllExportRects,
 } from "@/stores/drawingStores"
-import type { CutoutAnchor, ExportRect, QuadrantState } from "@/types/gridpaint"
+import type { CutoutAnchor, CutoutToolSettings, ExportRect, QuadrantState } from "@/types/gridpaint"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { exportExportRectsSvg } from "@/lib/export/exportRectsSvg"
@@ -641,17 +641,40 @@ function CutoutOptions({
   settings,
   mmPerUnit,
 }: {
-  settings: {
-    anchor: CutoutAnchor
-    diameterMm: number
-    customOffset: { x: number; y: number }
-    mode: "single" | "rivet"
-    rivetScalePercent: number
-  }
+  settings: CutoutToolSettings
   mmPerUnit: number
 }) {
+  const sizeKey = settings.sizeUnit === "grid" ? "diameterGrid" : "diameterMm"
+  const diameter = settings[sizeKey]
+  const minimum = settings.sizeUnit === "grid" ? 0.01 : 0.1
   return (
-    <div className='flex items-start gap-3'>
+    <div className='flex flex-wrap items-start gap-3 max-w-[calc(100vw-2rem)]'>
+      <div className='flex flex-col gap-1'>
+        <span className='text-xs text-muted-foreground font-mono leading-none mb-0.5'>shape</span>
+        <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+          {(["circle", "pill"] as const).map(shape => (
+            <button
+              key={shape}
+              type='button'
+              aria-pressed={settings.shape === shape}
+              onClick={() => $cutoutToolSettings.setKey("shape", shape)}
+              className={cn(
+                "text-xs font-mono px-2 min-h-10 transition-colors",
+                settings.shape === shape
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {shape}
+            </button>
+          ))}
+        </div>
+        <span className='text-xs text-muted-foreground font-mono max-w-36'>
+          {settings.shape === "pill" ? "Click first center, then second. Esc cancels." : "Click to place a circle."}
+        </span>
+      </div>
+      <div className='w-px self-stretch bg-border' />
+
       {/* Anchor 3×3 grid + custom */}
       <div className='flex flex-col gap-1'>
         <span className='text-xs text-muted-foreground font-mono leading-none mb-0.5'>
@@ -664,6 +687,8 @@ function CutoutOptions({
               type='button'
               onClick={() => $cutoutToolSettings.setKey("anchor", id)}
               title={label}
+              aria-label={label}
+              aria-pressed={settings.anchor === id}
               className={cn(
                 "w-6 h-6 border rounded-sm transition-colors",
                 settings.anchor === id
@@ -717,33 +742,47 @@ function CutoutOptions({
 
       <div className='w-px self-stretch bg-border' />
 
-      {/* Diameter input */}
+      {/* Each sizing mode keeps its own last-used value. */}
       <div className='flex flex-col gap-1'>
         <span className='text-xs text-muted-foreground font-mono leading-none mb-0.5'>
-          diameter
+          {settings.shape === "pill" ? "diameter / width" : "diameter"}
         </span>
-        <div className='flex items-center gap-1'>
-          <input
-            type='number'
-            value={settings.diameterMm}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value)
-              if (!isNaN(val)) {
-                $cutoutToolSettings.setKey("diameterMm", val)
-              }
-            }}
-            onBlur={(e) => {
-              const val = parseFloat(e.target.value)
-              const clamped = Math.max(0.1, isNaN(val) ? 1 : val)
-              $cutoutToolSettings.setKey("diameterMm", clamped)
-            }}
-            className='w-16 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-1 font-mono'
-            step='0.1'
-          />
-          <span className='text-xs text-muted-foreground font-mono'>mm</span>
+        <div className='flex gap-0.5 border border-border rounded overflow-hidden'>
+          {(["mm", "grid"] as const).map(unit => (
+            <button
+              key={unit}
+              type='button'
+              aria-pressed={settings.sizeUnit === unit}
+              onClick={() => $cutoutToolSettings.setKey("sizeUnit", unit)}
+              className={cn(
+                "text-xs font-mono px-2 min-h-10 transition-colors",
+                settings.sizeUnit === unit
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {unit === "grid" ? "grid units" : "mm"}
+            </button>
+          ))}
         </div>
-        <span className='text-xs text-muted-foreground/60 font-mono'>
-          {(settings.diameterMm / mmPerUnit).toFixed(2)} gu
+        <input
+          key={sizeKey}
+          aria-label={settings.sizeUnit === "grid" ? "Diameter in grid units" : "Diameter in millimeters"}
+          type='number'
+          value={diameter}
+          min={minimum}
+          onChange={e => {
+            const value = parseFloat(e.target.value)
+            if (Number.isFinite(value) && value > 0) $cutoutToolSettings.setKey(sizeKey, value)
+          }}
+          onBlur={() => $cutoutToolSettings.setKey(sizeKey, Math.max(minimum, diameter))}
+          className='w-24 bg-muted/50 text-xs text-foreground border border-border rounded px-1.5 py-1 font-mono tabular-nums'
+          step={settings.sizeUnit === "grid" ? 0.05 : 0.1}
+        />
+        <span className='text-xs text-muted-foreground/60 font-mono tabular-nums'>
+          {settings.sizeUnit === "grid"
+            ? `${(diameter * mmPerUnit).toFixed(2)} mm at canvas scale`
+            : `${(diameter / mmPerUnit).toFixed(2)} grid units`}
         </span>
       </div>
 

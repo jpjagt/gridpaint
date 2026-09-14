@@ -37,7 +37,7 @@ import type {
   RenderStyle,
 } from "../types"
 import type { PointModifications } from "@/types/gridpaint"
-import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
+import { cutoutSvgPath, getCutoutGeometry } from "@/lib/gridpaint/cutoutGeometry"
 import {
   Renderer,
   type RenderOptions,
@@ -697,20 +697,7 @@ function generateCutoutPaths(
     const [px, py] = pointKey.split(",").map(Number)
 
     for (const cutout of mods.cutouts) {
-      const anchorOffset =
-        cutout.anchor === "custom"
-          ? (cutout.customOffset ?? { x: 0, y: 0 })
-          : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
-      const cx = px + anchorOffset.x + (cutout.offset?.x ?? 0)
-      const cy = py + anchorOffset.y + (cutout.offset?.y ?? 0)
-      const r = cutout.diameterMm / 2 / mmPerUnit
-
-      // CCW circle as two half-arcs (sweep-flag=0 for CCW)
-      paths.push(
-        `M ${fmtN(cx + r)} ${fmtN(cy)} ` +
-          `A ${fmtN(r)} ${fmtN(r)} 0 0 0 ${fmtN(cx - r)} ${fmtN(cy)} ` +
-          `A ${fmtN(r)} ${fmtN(r)} 0 0 0 ${fmtN(cx + r)} ${fmtN(cy)} Z`,
-      )
+      paths.push(cutoutSvgPath(getCutoutGeometry(cutout, px, py, mmPerUnit)))
     }
   }
 
