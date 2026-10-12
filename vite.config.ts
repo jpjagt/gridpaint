@@ -28,6 +28,12 @@ export default defineConfig({
       overlay: true 
     }),
   ],
+  server: {
+    proxy: {
+      // generative lab python server (lab/bin/gl serve)
+      '/api/lab': 'http://127.0.0.1:8765',
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

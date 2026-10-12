@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react"
 import { Routes, Route, useParams, useNavigate } from "react-router-dom"
 import Home from "@/components/Home"
+import LabPage from "@/pages/lab/LabPage"
 import {
   GridPaintCanvas,
   type GridPaintCanvasMethods,
@@ -217,6 +218,7 @@ export default function App() {
         path='/grids/:drawingId/layers/:layerIndex'
         element={<LayerSvgRoute />}
       />
+      <Route path='/lab' element={<LabPage />} />
       <Route path='/' element={<Home />} />
     </Routes>
   )

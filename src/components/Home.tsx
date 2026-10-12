@@ -90,7 +90,15 @@ export default function Home() {
   return (
     <div className='p-8'>
       <div className='flex items-center justify-between mb-6'>
-        <h1 className='text-2xl font-medium'>your grids</h1>
+        <div className='flex items-baseline gap-3'>
+          <h1 className='text-2xl font-medium'>your grids</h1>
+          <a
+            href='#/lab'
+            className='font-mono text-xs text-muted-foreground hover:text-foreground'
+          >
+            lab →
+          </a>
+        </div>
         <div className='flex gap-2'>
           {authState.isAuthenticated && (
             <Button
