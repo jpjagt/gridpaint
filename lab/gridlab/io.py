@@ -43,7 +43,10 @@ def points_to_mask(points, width: int, height: int, dx: int = 0, dy: int = 0) ->
     return m
 
 
-def _groups_to_json(groups: list[Group], dx: int = 0, dy: int = 0) -> list[dict]:
+def _groups_to_json(groups: "list[Group] | np.ndarray", dx: int = 0, dy: int = 0) -> list[dict]:
+    # frames may hold a bare mask instead of a group list (see architecture contract)
+    if isinstance(groups, np.ndarray):
+        groups = [Group("default", groups.astype(bool))]
     return [{"id": g.id, "points": mask_to_points(g.cells, dx, dy)} for g in groups]
 
 
