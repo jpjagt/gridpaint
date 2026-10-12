@@ -832,6 +832,10 @@ def _setup(name: str) -> argparse.ArgumentParser:
         p.add_argument("id", type=int)
     elif name == "serve":
         p.add_argument("--port", type=int, default=8765)
+    elif name in ("ask", "brief"):
+        from .assist import setup_cli
+
+        setup_cli(name, p)
     elif name == "gallery":
         p.add_argument("--out", help="default ../public/lab/gallery.json")
         p.add_argument("--seeds", type=int, default=3)
@@ -860,6 +864,10 @@ COMMANDS = {
     "recipes": (cmd_recipes, "list recipes (recipes NAME for params)"),
     "layer": (cmd_layer, "layer FILE add|rm ID"),
     "serve": (cmd_serve, "HTTP API for the /lab page (default port 8765)"),
+    "ask": (lambda a: __import__("gridlab.assist", fromlist=["x"]).cmd_ask(a),
+            'ask FILE "request" [--region R] [--layer ID] [--dry-run]: Jev routes text to an op (apply/candidates/handoff)'),
+    "brief": (lambda a: __import__("gridlab.assist", fromlist=["x"]).cmd_brief(a),
+              'brief "a delicate airy ring pendant" [--out FILE] [--n 6]: Jev picks recipe+settings -> variants sheet'),
     "gallery": (cmd_gallery, "build public/lab/gallery.json from all recipes + samples"),
 }
 

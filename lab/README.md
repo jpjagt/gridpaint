@@ -56,6 +56,8 @@ uv run pytest                # tests
 | `metrics FILE [--json]` | full metrics |
 | `layer FILE add\|rm ID` | add/remove layers |
 | `recipes [NAME]` | list recipes / show params |
+| `ask FILE "request" [--region R] [--layer ID] [--dry-run]` | Jev routes free text to a registered op: apply (undoable) / candidates sheet / handoff |
+| `brief "a delicate airy ring pendant" [--out FILE] [--n 6]` | Jev picks recipe + silhouette/density/symmetry/layers/size -> variants sheet |
 | `serve [--port 8765]` | HTTP API for the /lab page |
 | `gallery [--out ../public/lab/gallery.json] [--seeds 3] [--only a,b]` | static gallery |
 
@@ -77,6 +79,49 @@ bin/gl show $F                       # then Read work/pendant.png
 bin/gl variants $F "op $F clear --layer 2; gen $F symmetric_noise --layer-map 1:2 width=13 height=21" --seeds 1..6
 bin/gl pick work/pendant.v4.json $F --clean
 ```
+
+## Jev in gridlab (`ask`, `brief`)
+
+`gridlab/jev.py` is a urllib client for TypeSafe Jev (model pinned to `jev-1.13.0`, key from `TYPESAFE_API_KEY` or
+`lab/.env`). It caches answers in `work/.jev-cache/` by (state, questions), logs every exchange to
+`work/.jev-cache/log.jsonl`, and falls back to a keyword `HeuristicJudge` that returns the same answer shapes when
+there is no key or a call fails. `GRIDLAB_JEV=off|cache|jev` or `--judge` chooses the judge.
+`gridlab/assist.py` uses it only where `docs/jev-experiments.md` shows it works: **language -> closed-set choices**.
+It never reads grids or judges beauty. Code computes the metrics, and you or the human look at the PNGs.
+
+- `gl ask work/x.json "fill the holes in layer 3"` builds the op options **from the live registry**
+  (hand-written descriptions in `assist.OP_HINTS`, else the op docstring's first sentence). It asks the op Choice
+  in forward and reversed order and averages them, then gets the args as Choices plus "was it stated?" Nouls.
+  - **conf ≥ 0.7**: applies the edit (one undo entry).
+  - **0.5–0.7**, or an essential arg left open (mirror axis, d4 vs rot4, flip axis): writes `x.vN.json` candidates
+    plus `work/x.ask.png`, then you run `gl pick`.
+  - **`other`, conf < 0.5, or the two orders disagree**: prints `handoff:` with the likely ops. You (the
+    coordinator) decide, chain ops for compound requests, or ask the user.
+
+  Code still does the exact work: `--layer` and "layer N" beat Jev, and "bottom half" is a side, not a layer.
+  "make the top layer the skeleton of the middle" becomes `copy-layer` then the op. Symmetry ops on off-centre
+  designs use `cx/cy` or trim first. Square-only kinds (`d4`/`rot4`/`diag`) resize first.
+- `gl brief "..."` chooses the recipe (from the registry: title, description and section) and the buckets. A slot
+  the brief does not imply (conf < 0.5, or its `*_stated` Noul is low) uses the recipe default in v1 and is sampled
+  from Jev's probabilities in v2..vN. Buckets map onto whatever knobs a recipe exposes
+  (`silhouette/shape`, `sym`, `density/fill` as a ×0.6–1.25 nudge, `layers`, `width/height/size`). An empty result is
+  re-run with only the choice params.
+- Observed with real Jev on `samples/multi_1.json` (18 requests, 22 API calls including briefs):
+  - **11 auto-applied, all with the right op**: mirror L->R, remove specks, top = skeleton(middle),
+    fill holes in L3, frame, a bit chunkier on the bottom layer, clip-to-below, join the floating bits, swap top and
+    middle, "bottom half match the top", and stray dots with `--region`.
+  - **3 became candidate sheets**: "4-fold symmetric" (d4 vs rot4), "flip upside down" (axis not stated), and
+    "layer 2 hug the outline of layer 3" (conf 0.61: outline vs clip-to-below).
+  - **4 were handed off**: "export svg", "I don't love it", "too busy, thin it out" (sym-thin/erode/skeleton tie) and
+    "soften the corners" (there is no smoothing op).
+  - Briefs: leaf+veins → `venation_spine` D1 2 layers (conf 1.0); airy ring → ring/very-airy/D4 with the recipe
+    sampled (conf 0.41); chunky celtic medallion → dense/D4/large, but the recipe was unsure (0.20) because there is
+    no truchet recipe.
+- Caveats:
+  - Adding or renaming an op changes the routing questions, which invalidates the cache (one new call per request).
+  - The op descriptions are the main tuning knob, and they are worth more than thresholds. Example: `frame` (border
+    around the silhouette) vs `outline` (band around every stroke).
+  - What a bucket means per recipe is a heuristic.
 
 ## Python API (for recipe/op authors)
 
