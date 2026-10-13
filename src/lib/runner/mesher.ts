@@ -179,7 +179,16 @@ export function tileLayout(grid: SliceGrid): TileLayout {
   }
 }
 
-/** Corner-tile case for every grid corner of a slice */
+/** Cell value for metal cells (1 = regular filled cell) */
+export const CELL_METAL = 2
+/** Set on a tile's case when any of its cells is metal; the low 4 bits are the shape */
+export const METAL_BIT = 16
+const SHAPE = 15
+
+/**
+ * Corner-tile case for every grid corner of a slice: shape bits (0..15),
+ * plus METAL_BIT when the tile touches a metal cell.
+ */
 export function computeCases(grid: SliceGrid, out: Uint8Array): Uint8Array {
   const { cols, rows, cells } = grid
   const tx = cols + 1
@@ -188,17 +197,18 @@ export function computeCases(grid: SliceGrid, out: Uint8Array): Uint8Array {
   for (let j = 0; j < ty; j++) {
     for (let i = 0; i < tx; i++) {
       let c = 0
+      let v = 0
       const hasL = i > 0
       const hasR = i < cols
       if (j > 0) {
         const row = (j - 1) * cols
-        if (hasL && cells[row + i - 1]) c |= 1 // SW
-        if (hasR && cells[row + i]) c |= 2 // SE
+        if (hasL && (v = cells[row + i - 1])) c |= 1 | (v === CELL_METAL ? METAL_BIT : 0) // SW
+        if (hasR && (v = cells[row + i])) c |= 2 | (v === CELL_METAL ? METAL_BIT : 0) // SE
       }
       if (j < rows) {
         const row = j * cols
-        if (hasR && cells[row + i]) c |= 4 // NE
-        if (hasL && cells[row + i - 1]) c |= 8 // NW
+        if (hasR && (v = cells[row + i])) c |= 4 | (v === CELL_METAL ? METAL_BIT : 0) // NE
+        if (hasL && (v = cells[row + i - 1])) c |= 8 | (v === CELL_METAL ? METAL_BIT : 0) // NW
       }
       out[j * tx + i] = c
     }
@@ -228,7 +238,10 @@ export function buildChunkMesh(
   const cases = slices.map((s) => computeCases(s, new Uint8Array(tileCount)))
 
   const fronts = new FloatBuilder(32768)
+  const metalFronts = new FloatBuilder(1024)
   const walls = new WallBuilder()
+  const metalWalls = new FloatBuilder(1024)
+  const metalNormals = new FloatBuilder(1024)
   const outlines = new LineBuilder()
   const seams = new LineBuilder()
 
@@ -240,26 +253,32 @@ export function buildChunkMesh(
     for (let j = 0; j < tilesY; j++) {
       const y = vy0 + j
       let runStart = -1
+      let runMetal = false
       const flushRun = (endExclusive: number) => {
         if (runStart < 0) return
         const xa = vx0 + runStart - 1
         const xb = vx0 + endExclusive - 1
-        pushQuad(fronts, xa, y - 0.5, xb, y + 0.5, z)
+        pushQuad(runMetal ? metalFronts : fronts, xa, y - 0.5, xb, y + 0.5, z)
         runStart = -1
       }
       for (let i = iMin; i <= iMax; i++) {
         const t = j * tilesX + i
-        const c = cur[t]
-        if (c === 0 || caseContainedIn(c, prev[t])) {
+        const c = cur[t] & SHAPE
+        const metal = (cur[t] & METAL_BIT) !== 0
+        if (c === 0 || caseContainedIn(c, prev[t] & SHAPE)) {
           flushRun(i)
           continue
         }
         if (c === CASE_FULL) {
-          if (runStart < 0) runStart = i
+          if (runStart >= 0 && runMetal !== metal) flushRun(i)
+          if (runStart < 0) {
+            runStart = i
+            runMetal = metal
+          }
           continue
         }
         flushRun(i)
-        pushTris(fronts, templates[c], vx0 + i - 0.5, y, z)
+        pushTris(metal ? metalFronts : fronts, templates[c], vx0 + i - 0.5, y, z)
       }
       flushRun(iMax + 1)
     }
@@ -269,7 +288,8 @@ export function buildChunkMesh(
   const runCase = new Uint8Array(tileCount)
   const runStart = new Int32Array(tileCount)
   runCase.set(cases[1])
-  const emitWall = (t: number, c: number, s0: number, s1: number) => {
+  const emitWall = (t: number, caseByte: number, s0: number, s1: number) => {
+    const c = caseByte & SHAPE
     if (c === 0 || c === CASE_FULL) return
     const i = t % tilesX
     if (i < iMin || i > iMax) return
@@ -279,6 +299,10 @@ export function buildChunkMesh(
     const z0 = -s0 * sliceDepth
     const z1 = -s1 * sliceDepth
     const seg = templates[c].contour
+    if (caseByte & METAL_BIT) {
+      pushNormalWalls(metalWalls, metalNormals, templates[c], x, y, z0, z1)
+      return
+    }
     for (let k = 0; k < seg.length; k += 4) {
       walls.wall(x + seg[k], y + seg[k + 1], x + seg[k + 2], y + seg[k + 3], z0, z1)
     }
@@ -304,8 +328,8 @@ export function buildChunkMesh(
     for (let t = 0; t < tileCount; t++) {
       const i = t % tilesX
       if (i < iMin || i > iMax) continue
-      const ca = a[t]
-      const cb = b[t]
+      const ca = a[t] & SHAPE
+      const cb = b[t] & SHAPE
       if (ca === cb) {
         if (ca !== 0 && ca !== CASE_FULL) emitContour(seams, templates[ca], t, layout, z)
       } else {
@@ -317,6 +341,9 @@ export function buildChunkMesh(
 
   return {
     fronts: fronts.finish(),
+    metalFronts: metalFronts.finish(),
+    metalSides: metalWalls.finish(),
+    metalSideNormals: metalNormals.finish(),
     sides: walls.finish(),
     outlines: outlines.finish(),
     seams: seams.finish(),
@@ -338,6 +365,45 @@ function emitContour(
   for (let k = 0; k < seg.length; k += 4) {
     lines.segment(x + seg[k], y + seg[k + 1], x + seg[k + 2], y + seg[k + 3], z)
   }
+}
+
+/** Walls with per-vertex normals (smooth along arcs), unmerged */
+function pushNormalWalls(
+  pos: FloatBuilder,
+  nrm: FloatBuilder,
+  tpl: TileTemplate,
+  x: number,
+  y: number,
+  z0: number,
+  z1: number,
+) {
+  const seg = tpl.contour
+  const nn = tpl.normals
+  const count = (seg.length / 4) * 18
+  pos.reserve(count)
+  nrm.reserve(count)
+  const p = pos.data
+  const q = nrm.data
+  let o = pos.length
+  for (let k = 0; k < seg.length; k += 4) {
+    const ax = x + seg[k], ay = y + seg[k + 1], bx = x + seg[k + 2], by = y + seg[k + 3]
+    const anx = nn[k], any = nn[k + 1], bnx = nn[k + 2], bny = nn[k + 3]
+    const verts = [
+      ax, ay, z0, anx, any, bx, by, z0, bnx, bny, bx, by, z1, bnx, bny,
+      ax, ay, z0, anx, any, bx, by, z1, bnx, bny, ax, ay, z1, anx, any,
+    ]
+    for (let v = 0; v < verts.length; v += 5) {
+      p[o] = verts[v]
+      p[o + 1] = verts[v + 1]
+      p[o + 2] = verts[v + 2]
+      q[o] = verts[v + 3]
+      q[o + 1] = verts[v + 4]
+      q[o + 2] = 0
+      o += 3
+    }
+  }
+  pos.length = o
+  nrm.length = o
 }
 
 function pushTris(b: FloatBuilder, tpl: TileTemplate, x: number, y: number, z: number) {

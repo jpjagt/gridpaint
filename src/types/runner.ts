@@ -93,6 +93,8 @@ export interface RunnerWorldConfig {
   biomeWeights: Record<BiomeId, number>
   /** > 0: the world repeats every this many tiles, seamlessly (for video loops) */
   loopLength: number
+  /** Share of placed structures made of metal (0..1). Terrain and ground stay matte. */
+  metalFraction: number
 }
 
 export interface RunnerRenderConfig {
@@ -102,6 +104,17 @@ export interface RunnerRenderConfig {
   chunksPerFrame: number
   /** Lower the pixel ratio automatically when frames keep missing vsync */
   adaptiveResolution: boolean
+}
+
+export interface RunnerMetalConfig {
+  /** HDRI file name in public/three-assets/hdri (without .hdr) */
+  envMap: string
+  /** Mip level to sample: 0 = sharp mirror, ~2-4 = brushed */
+  blur: number
+  exposure: number
+  /** >1 deepens darks, <1 flattens */
+  contrast: number
+  tint: string
 }
 
 export interface RunnerCaptureConfig {
@@ -126,6 +139,7 @@ export interface RunnerConfig {
   character: RunnerCharacterConfig
   world: RunnerWorldConfig
   render: RunnerRenderConfig
+  metal: RunnerMetalConfig
   capture: RunnerCaptureConfig
 }
 
@@ -144,6 +158,8 @@ export interface WorldGenParams {
   transitionLength: number
   biomeWeights: Record<BiomeId, number>
   loopLength: number
+  /** Share of placed structures made of metal (0..1) */
+  metalFraction: number
   /** Cells that must stay empty in every slice, as [column, row] */
   tunnels: [number, number][]
   /** Rows 0..doorHeight-1 (3 wide) are cut through anything built across the path */
@@ -205,6 +221,8 @@ export interface Structure {
   top: number
   /** 0 = none, 2 = mirror in X, 4 = mirror in X and Z */
   symmetry: 0 | 2 | 4
+  /** Rendered with the metal material */
+  metal?: boolean
   contains(lx: number, row: number, lz: number): boolean
 }
 
@@ -236,6 +254,8 @@ export interface TileTemplate {
   tris: Float32Array
   /** Outline segments as (u0, v0, u1, v1) */
   contour: Float32Array
+  /** Outward unit normal at each contour endpoint, (nx0, ny0, nx1, ny1) per segment */
+  normals: Float32Array
 }
 
 export interface ChunkMeshData {
@@ -247,6 +267,11 @@ export interface ChunkMeshData {
   outlines: Float32Array
   /** Seams between equal consecutive layers (xyz line segment pairs) */
   seams: Float32Array
+  /** Metal structures: fronts (xyz triangles, normal +Z) */
+  metalFronts: Float32Array
+  /** Metal structures: side walls (xyz triangles) with per-vertex normals */
+  metalSides: Float32Array
+  metalSideNormals: Float32Array
 }
 
 // === Worker protocol ===

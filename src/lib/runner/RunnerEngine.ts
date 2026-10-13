@@ -26,8 +26,11 @@ import { RunnerCharacter } from "./character"
 import {
   applyFog,
   createFaceMaterial,
+  createFallbackEnv,
   createLineMaterial,
+  createMetalMaterial,
   hexToVec3,
+  loadGrayscaleEnv,
 } from "./materials"
 
 interface ChunkEntry {
@@ -60,6 +63,10 @@ export class RunnerEngine {
   private sideMat = createFaceMaterial()
   private outlineMat = createLineMaterial(false)
   private seamMat = createLineMaterial(true)
+  private metalFrontMat = createMetalMaterial(true)
+  private metalSideMat = createMetalMaterial(false)
+  private envName = ""
+  private env: THREE.Texture = createFallbackEnv()
 
   private worker: Worker
   private generation = 0
@@ -162,7 +169,8 @@ export class RunnerEngine {
     for (const entry of this.chunks.values()) this.disposeChunk(entry)
     this.chunks.clear()
     this.character.dispose()
-    for (const m of [this.frontMat, this.sideMat, this.outlineMat, this.seamMat]) m.dispose()
+    for (const m of this.allMaterials()) m.dispose()
+    this.env.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()
   }
@@ -173,7 +181,8 @@ export class RunnerEngine {
     this.config = config
     const c = config.colors
 
-    for (const m of [this.frontMat, this.sideMat, this.outlineMat, this.seamMat]) applyFog(m, config)
+    for (const m of this.allMaterials()) applyFog(m, config)
+    this.applyMetal(config)
     hexToVec3(c.front, this.frontMat.uniforms.uColor.value)
     hexToVec3(c.front, this.frontMat.uniforms.uColorTop.value)
     hexToVec3(c.side, this.sideMat.uniforms.uColor.value)
@@ -204,6 +213,9 @@ export class RunnerEngine {
     const up = new THREE.Vector3(0, 1, 0).transformDirection(this.camera.matrixWorldInverse)
     this.frontMat.uniforms.uUpView.value.copy(up)
     this.sideMat.uniforms.uUpView.value.copy(up)
+    for (const m of [this.metalFrontMat, this.metalSideMat]) {
+      m.uniforms.uViewToWorld.value.setFromMatrix4(this.camera.matrixWorld)
+    }
 
     this.character.applyConfig(config)
 
@@ -211,6 +223,34 @@ export class RunnerEngine {
     if (key !== this.worldKey) {
       this.worldKey = key
       this.resetWorld()
+    }
+  }
+
+  private allMaterials() {
+    return [this.frontMat, this.sideMat, this.outlineMat, this.seamMat, this.metalFrontMat, this.metalSideMat]
+  }
+
+  private applyMetal(config: RunnerConfig) {
+    const m = config.metal
+    for (const mat of [this.metalFrontMat, this.metalSideMat]) {
+      const u = mat.uniforms
+      u.uEnv.value = this.env
+      u.uBlur.value = m.blur
+      u.uExposure.value = m.exposure
+      u.uContrast.value = m.contrast
+      hexToVec3(m.tint, u.uTint.value)
+    }
+    if (m.envMap !== this.envName) {
+      this.envName = m.envMap
+      const name = m.envMap
+      loadGrayscaleEnv(`/three-assets/hdri/${name}.hdr`)
+        .then((tex) => {
+          if (this.envName !== name) return tex.dispose()
+          this.env.dispose()
+          this.env = tex
+          for (const mat of [this.metalFrontMat, this.metalSideMat]) mat.uniforms.uEnv.value = tex
+        })
+        .catch((err) => console.warn("Runner: failed to load environment map", err))
     }
   }
 
@@ -375,13 +415,23 @@ export class RunnerEngine {
     add(m.sides, this.sideMat, false)
     add(m.outlines, this.outlineMat, true)
     add(m.seams, this.seamMat, true)
+    add(m.metalFronts, this.metalFrontMat, false)
+    if (m.metalSides.length > 0) {
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute("position", new THREE.BufferAttribute(m.metalSides, 3))
+      geo.setAttribute("normal", new THREE.BufferAttribute(m.metalSideNormals, 3))
+      const mesh = new THREE.Mesh(geo, this.metalSideMat)
+      mesh.frustumCulled = false
+      mesh.matrixAutoUpdate = false
+      group.add(mesh)
+    }
     this.world.add(group)
     return {
       index: res.chunk,
       group,
       lod: pend.lod,
       colLimit: pend.colLimit,
-      triangles: (m.fronts.length + m.sides.length) / 9,
+      triangles: (m.fronts.length + m.sides.length + m.metalFronts.length + m.metalSides.length) / 9,
       lineSegments: (m.outlines.length + m.seams.length) / 6,
       biome: res.biome,
     }

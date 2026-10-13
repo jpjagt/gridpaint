@@ -229,6 +229,16 @@ function buildGui(
     weights.add(config.world.biomeWeights, key, 0, 5, 0.1).onFinishChange(apply)
   }
 
+  const metal = gui.addFolder("metal").close()
+  metal.add(config.world, "metalFraction", 0, 1, 0.05).name("share (rebuilds)").onFinishChange(apply)
+  metal
+    .add(config.metal, "envMap", ["studio_small_08_1k", "kloppenheim_06_2k", "quattro_canti_2k", "potsdamer_platz_2k"])
+    .onChange(apply)
+  metal.add(config.metal, "blur", 0, 6, 0.1).onChange(apply)
+  metal.add(config.metal, "exposure", 0.2, 3, 0.05).onChange(apply)
+  metal.add(config.metal, "contrast", 0.3, 3, 0.05).onChange(apply)
+  metal.addColor(config.metal, "tint").onChange(apply)
+
   const r = gui.addFolder("render").close()
   r.add(config.render, "maxPixelRatio", 0.5, 3, 0.25).onChange(apply)
   r.add(config.render, "adaptiveResolution").onChange(apply)

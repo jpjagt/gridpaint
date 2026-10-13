@@ -59,6 +59,9 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       mesh.sides.buffer,
       mesh.outlines.buffer,
       mesh.seams.buffer,
+      mesh.metalFronts.buffer,
+      mesh.metalSides.buffer,
+      mesh.metalSideNormals.buffer,
     ])
   }
 }

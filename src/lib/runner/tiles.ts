@@ -87,6 +87,8 @@ function arcPoints(q: QuadrantSpec, segments: number): number[] {
 function buildTemplate(c: number, segments: number): TileTemplate {
   const tris: number[] = []
   const contour: number[] = []
+  // Outward normal (nx, ny) at each contour endpoint, for lit/metal walls
+  const normals: number[] = []
   const filledEdge = new Map<number, boolean>()
 
   for (const q of QUADRANTS) {
@@ -101,17 +103,28 @@ function buildTemplate(c: number, segments: number): TileTemplate {
       // Disk: fan from the cell centre. Bridge: fan from the grid corner.
       const ox = kind === "disk" ? q.fx : 0
       const oy = kind === "disk" ? q.fy : 0
+      // Disk: filled inside the circle (normal points away from its centre).
+      // Bridge: filled outside it (normal points toward the centre).
+      const sign = kind === "disk" ? 1 : -1
+      const radial = (u: number, v: number) => [sign * (u - q.fx) * 2, sign * (v - q.fy) * 2]
       for (let i = 0; i < segments; i++) {
-        tris.push(ox, oy, pts[i * 2], pts[i * 2 + 1], pts[i * 2 + 2], pts[i * 2 + 3])
-        contour.push(pts[i * 2], pts[i * 2 + 1], pts[i * 2 + 2], pts[i * 2 + 3])
+        const [u0, v0, u1, v1] = [pts[i * 2], pts[i * 2 + 1], pts[i * 2 + 2], pts[i * 2 + 3]]
+        tris.push(ox, oy, u0, v0, u1, v1)
+        contour.push(u0, v0, u1, v1)
+        normals.push(...radial(u0, v0), ...radial(u1, v1))
       }
     }
   }
 
   // Inner edges along the axes: an outline wherever one side is filled and
   // the other isn't. Disks only touch the axes at their endpoints.
+  // `a` is the quadrant above (horizontal edge) or right of (vertical edge) it
   const edge = (a: number, b: number, u: number, v: number) => {
-    if (filledEdge.get(a) !== filledEdge.get(b)) contour.push(0, 0, u, v)
+    if (filledEdge.get(a) === filledEdge.get(b)) return
+    contour.push(0, 0, u, v)
+    const s = filledEdge.get(a) ? -1 : 1
+    const [nx, ny] = v === 0 ? [0, s] : [s, 0]
+    normals.push(nx, ny, nx, ny)
   }
   // Left half before right half so the mesher can merge horizontal runs
   edge(BIT_NW, BIT_SW, -0.5, 0)
@@ -119,7 +132,11 @@ function buildTemplate(c: number, segments: number): TileTemplate {
   edge(BIT_NE, BIT_NW, 0, 0.5)
   edge(BIT_SE, BIT_SW, 0, -0.5)
 
-  return { tris: new Float32Array(tris), contour: new Float32Array(contour) }
+  return {
+    tris: new Float32Array(tris),
+    contour: new Float32Array(contour),
+    normals: new Float32Array(normals),
+  }
 }
 
 const cache = new Map<number, TileTemplate[]>()

@@ -103,6 +103,25 @@ describe("corner tiles", () => {
     }
   })
 
+  it("has unit outward normals on every outline endpoint", () => {
+    const t = getTileTemplates(6)
+    for (let c = 0; c < 16; c++) {
+      const { contour, normals } = t[c]
+      expect(normals.length).toBe(contour.length)
+      for (let k = 0; k < contour.length; k += 4) {
+        const mu = (contour[k] + contour[k + 2]) / 2
+        const mv = (contour[k + 1] + contour[k + 3]) / 2
+        const nx = (normals[k] + normals[k + 2]) / 2
+        const ny = (normals[k + 1] + normals[k + 3]) / 2
+        expect(Math.hypot(normals[k], normals[k + 1])).toBeCloseTo(1, 5)
+        // a small step along the normal leaves the shape, against it enters
+        const e = 0.02
+        expect(inside(c, mu + nx * e, mv + ny * e), `case ${c} seg ${k / 4} out`).toBe(false)
+        expect(inside(c, mu - nx * e, mv - ny * e), `case ${c} seg ${k / 4} in`).toBe(true)
+      }
+    }
+  })
+
   it("front triangles cover exactly the blob shape", () => {
     const t = getTileTemplates(16)
     for (let c = 0; c < 16; c++) {

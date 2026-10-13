@@ -72,6 +72,7 @@ class FieldSet {
         this.params.halfWidth,
         this.params.sliceDepth,
         this.params.doorHeight,
+        this.params.metalFraction,
       ),
     )
     return this
@@ -264,9 +265,11 @@ class PlainsBiome implements Biome {
   id: BiomeId = "plains"
   ground = 1
   private seed: number
+  private metalFraction: number
 
   constructor(params: WorldGenParams) {
     this.seed = params.seed
+    this.metalFraction = params.metalFraction
   }
 
   fill(ctx: SliceContext, grid: SliceGrid) {
@@ -286,14 +289,24 @@ class PlainsBiome implements Biome {
     const cubeSize = 1 + Math.floor(rng() * 2)
 
     const list: Structure[] = []
+    // whole stretches of frames/poles are metal (separate hash: shapes unchanged)
+    const frameMetal = rand3(seg, 31, 0, this.seed) < this.metalFraction * 1.5
+    const poleMetal = rand3(seg, 32, 0, this.seed) < this.metalFraction
     const near = (spacing: number) => {
       const k = Math.round(zt / spacing)
       return k * spacing
     }
-    if (frames) list.push(frameAt(frameW, frameH, near(frameSpacing)))
+    if (frames) {
+      const f = frameAt(frameW, frameH, near(frameSpacing))
+      f.metal = frameMetal
+      list.push(f)
+    }
     if (poles) {
       const cz = near(poleSpacing)
-      list.push(pole(poleH, poleX, cz, 2), pole(poleH, -poleX, cz, 2))
+      for (const p of [pole(poleH, poleX, cz, 2), pole(poleH, -poleX, cz, 2)]) {
+        p.metal = poleMetal
+        list.push(p)
+      }
     }
     const cz = near(grid0)
     for (let cx = grid0 * 2; cx <= grid.halfWidth; cx += grid0) {

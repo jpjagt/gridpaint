@@ -11,7 +11,8 @@ import type {
   StructureFieldOptions,
 } from "@/types/runner"
 import { MIN_ROW } from "../config"
-import { hash3, makeRng } from "../noise"
+import { CELL_METAL } from "../mesher"
+import { hash3, makeRng, rand3 } from "../noise"
 
 type Contains = Structure["contains"]
 
@@ -253,6 +254,7 @@ export class StructureField {
     private halfWidth: number,
     private sliceDepth: number,
     private doorHeight: number,
+    private metalFraction: number,
   ) {}
 
   /** Structures whose Z extent covers zt */
@@ -290,8 +292,12 @@ export class StructureField {
       cz = Math.round(cz / this.sliceDepth) * this.sliceDepth
       const s = factory(rng, cx, cz)
       if (!s) continue
+      // separate hash, so changing the metal share never changes the shapes
+      s.metal = rand3(n, m, this.fieldId + 7777, this.seed) < this.metalFraction
       if (onPath) {
-        list.push(withDoorway(s, this.doorHeight))
+        const door = withDoorway(s, this.doorHeight)
+        door.metal = s.metal
+        list.push(door)
       } else {
         // Off-path structures never cover the path (±1 column)
         if (s.cx - s.hx <= 1 && s.cx + s.hx >= -1) {
@@ -322,6 +328,7 @@ export function stampStructures(grid: SliceGrid, structures: Structure[], zt: nu
   const { cols, halfWidth, cells } = grid
   const maxRow = MIN_ROW + grid.rows - 1
   for (const s of structures) {
+    const value = s.metal ? CELL_METAL : 1
     let lz = zt - s.cz
     if (s.symmetry === 4) lz = Math.abs(lz)
     const c0 = Math.max(-halfWidth, s.cx - s.hx)
@@ -333,7 +340,7 @@ export function stampStructures(grid: SliceGrid, structures: Structure[], zt: nu
       for (let col = c0; col <= c1; col++) {
         let lx = col - s.cx
         if (s.symmetry !== 0) lx = Math.abs(lx)
-        if (s.contains(lx, row, lz)) cells[base + col] = 1
+        if (s.contains(lx, row, lz)) cells[base + col] = value
       }
     }
   }

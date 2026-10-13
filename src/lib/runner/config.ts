@@ -69,12 +69,20 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
       megacity: 0.8,
     },
     loopLength: 0,
+    metalFraction: 0.3,
   },
   render: {
     maxPixelRatio: 2,
     antialias: true,
     chunksPerFrame: 1,
     adaptiveResolution: true,
+  },
+  metal: {
+    envMap: "studio_small_08_1k",
+    blur: 1.5,
+    exposure: 1.15,
+    contrast: 1.1,
+    tint: "#ffffff",
   },
   capture: {
     width: 1920,
@@ -104,6 +112,7 @@ export function toWorldGenParams(config: RunnerConfig): WorldGenParams {
     transitionLength: w.transitionLength,
     biomeWeights: { ...w.biomeWeights },
     loopLength: w.loopLength,
+    metalFraction: w.metalFraction,
     tunnels: [
       [0, CHARACTER_ROW],
       ...cameraTunnelRows(config).map((r) => [0, r] as [number, number]),
@@ -122,7 +131,7 @@ export function cloneConfig(config: RunnerConfig): RunnerConfig {
  * seed, speed, depth (slice depth), seams (0/1), fog (far distance),
  * at (start distance), biome (only these biomes, comma-separated),
  * loop (loop length in tiles; the world repeats seamlessly),
- * quality (low | high), res (export size, e.g. 3840x2160), fps (export).
+ * metal (share of metal structures 0..1), quality (low | high), res (export size, e.g. 3840x2160), fps (export).
  */
 export function applyUrlOverrides(
   config: RunnerConfig,
@@ -165,6 +174,8 @@ export function applyUrlOverrides(
   }
   const fps = num("fps")
   if (fps !== undefined && fps > 0) config.capture.fps = fps
+  const metal = num("metal")
+  if (metal !== undefined) config.world.metalFraction = Math.min(1, Math.max(0, metal))
   const loop = num("loop")
   if (loop !== undefined && loop >= 0) config.world.loopLength = loop
   const at = num("at")
