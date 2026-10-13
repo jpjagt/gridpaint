@@ -176,9 +176,16 @@ describe("export rectangle scale overrides", () => {
     }
     const solid = createLayeredModel({ ...options, includeCutouts: false })!
     const holed = createLayeredModel(options)!
-    const solidMesh = solid.group.children[0] as InstanceType<typeof Mesh>
-    const holeMesh = holed.group.children[0] as InstanceType<typeof Mesh>
-    const removedVolumeMm = (meshVolume(solidMesh.geometry) - meshVolume(holeMesh.geometry)) * scale ** 3
+    const firstMesh = (root: typeof solid.group) => {
+      let found: InstanceType<typeof Mesh> | undefined
+      root.traverse(o => { if (!found && o instanceof Mesh) found = o })
+      return found!
+    }
+    const solidMesh = firstMesh(solid.group)
+    const holeMesh = firstMesh(holed.group)
+    // Geometry is built one unit thick per layer; thickness is the stack's z-scale
+    const worldVolume = (mesh: InstanceType<typeof Mesh>) => meshVolume(mesh.geometry) * mesh.parent!.scale.z
+    const removedVolumeMm = (worldVolume(solidMesh) - worldVolume(holeMesh)) * scale ** 3
     // Physical volume of a pill: diameter * center distance + two semicircles, at 1 mm thick.
     const expectedVolume = fixture.heightMm * 3 * scale + Math.PI * (fixture.heightMm / 2) ** 2
     expect(Math.abs(removedVolumeMm - expectedVolume) / expectedVolume).toBeLessThan(0.005)

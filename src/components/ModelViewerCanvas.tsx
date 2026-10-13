@@ -1,8 +1,11 @@
 /**
  * ModelViewerCanvas - Three.js canvas for rendering the 3D model preview.
+ *
+ * The renderer/scene live as long as the canvas; the model is rebuilt only
+ * when its inputs change, and thickness changes just rescale it.
  */
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import {
   createSceneSetup,
@@ -12,6 +15,7 @@ import {
   LAYER_THICKNESS_OPTIONS,
   type LayerThickness,
   type CameraSyncGroup,
+  type SceneSetup,
 } from "@/lib/threejs"
 import { CustomThicknessInput } from "@/components/CustomThicknessInput"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
@@ -46,27 +50,58 @@ export function ModelViewerCanvas({
   cameraSync = null,
 }: ModelViewerCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const setupRef = useRef<ReturnType<typeof createSceneSetup> | null>(null)
+  const [setup, setSetup] = useState<SceneSetup | null>(null)
   const modelGroupRef = useRef<THREE.Group | null>(null)
-  const animationRef = useRef<number>(0)
 
-  const initScene = useCallback(() => {
-    if (!containerRef.current) return
+  const effectiveMmPerUnit =
+    exportRect.customMmPerUnit && exportRect.customMmPerUnit > 0
+      ? exportRect.customMmPerUnit
+      : canvasView.mmPerUnit
+  // Read by the model build without making thickness a rebuild trigger
+  const thicknessRef = useRef(layerThickness)
+  thicknessRef.current = layerThickness
 
-    if (setupRef.current) {
-      setupRef.current.dispose()
+  // Renderer, scene, controls and render loop: created once per canvas.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const sceneSetup = createSceneSetup({ container })
+    setSetup(sceneSetup)
+
+    let frame = 0
+    const animate = () => {
+      frame = requestAnimationFrame(animate)
+      sceneSetup.controls.update()
+      sceneSetup.renderer.render(sceneSetup.scene, sceneSetup.camera)
     }
+    animate()
 
-    const setup = createSceneSetup({
-      container: containerRef.current,
-    })
-    setupRef.current = setup
+    const handleResize = () => {
+      const { clientWidth, clientHeight } = container
+      sceneSetup.camera.aspect = clientWidth / clientHeight
+      sceneSetup.camera.updateProjectionMatrix()
+      sceneSetup.renderer.setSize(clientWidth, clientHeight)
+    }
+    window.addEventListener("resize", handleResize)
+
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      cancelAnimationFrame(frame)
+      sceneSetup.dispose()
+      setSetup(null)
+    }
+  }, [])
+
+  // (Re)build the model when its inputs change and frame it.
+  useEffect(() => {
+    if (!setup) return
 
     const result = createLayeredModel({
       layers,
       exportRect,
       canvasView,
-      layerThickness,
+      layerThickness: thicknessRef.current,
       reverseLayers,
       includeCutouts,
     })
@@ -74,12 +109,7 @@ export function ModelViewerCanvas({
     if (result && result.group) {
       setup.scene.add(result.group)
       modelGroupRef.current = result.group
-
-      const center = new THREE.Vector3()
-      result.boundingBox.getCenter(center)
-      result.group.position.x -= center.x
-      result.group.position.y -= center.y
-      result.group.position.z -= center.z
+      centerModel(result.group)
 
       const distance = 100
       const angleRight = 30 * (Math.PI / 180)
@@ -98,50 +128,17 @@ export function ModelViewerCanvas({
       setup.camera.lookAt(0, 0, 0)
     }
 
-    const animate = () => {
-      animationRef.current = requestAnimationFrame(animate)
-      setup.controls.update()
-      setup.renderer.render(setup.scene, setup.camera)
-    }
-    animate()
-  }, [layers, exportRect, canvasView, layerThickness, reverseLayers, includeCutouts])
-
-  useEffect(() => {
-    initScene()
-
-    const handleResize = () => {
-      if (!containerRef.current || !setupRef.current) return
-
-      const { clientWidth, clientHeight } = containerRef.current
-      const { camera, renderer } = setupRef.current
-
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.aspect = clientWidth / clientHeight
-        camera.updateProjectionMatrix()
-      }
-
-      renderer.setSize(clientWidth, clientHeight)
-    }
-
-    window.addEventListener("resize", handleResize)
-
     return () => {
-      window.removeEventListener("resize", handleResize)
-      if (setupRef.current) {
-        setupRef.current.controls.enabled = false
+      if (result) {
+        setup.scene.remove(result.group)
+        disposeObject(result.group)
       }
-      cancelAnimationFrame(animationRef.current)
-      setupRef.current?.dispose()
-      setupRef.current = null
       modelGroupRef.current = null
     }
-  }, [initScene])
+  }, [setup, layers, exportRect, canvasView, reverseLayers, includeCutouts])
 
-  // Camera sync registration. Runs after the init effect above (declaration
-  // order), so setupRef.current holds the current scene setup. `initScene` is
-  // a dep so a rebuilt scene re-registers its new camera/controls.
+  // Camera sync registration for this canvas's camera/controls.
   useEffect(() => {
-    const setup = setupRef.current
     if (!cameraSync || !setup) return
 
     const member = { camera: setup.camera, controls: setup.controls }
@@ -153,16 +150,15 @@ export function ModelViewerCanvas({
       setup.controls.removeEventListener("change", handleChange)
       unregister()
     }
-  }, [initScene, cameraSync])
+  }, [setup, cameraSync])
 
+  // Thickness only rescales the stack; keep the model centred on the target.
   useEffect(() => {
-    if (modelGroupRef.current) {
-      const effectiveMmPerUnit = exportRect.customMmPerUnit && exportRect.customMmPerUnit > 0
-        ? exportRect.customMmPerUnit
-        : canvasView.mmPerUnit
-      updateLayerThickness(modelGroupRef.current, layerThickness, effectiveMmPerUnit)
-    }
-  }, [layerThickness, exportRect.customMmPerUnit, canvasView.mmPerUnit])
+    const group = modelGroupRef.current
+    if (!group) return
+    updateLayerThickness(group, layerThickness, effectiveMmPerUnit)
+    centerModel(group)
+  }, [setup, layerThickness, effectiveMmPerUnit])
 
   return (
     <div className='flex flex-col h-full'>
@@ -206,4 +202,23 @@ export function ModelViewerCanvas({
       )}
     </div>
   )
+}
+
+/** Centre the model's bounding box on the origin (the orbit target) */
+function centerModel(group: THREE.Group): void {
+  group.position.set(0, 0, 0)
+  const center = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3())
+  group.position.copy(center).negate()
+}
+
+function disposeObject(root: THREE.Object3D): void {
+  root.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
+      object.geometry.dispose()
+      const materials: THREE.Material[] = Array.isArray(object.material)
+        ? object.material
+        : [object.material]
+      materials.forEach((m) => m.dispose())
+    }
+  })
 }

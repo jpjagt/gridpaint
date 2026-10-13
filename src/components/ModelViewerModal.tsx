@@ -5,7 +5,7 @@
  * canvas so camera controls stay independent per rect.
  */
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -75,7 +75,8 @@ export function ModelViewerModal({
     onReverseLayersChange?.(v)
   }
 
-  const visibleLayers = layers.filter((l) => l.isVisible)
+  // Stable across re-renders so thickness/mirror changes don't rebuild models
+  const visibleLayers = useMemo(() => layers.filter((l) => l.isVisible), [layers])
 
   const shownRects = exportRects.slice(0, MAX_PREVIEW_RECTS)
   const hiddenCount = exportRects.length - shownRects.length
