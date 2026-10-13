@@ -104,6 +104,16 @@ export interface RunnerRenderConfig {
   adaptiveResolution: boolean
 }
 
+export interface RunnerCaptureConfig {
+  width: number
+  height: number
+  fps: number
+  /** Megabits per second */
+  mbps: number
+  /** Clip length when not looping (with a loop length, one loop is exported) */
+  seconds: number
+}
+
 export interface RunnerConfig {
   /** Tiles per second */
   speed: number
@@ -116,6 +126,7 @@ export interface RunnerConfig {
   character: RunnerCharacterConfig
   world: RunnerWorldConfig
   render: RunnerRenderConfig
+  capture: RunnerCaptureConfig
 }
 
 // === World generation ===
@@ -285,4 +296,17 @@ export interface RunnerStats {
 
 export interface Recording {
   stop(): void
+}
+
+export interface VideoExportOptions {
+  width: number
+  height: number
+  fps: number
+  /** Bits per second */
+  bitrate: number
+  /** Distance of the first frame */
+  startDistance: number
+  frames: number
+  /** Distance advanced per frame */
+  tilesPerFrame: number
 }

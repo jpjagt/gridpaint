@@ -76,6 +76,13 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
     chunksPerFrame: 1,
     adaptiveResolution: true,
   },
+  capture: {
+    width: 1920,
+    height: 1080,
+    fps: 60,
+    mbps: 24,
+    seconds: 12,
+  },
 }
 
 /** Rows that must stay empty so the camera always has a clear tunnel */
@@ -115,7 +122,7 @@ export function cloneConfig(config: RunnerConfig): RunnerConfig {
  * seed, speed, depth (slice depth), seams (0/1), fog (far distance),
  * at (start distance), biome (only these biomes, comma-separated),
  * loop (loop length in tiles; the world repeats seamlessly),
- * quality (low | high).
+ * quality (low | high), res (export size, e.g. 3840x2160), fps (export).
  */
 export function applyUrlOverrides(
   config: RunnerConfig,
@@ -151,6 +158,13 @@ export function applyUrlOverrides(
     config.render.adaptiveResolution = false
     config.world.arcSegments = [10, 6, 3]
   }
+  const res = params.get("res")?.match(/^(\d+)x(\d+)$/)
+  if (res) {
+    config.capture.width = Number(res[1])
+    config.capture.height = Number(res[2])
+  }
+  const fps = num("fps")
+  if (fps !== undefined && fps > 0) config.capture.fps = fps
   const loop = num("loop")
   if (loop !== undefined && loop >= 0) config.world.loopLength = loop
   const at = num("at")

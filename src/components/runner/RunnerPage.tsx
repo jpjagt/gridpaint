@@ -9,13 +9,15 @@ import {
   cloneConfig,
 } from "@/lib/runner/config"
 import { startRecording } from "@/lib/runner/recording"
+import { downloadBlob, exportVideo, videoExportSupported } from "@/lib/runner/videoExport"
 
 /**
  * Infinite runner through a generated GridPaint-style landscape.
  *
- * Keys: Space pause · H stats · G settings · R record video · F fullscreen
+ * Keys: Space pause · H stats · G settings · F fullscreen
+ *       R record realtime WebM · V export frame-exact MP4 (one loop when looping)
  * URL:  #/runner?seed=4&speed=9&depth=1&seams=0&fog=140&ui=0
- *       &biome=dream,ruins  &at=500  &loop=140&record=loop
+ *       &biome=dream,ruins  &at=500  &loop=140&record=loop  &res=3840x2160
  */
 export default function RunnerPage() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -27,6 +29,7 @@ export default function RunnerPage() {
   const [paused, setPaused] = useState(false)
   const [warming, setWarming] = useState(true)
   const [recording, setRecording] = useState(false)
+  const [exportState, setExportState] = useState("")
 
   useEffect(() => {
     const container = containerRef.current
@@ -40,30 +43,57 @@ export default function RunnerPage() {
     }
     engine.start()
 
-    const gui = buildGui(config, (next) => engine.updateConfig(next))
-    if (!showUi) gui.hide()
 
     let rec: Recording | null = null
     const recordName = `gridpaint-runner-seed${config.world.seed}`
 
-    // ?record=loop: record exactly one loop, starting on a loop boundary
-    const L = config.world.loopLength
-    if (params.get("record") === "loop" && L > 0) {
-      let startAt = -1
-      engine.onFrame = (distance) => {
-        if (engine.isWarmingUp()) return
-        if (startAt < 0) startAt = (Math.floor(distance / L) + 1) * L
-        if (!rec && distance >= startAt && distance < startAt + L) {
-          rec = startRecording(engine.canvas, `${recordName}-loop${L}`)
-          setRecording(true)
-        } else if (rec && distance >= startAt + L) {
-          rec.stop()
-          rec = null
-          setRecording(false)
-          engine.onFrame = undefined
-        }
+    // Frame-exact MP4 export (V, or ?record=loop to export one loop on load).
+    // With a loop length it renders exactly one loop: frame N would equal
+    // frame 0, so the file loops seamlessly.
+    let exporting = false
+    const runExport = async () => {
+      if (exporting) return
+      if (!videoExportSupported()) {
+        setExportState("this browser can't encode video (needs WebCodecs)")
+        return
+      }
+      exporting = true
+      const cap = config.capture
+      const L = config.world.loopLength
+      const distance = engine.getDistance()
+      const loop = L > 0
+      const frames = loop
+        ? Math.max(1, Math.round((L / config.speed) * cap.fps))
+        : Math.round(cap.seconds * cap.fps)
+      const options = {
+        width: cap.width,
+        height: cap.height,
+        fps: cap.fps,
+        bitrate: cap.mbps * 1e6,
+        startDistance: loop ? Math.ceil(distance / L) * L : distance,
+        frames,
+        tilesPerFrame: loop ? L / frames : config.speed / cap.fps,
+      }
+      try {
+        const blob = await exportVideo(engine, options, (done, total) =>
+          setExportState(`exporting ${done}/${total} frames`),
+        )
+        const name = loop ? `${recordName}-loop${L}` : `${recordName}-at${Math.round(distance)}`
+        downloadBlob(blob, `${name}-${cap.width}x${cap.height}.mp4`)
+        setExportState("")
+      } catch (err) {
+        setExportState(`export failed: ${String(err)}`)
+      } finally {
+        exporting = false
       }
     }
+    if (params.get("record") === "loop") {
+      const wait = () => (engine.isWarmingUp() ? setTimeout(wait, 100) : void runExport())
+      wait()
+    }
+
+    const gui = buildGui(config, (next) => engine.updateConfig(next), () => void runExport())
+    if (!showUi) gui.hide()
 
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
@@ -78,6 +108,8 @@ export default function RunnerPage() {
       } else if (e.key === "f" || e.key === "F") {
         if (document.fullscreenElement) void document.exitFullscreen()
         else void container.requestFullscreen()
+      } else if (e.key === "v" || e.key === "V") {
+        void runExport()
       } else if (e.key === "r" || e.key === "R") {
         if (rec) {
           rec.stop()
@@ -134,7 +166,9 @@ export default function RunnerPage() {
             `${stats.distance.toFixed(0)} tiles   ${stats.biome}`,
             warming ? "loading world…" : paused ? "paused" : "",
             recording ? "● recording (R to stop)" : "",
-            "space pause · h stats · g settings · r record · f fullscreen",
+            exportState,
+            "space pause · h stats · g settings · f fullscreen",
+            "r record (realtime webm) · v export mp4 (frame-exact)",
           ]
             .filter(Boolean)
             .join("\n")}
@@ -144,7 +178,11 @@ export default function RunnerPage() {
   )
 }
 
-function buildGui(config: RunnerConfig, onChange: (c: RunnerConfig) => void): GUI {
+function buildGui(
+  config: RunnerConfig,
+  onChange: (c: RunnerConfig) => void,
+  onExport: () => void,
+): GUI {
   const gui = new GUI({ title: "runner" })
   gui.close()
   const apply = () => onChange(config)
@@ -193,6 +231,16 @@ function buildGui(config: RunnerConfig, onChange: (c: RunnerConfig) => void): GU
 
   const r = gui.addFolder("render").close()
   r.add(config.render, "maxPixelRatio", 0.5, 3, 0.25).onChange(apply)
+  r.add(config.render, "adaptiveResolution").onChange(apply)
+
+  const ex = gui.addFolder("export mp4").close()
+  ex.add(config.world, "loopLength", 0, 1000, 10).name("loop length (0 = off)").onFinishChange(apply)
+  ex.add(config.capture, "width", 320, 3840, 2)
+  ex.add(config.capture, "height", 240, 2160, 2)
+  ex.add(config.capture, "fps", [24, 25, 30, 50, 60])
+  ex.add(config.capture, "mbps", 2, 100, 1)
+  ex.add(config.capture, "seconds", 1, 120, 1).name("seconds (no loop)")
+  ex.add({ onExport }, "onExport").name("export (V)")
 
   gui.add(
     {

@@ -89,8 +89,6 @@ export class RunnerEngine {
   private vsyncMs = Infinity
 
   onStats?: (stats: RunnerStats) => void
-  /** Called every simulation step with the distance travelled */
-  onFrame?: (distance: number) => void
 
   constructor(
     private container: HTMLElement,
@@ -228,6 +226,7 @@ export class RunnerEngine {
   }
 
   private resize() {
+    if (this.offline) return
     const w = Math.max(1, this.container.clientWidth)
     const h = Math.max(1, this.container.clientHeight)
     this.renderer.setSize(w, h, true)
@@ -247,21 +246,21 @@ export class RunnerEngine {
     this.renderer.render(this.scene, this.camera)
   }
 
-  /** Advance the simulation by dt seconds (also used for offline capture) */
+  /** Advance the simulation by dt seconds */
   step(dt: number) {
     if (this.warmingUp && this.isWorldReady()) this.warmingUp = false
-    const speed = this.paused || this.warmingUp ? 0 : this.config.speed
-    this.distance += speed * dt
+    const moving = !this.paused && !this.warmingUp
+    if (moving) this.distance += this.config.speed * dt
     this.character.update(this.distance, this.config.world.loopLength)
-    this.onFrame?.(this.distance)
     this.integrateArrivals()
     this.manageChunks()
     this.positionChunks()
   }
 
-  renderFrame() {
-    this.renderer.render(this.scene, this.camera)
+  getDistance() {
+    return this.distance
   }
+
 
   private chunkLength() {
     return this.config.world.chunkSlices * this.config.world.sliceDepth
@@ -335,9 +334,9 @@ export class RunnerEngine {
     this.worker.postMessage(msg)
   }
 
-  private integrateArrivals() {
+  private integrateArrivals(unlimited = false) {
     // Nothing is moving while warming up, so upload faster
-    let budget = this.warmingUp ? 8 : this.config.render.chunksPerFrame
+    let budget = unlimited ? Infinity : this.warmingUp ? 8 : this.config.render.chunksPerFrame
     while (budget > 0 && this.arrivals.length > 0) {
       const res = this.arrivals.shift()!
       const pend = this.pending.get(res.chunk)
@@ -397,6 +396,55 @@ export class RunnerEngine {
   }
 
   /** True once every chunk the camera can see has arrived */
+  // --- Offline rendering (frame-exact video export) -----------------------
+
+  private offline = false
+
+  /** Stop the realtime loop and render at a fixed output size */
+  beginOffline(width: number, height: number) {
+    this.stop()
+    this.offline = true
+    this.renderer.setPixelRatio(1)
+    this.renderer.setSize(width, height, false)
+    this.camera.aspect = width / height
+    this.camera.updateProjectionMatrix()
+  }
+
+  endOffline() {
+    this.offline = false
+    this.renderer.setPixelRatio(this.pixelRatio)
+    this.resize()
+    this.start()
+  }
+
+  /** Render the frame at a given distance once everything in view is fully built */
+  async renderAt(distance: number): Promise<void> {
+    this.distance = distance
+    for (;;) {
+      this.manageChunks()
+      this.integrateArrivals(true)
+      if (this.pending.size === 0 && this.isFullyBuilt()) break
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    this.character.update(this.distance, this.config.world.loopLength)
+    this.positionChunks()
+    this.renderer.render(this.scene, this.camera)
+  }
+
+  /** Every visible chunk present at the LOD and width it should have */
+  private isFullyBuilt(): boolean {
+    const len = this.chunkLength()
+    const first = Math.floor((this.distance - this.config.camera.back - 1) / len)
+    const last = Math.floor((this.distance + this.config.world.viewDistance) / len)
+    for (let c = first; c <= last; c++) {
+      const e = this.chunks.get(c)
+      if (!e) return false
+      const lod = this.lodFor(c * len - this.distance)
+      if (e.lod > lod || e.colLimit < this.colLimitFor(lod)) return false
+    }
+    return true
+  }
+
   isWorldReady(): boolean {
     const len = this.chunkLength()
     const first = Math.floor((this.distance - this.config.camera.back - 1) / len)

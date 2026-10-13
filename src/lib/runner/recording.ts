@@ -1,6 +1,6 @@
 /**
- * Realtime canvas recording to WebM via MediaRecorder. Good enough for
- * quick clips; for perfectly even frames use offline capture instead.
+ * Realtime canvas recording to WebM via MediaRecorder: quick clips of
+ * exactly what's on screen. For frame-exact output use videoExport.
  */
 
 import type { Recording } from "@/types/runner"
