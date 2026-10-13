@@ -181,3 +181,13 @@ GridPaint implements a semantic theming system that follows shadcn/ui convention
 - Export functionality (SVG/PNG) deliberately ignores theming and uses hardcoded colors for consistency
 - Theme colors are defined in `src/globals.css` with separate light/dark mode values
 - All color tokens follow HSL format for easy manipulation
+## Infinite Runner (`#/runner`)
+
+A promo tool: a ball runs forever through generated landscapes built from the same blob shapes, cut into layers along the direction of travel. Code in `src/lib/runner/`, page in `src/components/runner/RunnerPage.tsx`, types in `src/types/runner.ts`, all defaults in `src/lib/runner/config.ts`.
+
+- **Corner tiles** (`tiles.ts`): the blob rule re-expressed as 16 tiles centred on grid corners (marching-squares style), each depending only on the 4 surrounding cells. Verified against `NeighborhoodAnalyzer` in `__tests__/tiles.test.ts`. Outlines never fall on tile borders, so tiled shapes are seamless.
+- **Mesher** (`mesher.ts`): builds chunk buffers (fronts, side walls, outlines, layer seams, metal faces with normals). Culls fronts hidden by the slice in front, merges walls along Z, and limits near chunks to the columns the camera can see. A tile's case byte carries shape bits 0-15 plus `METAL_BIT`.
+- **World** (`world/`): `generator.ts` (biome zones with noise-mask cross-fades, ground/walkway, tunnels, optional seamless loop), `biomes.ts` (desert, ruins, dream, plains, megacity), `structures.ts` (lattice-placed, optionally mirror-symmetric shapes; off-path structures are pushed off the path, on-path ones get a doorway).
+- **Engine** (`RunnerEngine.ts`): generation and meshing run in `worker.ts`. The camera and character stay at the origin and chunks move (distance is a double, so no float drift). At most one chunk is uploaded per frame, with distance-based LOD and adaptive resolution. `renderAt()` drives the offline export.
+- **Output**: `R` records a realtime WebM; `V` / `?record=loop` exports a frame-exact MP4 via WebCodecs (`videoExport.ts`), exactly one loop when `loop` is set.
+- **URL params**: `seed, speed, depth, seams, fog, at, biome, loop, metal, quality=low|high, res=WxH, fps, record=loop, ui=0`.
