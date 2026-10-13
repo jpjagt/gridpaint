@@ -19,6 +19,55 @@ from .recipes import SECTIONS, list_recipes, run_recipe
 
 LAB_ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = LAB_ROOT / "samples"
+CURATED = LAB_ROOT / "curated"
+
+
+def curated_sections() -> list[dict]:
+    """Hand/AI-made designs: lab/curated/<dir>/section.json ({title, description, order?}) + *.json designs."""
+    out = []
+    if not CURATED.exists():
+        return out
+    for d in sorted(p for p in CURATED.iterdir() if p.is_dir()):
+        meta_p = d / "section.json"
+        meta = json.loads(meta_p.read_text()) if meta_p.exists() else {}
+        designs = []
+        for p in sorted(d.glob("*.json")):
+            if p.name == "section.json":
+                continue
+            try:
+                des = load_any(p)
+            except Exception as e:  # pragma: no cover
+                print(f"skip curated {p}: {e}", file=sys.stderr)
+                continue
+            des.id = des.id if des.id not in ("", "design") else f"{d.name}-{p.stem}"
+            des.title = des.title or p.stem.replace("_", " ")
+            designs.append(design_to_dict(des))
+        if designs:
+            out.append({"id": d.name, "title": meta.get("title", d.name), "description": meta.get("description", ""),
+                        "order": meta.get("order", 0), "designs": designs})
+    out.sort(key=lambda s: s.pop("order"))
+    return out
+
+
+def preset_designs() -> dict[str, list[dict]]:
+    """Tuned parameter presets from lab/curated/presets.json: [{recipe, params, seeds:[..], title?}] -> by section."""
+    p = CURATED / "presets.json"
+    by_section: dict[str, list[dict]] = {}
+    if not p.exists():
+        return by_section
+    for entry in json.loads(p.read_text()):
+        for s in entry.get("seeds", [1]):
+            try:
+                des = run_recipe(entry["recipe"], entry.get("params", {}), s)
+            except Exception:
+                print(f"preset {entry} seed {s} failed:\n{traceback.format_exc()}", file=sys.stderr)
+                continue
+            if entry.get("title"):
+                des.title = entry["title"]
+            des.tags = list(des.tags) + ["preset"]
+            from .recipes import get_recipe
+            by_section.setdefault(get_recipe(entry["recipe"]).section, []).append(design_to_dict(des))
+    return by_section
 
 
 def sample_designs() -> list:
@@ -54,8 +103,13 @@ def build_gallery_dict(seeds: int = 3, only: list[str] | None = None, verbose: b
                 print(f"recipe {spec.name} seed {s} failed:\n{traceback.format_exc()}", file=sys.stderr)
         if verbose:
             print(f"  {spec.section}/{spec.name}: {seeds} seeds in {time.time() - t:.1f}s")
+    if not only:
+        for sec_id, ds in preset_designs().items():
+            sec = sections.setdefault(sec_id, {**SECTIONS.get(sec_id, {"id": sec_id, "title": sec_id, "description": ""}), "designs": []})
+            sec["designs"].extend(ds)
     out_sections = [s for s in sections.values() if s["designs"]]
     if not only:
+        out_sections = curated_sections() + out_sections
         out_sections.append({"id": "samples", "title": "Samples", "description": "The user's own reference designs.",
                              "designs": [design_to_dict(d) for d in sample_designs()]})
     return {"type": "gridlab-gallery", "version": 1,
