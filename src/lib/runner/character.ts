@@ -13,6 +13,21 @@ import {
   hexToVec3,
 } from "./materials"
 
+/**
+ * Phase in [0, 2π) that completes once per `period` tiles. With a loop
+ * length, the period is stretched slightly so a whole number of cycles fits
+ * in one loop.
+ */
+function loopPhase(distance: number, period: number, loopLength: number): number {
+  if (loopLength > 0) {
+    const cycles = Math.max(1, Math.round(loopLength / period))
+    const d = ((distance % loopLength) + loopLength) % loopLength
+    return ((d * cycles) / loopLength) * Math.PI * 2
+  }
+  const d = ((distance % period) + period) % period
+  return (d / period) * Math.PI * 2
+}
+
 export class RunnerCharacter {
   readonly group = new THREE.Group()
   private body = new THREE.Group()
@@ -23,7 +38,6 @@ export class RunnerCharacter {
   private geometries: THREE.BufferGeometry[] = []
   private kind = ""
   private radius = 0
-  private time = 0
 
   constructor(config: RunnerConfig) {
     const shadowGeo = new THREE.PlaneGeometry(1, 1)
@@ -81,14 +95,19 @@ export class RunnerCharacter {
     this.body.rotation.set(0, 0, 0)
   }
 
-  update(dt: number, speed: number) {
-    this.time += dt
+  /**
+   * Motion is derived from distance, not time, so it repeats exactly when
+   * the world loops.
+   */
+  update(distance: number, loopLength: number) {
     if (this.kind === "ball") {
-      this.body.rotation.x = (this.body.rotation.x - (speed * dt) / this.radius) % (Math.PI * 2)
+      // The ring pattern repeats every quarter turn
+      this.body.rotation.x = -loopPhase(distance, (Math.PI / 2) * this.radius, loopLength) / 4
     } else {
-      const bob = Math.sin(this.time * 6) * 0.06
+      const phase = loopPhase(distance, 2.5, loopLength)
+      const bob = Math.sin(phase) * 0.06
       this.body.position.y = this.radius * 1.3 + bob
-      this.body.rotation.z = Math.sin(this.time * 3) * 0.06
+      this.body.rotation.z = Math.sin(phase / 2) * 0.06
       this.shadow.scale.setScalar(this.radius * (2.6 - bob * 2))
     }
   }

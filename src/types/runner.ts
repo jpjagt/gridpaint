@@ -91,6 +91,8 @@ export interface RunnerWorldConfig {
   transitionLength: number
   /** Relative odds of each biome being picked for a zone (0 disables it) */
   biomeWeights: Record<BiomeId, number>
+  /** > 0: the world repeats every this many tiles, seamlessly (for video loops) */
+  loopLength: number
 }
 
 export interface RunnerRenderConfig {
@@ -98,6 +100,8 @@ export interface RunnerRenderConfig {
   antialias: boolean
   /** Max chunks handed to the GPU per frame (keeps uploads from spiking a frame) */
   chunksPerFrame: number
+  /** Lower the pixel ratio automatically when frames keep missing vsync */
+  adaptiveResolution: boolean
 }
 
 export interface RunnerConfig {
@@ -128,6 +132,7 @@ export interface WorldGenParams {
   zoneLength: number
   transitionLength: number
   biomeWeights: Record<BiomeId, number>
+  loopLength: number
   /** Cells that must stay empty in every slice, as [column, row] */
   tunnels: [number, number][]
   /** Rows 0..doorHeight-1 (3 wide) are cut through anything built across the path */
@@ -275,6 +280,7 @@ export interface RunnerStats {
   avgChunkBuildMs: number
   distance: number
   biome: string
+  pixelRatio: number
 }
 
 export interface Recording {

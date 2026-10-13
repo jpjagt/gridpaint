@@ -50,6 +50,24 @@ describe("world generator", () => {
   })
 })
 
+describe("loop mode", () => {
+  it("repeats exactly and wraps without a jump", () => {
+    const p = { ...params(), loopLength: 120, biomeWeights: { desert: 0, ruins: 1, dream: 0, plains: 0, megacity: 0 } }
+    const gen = new WorldGenerator(p)
+    const period = 120 / p.sliceDepth
+    const at = (k: number) => {
+      const g = gen.createGrid()
+      gen.fillSlice(k, g)
+      return g.cells
+    }
+    for (const k of [0, 5, 100, period - 1]) expect(at(k + period)).toEqual(at(k))
+    const diff = (a: Uint8Array, b: Uint8Array) => a.reduce((n, v, i) => n + (v !== b[i] ? 1 : 0), 0)
+    let worst = 0
+    for (let k = 1; k < period; k++) worst = Math.max(worst, diff(at(k - 1), at(k)))
+    expect(diff(at(period - 1), at(period))).toBeLessThanOrEqual(worst)
+  })
+})
+
 describe("chunk mesher", () => {
   it("draws a front only where the slice in front doesn't cover it", () => {
     const grids = Array.from({ length: 5 }, () => createSliceGrid(4, 4))

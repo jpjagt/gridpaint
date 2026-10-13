@@ -30,6 +30,8 @@ export class WorldGenerator {
   private groundNoise: SimplexNoise
   private tmpA: SliceGrid
   private tmpB: SliceGrid
+  private loopA: SliceGrid
+  private loopB: SliceGrid
 
   constructor(params: WorldGenParams) {
     this.params = params
@@ -38,6 +40,8 @@ export class WorldGenerator {
     this.groundNoise = new SimplexNoise(params.seed + 103)
     this.tmpA = createSliceGrid(params.halfWidth, params.maxRow)
     this.tmpB = createSliceGrid(params.halfWidth, params.maxRow)
+    this.loopA = createSliceGrid(params.halfWidth, params.maxRow)
+    this.loopB = createSliceGrid(params.halfWidth, params.maxRow)
   }
 
   createGrid(): SliceGrid {
@@ -106,8 +110,51 @@ export class WorldGenerator {
     return { from: here, to: here, t: 0 }
   }
 
-  /** Fill `grid` with slice k (k = 0 is the first slice ahead of the start) */
+  /**
+   * Fill `grid` with slice k (k = 0 is the first slice ahead of the start).
+   * With a loop length set, the world repeats and its last stretch
+   * cross-fades into the slices just before the start, so the wrap is seamless.
+   */
   fillSlice(k: number, grid: SliceGrid): void {
+    const d = this.params.sliceDepth
+    const period = Math.round(this.params.loopLength / d)
+    if (period <= 0) {
+      this.fillRaw(k, grid)
+      return
+    }
+    const kk = ((k % period) + period) % period
+    const zt = (kk + 0.5) * d
+    const L = period * d
+    const fadeLen = Math.min(this.params.transitionLength, L / 3)
+    if (zt <= L - fadeLen) {
+      this.fillRaw(kk, grid)
+      return
+    }
+    const a = this.loopA
+    const b = this.loopB
+    this.fillRaw(kk, a)
+    this.fillRaw(kk - period, b)
+    this.blend(a, b, smoothstep(L - fadeLen, L, zt), zt, grid)
+  }
+
+  /** Per cell, take b where the 3D mask is below t (organic cross-fade) */
+  private blend(a: SliceGrid, b: SliceGrid, t: number, zt: number, out: SliceGrid) {
+    const { cols, halfWidth } = out
+    for (let row = MIN_ROW; row < MIN_ROW + out.rows; row++) {
+      const base = (row - MIN_ROW) * cols + halfWidth
+      for (let col = -halfWidth; col <= halfWidth; col++) {
+        const i = base + col
+        if (a.cells[i] === b.cells[i]) {
+          out.cells[i] = a.cells[i]
+          continue
+        }
+        const m = this.mask.noise3(col * 0.11, row * 0.11, zt * 0.11) * 0.5 + 0.5
+        out.cells[i] = m < t ? b.cells[i] : a.cells[i]
+      }
+    }
+  }
+
+  private fillRaw(k: number, grid: SliceGrid): void {
     const { cols, halfWidth, cells } = grid
     const zt = (k + 0.5) * this.params.sliceDepth
     const ctx = { k, zt }
@@ -124,19 +171,7 @@ export class WorldGenerator {
       b.cells.fill(0)
       zone.from.fill(ctx, a)
       zone.to.fill(ctx, b)
-      const t = zone.t
-      for (let row = MIN_ROW; row < MIN_ROW + grid.rows; row++) {
-        const base = (row - MIN_ROW) * cols + halfWidth
-        for (let col = -halfWidth; col <= halfWidth; col++) {
-          const i = base + col
-          if (a.cells[i] === b.cells[i]) {
-            cells[i] = a.cells[i]
-            continue
-          }
-          const m = this.mask.noise3(col * 0.11, row * 0.11, zt * 0.11) * 0.5 + 0.5
-          cells[i] = m < t ? b.cells[i] : a.cells[i]
-        }
-      }
+      this.blend(a, b, zone.t, zt, grid)
     }
 
     // Ground: solid when the biome wants it, eroding into islands otherwise
@@ -168,6 +203,8 @@ export class WorldGenerator {
   }
 
   biomeNameAt(zt: number): string {
+    const L = this.params.loopLength
+    if (L > 0) zt = ((zt % L) + L) % L
     const z = this.zoneAt(zt)
     if (z.from === z.to || z.t <= 0) return z.from.id
     if (z.t >= 1) return z.to.id

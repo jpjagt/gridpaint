@@ -3,7 +3,7 @@ import { drawingStore } from "@/lib/storage/store"
 import type { DrawingMetadata } from "@/lib/storage/types"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Trash2, Download, User } from "lucide-react"
+import { Plus, Trash2, Download, User, Footprints } from "lucide-react"
 import { ImportDrawingDialog } from "@/components/ImportDrawingDialog"
 import { PassphraseSetupModal } from "@/components/PassphraseSetupModal"
 import { useStore } from "@nanostores/react"
@@ -101,6 +101,16 @@ export default function Home() {
               <Download className='mr-2 w-4 h-4' /> import
             </Button>
           )}
+          <Button
+            onClick={() => {
+              window.location.hash = "#/runner"
+            }}
+            variant='outline'
+            className='flex items-center'
+            title='Run through an endless generated landscape'
+          >
+            <Footprints className='mr-2 w-4 h-4' /> runner
+          </Button>
           <Button
             onClick={() => setShowPassphraseModal(true)}
             variant='outline'

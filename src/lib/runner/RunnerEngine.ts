@@ -82,8 +82,15 @@ export class RunnerEngine {
   private frameCount = 0
   private statsTimer = 0
   private resizeObserver: ResizeObserver
+  private pixelRatio = 1
+  private adaptFrames = 0
+  private adaptSlow = 0
+  private adaptElapsed = 0
+  private vsyncMs = Infinity
 
   onStats?: (stats: RunnerStats) => void
+  /** Called every simulation step with the distance travelled */
+  onFrame?: (distance: number) => void
 
   constructor(
     private container: HTMLElement,
@@ -96,7 +103,8 @@ export class RunnerEngine {
       powerPreference: "high-performance",
       preserveDrawingBuffer: false,
     })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.render.maxPixelRatio))
+    this.pixelRatio = Math.min(window.devicePixelRatio, config.render.maxPixelRatio)
+    this.renderer.setPixelRatio(this.pixelRatio)
     this.renderer.domElement.style.display = "block"
     container.appendChild(this.renderer.domElement)
 
@@ -181,7 +189,11 @@ export class RunnerEngine {
     this.seamMat.visible = config.lines.seams
 
     this.renderer.setClearColor(new THREE.Color().setHex(hexToHexNumber(c.fog), THREE.SRGBColorSpace))
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.render.maxPixelRatio))
+    const ratio = Math.min(window.devicePixelRatio, config.render.maxPixelRatio)
+    if (ratio !== this.pixelRatio) {
+      this.pixelRatio = ratio
+      this.renderer.setPixelRatio(ratio)
+    }
 
     const cam = config.camera
     this.camera.fov = cam.fov
@@ -240,7 +252,8 @@ export class RunnerEngine {
     if (this.warmingUp && this.isWorldReady()) this.warmingUp = false
     const speed = this.paused || this.warmingUp ? 0 : this.config.speed
     this.distance += speed * dt
-    this.character.update(dt, speed)
+    this.character.update(this.distance, this.config.world.loopLength)
+    this.onFrame?.(this.distance)
     this.integrateArrivals()
     this.manageChunks()
     this.positionChunks()
@@ -378,7 +391,8 @@ export class RunnerEngine {
   private disposeChunk(entry: ChunkEntry) {
     this.world.remove(entry.group)
     for (const child of entry.group.children) {
-      ;(child as THREE.Mesh).geometry.dispose()
+      const obj = child as THREE.Mesh
+      obj.geometry.dispose()
     }
   }
 
@@ -397,10 +411,32 @@ export class RunnerEngine {
     this.frameTimes[this.frameCursor] = ms
     this.frameCursor = (this.frameCursor + 1) % FRAME_HISTORY
     this.frameCount = Math.min(this.frameCount + 1, FRAME_HISTORY)
+    this.adaptResolution(ms)
     this.statsTimer += ms
     if (this.statsTimer < 500 || !this.onStats) return
     this.statsTimer = 0
     this.onStats(this.getStats())
+  }
+
+  /**
+   * If more than 8% of frames over a few seconds take noticeably longer
+   * than a vsync interval, drop the pixel ratio a notch (never below 1).
+   */
+  private adaptResolution(ms: number) {
+    if (!this.config.render.adaptiveResolution || this.warmingUp) return
+    if (ms > 4) this.vsyncMs = Math.min(this.vsyncMs, ms)
+    this.adaptFrames++
+    if (ms > this.vsyncMs * 1.4) this.adaptSlow++
+    this.adaptElapsed += ms
+    if (this.adaptElapsed < 3000) return
+    if (this.adaptSlow / this.adaptFrames > 0.08 && this.pixelRatio > 1) {
+      this.pixelRatio = Math.max(1, this.pixelRatio - 0.25)
+      this.renderer.setPixelRatio(this.pixelRatio)
+      this.resize()
+    }
+    this.adaptFrames = 0
+    this.adaptSlow = 0
+    this.adaptElapsed = 0
   }
 
   getStats(): RunnerStats {
@@ -426,6 +462,7 @@ export class RunnerEngine {
         : 0,
       distance: this.distance,
       biome: here?.biome ?? "…",
+      pixelRatio: this.pixelRatio,
     }
   }
 }

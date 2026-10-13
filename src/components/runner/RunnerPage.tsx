@@ -15,6 +15,7 @@ import { startRecording } from "@/lib/runner/recording"
  *
  * Keys: Space pause · H stats · G settings · R record video · F fullscreen
  * URL:  #/runner?seed=4&speed=9&depth=1&seams=0&fog=140&ui=0
+ *       &biome=dream,ruins  &at=500  &loop=140&record=loop
  */
 export default function RunnerPage() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -43,6 +44,27 @@ export default function RunnerPage() {
     if (!showUi) gui.hide()
 
     let rec: Recording | null = null
+    const recordName = `gridpaint-runner-seed${config.world.seed}`
+
+    // ?record=loop: record exactly one loop, starting on a loop boundary
+    const L = config.world.loopLength
+    if (params.get("record") === "loop" && L > 0) {
+      let startAt = -1
+      engine.onFrame = (distance) => {
+        if (engine.isWarmingUp()) return
+        if (startAt < 0) startAt = (Math.floor(distance / L) + 1) * L
+        if (!rec && distance >= startAt && distance < startAt + L) {
+          rec = startRecording(engine.canvas, `${recordName}-loop${L}`)
+          setRecording(true)
+        } else if (rec && distance >= startAt + L) {
+          rec.stop()
+          rec = null
+          setRecording(false)
+          engine.onFrame = undefined
+        }
+      }
+    }
+
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       if (e.code === "Space") {
@@ -62,7 +84,7 @@ export default function RunnerPage() {
           rec = null
           setRecording(false)
         } else {
-          rec = startRecording(engine.canvas, `gridpaint-runner-seed${config.world.seed}`)
+          rec = startRecording(engine.canvas, recordName)
           setRecording(true)
         }
       }
@@ -108,7 +130,7 @@ export default function RunnerPage() {
           {[
             `${stats.fps.toFixed(0)} fps   p99 ${stats.p99FrameMs.toFixed(1)}ms   worst ${stats.worstFrameMs.toFixed(1)}ms`,
             `${stats.chunks} chunks   ${(stats.triangles / 1000).toFixed(0)}k tris   ${(stats.lineSegments / 1000).toFixed(0)}k lines`,
-            `chunk build ${stats.avgChunkBuildMs.toFixed(1)}ms (worker)`,
+            `chunk build ${stats.avgChunkBuildMs.toFixed(1)}ms (worker)   ${stats.pixelRatio}x res`,
             `${stats.distance.toFixed(0)} tiles   ${stats.biome}`,
             warming ? "loading world…" : paused ? "paused" : "",
             recording ? "● recording (R to stop)" : "",

@@ -68,11 +68,13 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
       plains: 0.8,
       megacity: 0.8,
     },
+    loopLength: 0,
   },
   render: {
     maxPixelRatio: 2,
     antialias: true,
     chunksPerFrame: 1,
+    adaptiveResolution: true,
   },
 }
 
@@ -94,6 +96,7 @@ export function toWorldGenParams(config: RunnerConfig): WorldGenParams {
     zoneLength: w.zoneLength,
     transitionLength: w.transitionLength,
     biomeWeights: { ...w.biomeWeights },
+    loopLength: w.loopLength,
     tunnels: [
       [0, CHARACTER_ROW],
       ...cameraTunnelRows(config).map((r) => [0, r] as [number, number]),
@@ -110,7 +113,9 @@ export function cloneConfig(config: RunnerConfig): RunnerConfig {
 /**
  * Supported URL params (hash query, e.g. `#/runner?seed=4&speed=9&ui=0`):
  * seed, speed, depth (slice depth), seams (0/1), fog (far distance),
- * at (start distance), biome (only these biomes, comma-separated).
+ * at (start distance), biome (only these biomes, comma-separated),
+ * loop (loop length in tiles; the world repeats seamlessly),
+ * quality (low | high).
  */
 export function applyUrlOverrides(
   config: RunnerConfig,
@@ -132,6 +137,22 @@ export function applyUrlOverrides(
   if (seams !== undefined) config.lines.seams = seams !== 0
   const fog = num("fog")
   if (fog !== undefined && fog > config.fog.near) config.fog.far = fog
+  const quality = params.get("quality")
+  if (quality === "low") {
+    // For weaker GPUs: fewer pixels, coarser arcs, shorter view
+    config.render.maxPixelRatio = 1
+    config.render.antialias = false
+    config.world.arcSegments = [4, 2, 1]
+    config.world.viewDistance = Math.min(config.world.viewDistance, 80)
+    config.fog.far = Math.min(config.fog.far, 78)
+  } else if (quality === "high") {
+    // For recording on a fast machine
+    config.render.maxPixelRatio = 3
+    config.render.adaptiveResolution = false
+    config.world.arcSegments = [10, 6, 3]
+  }
+  const loop = num("loop")
+  if (loop !== undefined && loop >= 0) config.world.loopLength = loop
   const at = num("at")
   if (at !== undefined) config.startDistance = at
   const biomes = params.get("biome")
