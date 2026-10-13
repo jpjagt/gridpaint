@@ -14,6 +14,8 @@ export {
   type SceneSetupOptions,
 } from "./sceneSetup"
 
+export { CameraSyncGroup } from "./cameraSync"
+
 export {
   createLayeredModel,
   updateLayerThickness,

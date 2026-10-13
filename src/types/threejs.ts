@@ -1,4 +1,11 @@
 import type * as THREE from "three"
+import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
+
+/** One viewer participating in cross-canvas camera sync (see CameraSyncGroup). */
+export interface CameraSyncMember {
+  camera: THREE.PerspectiveCamera
+  controls: OrbitControls
+}
 
 /**
  * A classified solid region extracted from a layer's SVG loops, in SVG

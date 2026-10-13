@@ -11,7 +11,9 @@ import {
   updateLayerThickness,
   LAYER_THICKNESS_OPTIONS,
   type LayerThickness,
+  type CameraSyncGroup,
 } from "@/lib/threejs"
+import { CustomThicknessInput } from "@/components/CustomThicknessInput"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 
@@ -27,6 +29,8 @@ interface ModelViewerCanvasProps {
   includeCutouts?: boolean
   /** Hide the bottom controls bar (thickness picker, mirror checkbox). Defaults to false. */
   hideControls?: boolean
+  /** When set, this viewer's camera is kept in sync with the group's other members. */
+  cameraSync?: CameraSyncGroup | null
 }
 
 export function ModelViewerCanvas({
@@ -39,6 +43,7 @@ export function ModelViewerCanvas({
   onReverseLayersChange,
   includeCutouts = true,
   hideControls = false,
+  cameraSync = null,
 }: ModelViewerCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const setupRef = useRef<ReturnType<typeof createSceneSetup> | null>(null)
@@ -132,6 +137,24 @@ export function ModelViewerCanvas({
     }
   }, [initScene])
 
+  // Camera sync registration. Runs after the init effect above (declaration
+  // order), so setupRef.current holds the current scene setup. `initScene` is
+  // a dep so a rebuilt scene re-registers its new camera/controls.
+  useEffect(() => {
+    const setup = setupRef.current
+    if (!cameraSync || !setup) return
+
+    const member = { camera: setup.camera, controls: setup.controls }
+    const unregister = cameraSync.register(member)
+    const handleChange = () => cameraSync.broadcast(member)
+    setup.controls.addEventListener("change", handleChange)
+
+    return () => {
+      setup.controls.removeEventListener("change", handleChange)
+      unregister()
+    }
+  }, [initScene, cameraSync])
+
   useEffect(() => {
     if (modelGroupRef.current) {
       const effectiveMmPerUnit = exportRect.customMmPerUnit && exportRect.customMmPerUnit > 0
@@ -164,6 +187,10 @@ export function ModelViewerCanvas({
                 {t}mm
               </button>
             ))}
+            <CustomThicknessInput
+              thickness={layerThickness}
+              onThicknessChange={onThicknessChange}
+            />
           </div>
           <div className='w-px h-4 bg-border' />
           <label className='flex items-center gap-2 text-xs text-muted-foreground font-mono cursor-pointer'>

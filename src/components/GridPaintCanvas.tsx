@@ -2062,7 +2062,7 @@ export const GridPaintCanvas = forwardRef<
       <ModelViewerModal
         isOpen={viewingRectId !== null}
         onClose={() => setViewingRectId(null)}
-        exportRect={exportRects.find((r) => r.id === viewingRectId) ?? null}
+        exportRects={exportRects.filter((r) => r.id === viewingRectId)}
         layers={layersState.layers}
         canvasView={canvasView}
         drawingName={drawingMeta.name ?? undefined}

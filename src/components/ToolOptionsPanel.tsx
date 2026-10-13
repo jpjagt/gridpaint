@@ -41,6 +41,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
 import { LAYER_THICKNESS_OPTIONS, type LayerThickness } from "@/lib/threejs"
+import { CustomThicknessInput } from "@/components/CustomThicknessInput"
 
 // 3×3 grid layout: rows top→bottom, cols left→right
 const ANCHOR_GRID: { id: CutoutAnchor; label: string }[][] = [
@@ -371,8 +372,6 @@ function ExportOptions({
     return parts.join(" ")
   }
 
-  const previewRect = filteredRects[0] ?? null
-
   return (
     <>
       <div className='flex items-center gap-3 pb-2.5 mb-2.5 border-b border-border/60'>
@@ -398,6 +397,10 @@ function ExportOptions({
                   {t}mm
                 </button>
               ))}
+              <CustomThicknessInput
+                thickness={layerThickness}
+                onThicknessChange={setLayerThickness}
+              />
             </div>
 
             <div className='w-px h-4 bg-border' />
@@ -590,7 +593,7 @@ function ExportOptions({
         <ModelViewerModal
           isOpen={model3dOpen}
           onClose={() => setModel3dOpen(false)}
-          exportRect={previewRect}
+          exportRects={filteredRects}
           layers={layers}
           canvasView={canvasView}
           drawingName={drawingName}

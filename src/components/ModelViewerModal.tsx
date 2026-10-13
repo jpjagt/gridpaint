@@ -1,5 +1,8 @@
 /**
  * ModelViewerModal - Modal dialog for 3D model preview.
+ *
+ * Renders up to MAX_PREVIEW_RECTS export rects side by side, each in its own
+ * canvas so camera controls stay independent per rect.
  */
 
 import { useState } from "react"
@@ -10,14 +13,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ModelViewerCanvas } from "@/components/ModelViewerCanvas"
+import { CameraSyncGroup } from "@/lib/threejs"
+import { cn } from "@/lib/utils"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 import type { LayerThickness } from "@/lib/threejs"
 
+const MAX_PREVIEW_RECTS = 3
+
 interface ModelViewerModalProps {
   isOpen: boolean
   onClose: () => void
-  exportRect: ExportRect | null
+  /** Rects to preview. Only the first MAX_PREVIEW_RECTS are shown. */
+  exportRects: ExportRect[]
   layers: Layer[]
   canvasView: CanvasViewState
   drawingName?: string
@@ -31,13 +39,16 @@ interface ModelViewerModalProps {
   includeCutouts?: boolean
 }
 
+function rectLabel(rect: ExportRect): string {
+  return rect.name || `Rect ${rect.id.slice(0, 6)}`
+}
+
 export function ModelViewerModal({
   isOpen,
   onClose,
-  exportRect,
+  exportRects,
   layers,
   canvasView,
-  drawingName,
   layerThickness: layerThicknessProp,
   onLayerThicknessChange,
   reverseLayers: reverseLayersProp,
@@ -47,6 +58,8 @@ export function ModelViewerModal({
   const [layerThicknessInternal, setLayerThicknessInternal] =
     useState<LayerThickness>(1)
   const [reverseLayersInternal, setReverseLayersInternal] = useState(false)
+  const [syncCameras, setSyncCameras] = useState(false)
+  const [cameraSyncGroup] = useState(() => new CameraSyncGroup())
 
   const isControlled =
     layerThicknessProp !== undefined || reverseLayersProp !== undefined
@@ -64,13 +77,19 @@ export function ModelViewerModal({
 
   const visibleLayers = layers.filter((l) => l.isVisible)
 
-  const rectLabel =
-    exportRect?.name || `Rect ${exportRect?.id.slice(0, 6) ?? ""}`
+  const shownRects = exportRects.slice(0, MAX_PREVIEW_RECTS)
+  const hiddenCount = exportRects.length - shownRects.length
+  const isMulti = shownRects.length > 1
+
+  const title =
+    shownRects.length === 0
+      ? "3D Preview"
+      : `3D Preview: ${shownRects.map(rectLabel).join(" · ")}`
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className='p-0 overflow-hidden flex flex-col'
+        className='p-0 overflow-hidden flex flex-col gap-0'
         style={{
           width: "calc(100vw - 60px)",
           height: "calc(100vh - 60px)",
@@ -82,36 +101,76 @@ export function ModelViewerModal({
         }}
       >
         <DialogHeader className='px-6 py-4 border-b border-border shrink-0'>
-          <div className='flex items-center justify-between'>
-            <DialogTitle className='font-mono text-sm'>
-              3D Preview: {rectLabel}
+          <div className='flex items-center gap-4 mr-8'>
+            <DialogTitle
+              className='font-mono text-sm truncate min-w-0 flex-1'
+              title={title}
+            >
+              {title}
+              {hiddenCount > 0 && (
+                <span className='text-muted-foreground'>
+                  {" "}
+                  (+{hiddenCount} more not shown)
+                </span>
+              )}
             </DialogTitle>
+            {isMulti && (
+              <label className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground cursor-pointer select-none shrink-0'>
+                <input
+                  type='checkbox'
+                  checked={syncCameras}
+                  onChange={(e) => setSyncCameras(e.target.checked)}
+                  className='w-3 h-3'
+                />
+                Sync position
+              </label>
+            )}
           </div>
         </DialogHeader>
 
-        <div className='flex-1 overflow-hidden' style={{ minHeight: 0 }}>
-          {!exportRect ? (
-            <div className='flex items-center justify-center h-full text-sm text-muted-foreground font-mono'>
+        <div className='flex-1 overflow-hidden flex' style={{ minHeight: 0 }}>
+          {shownRects.length === 0 ? (
+            <div className='flex items-center justify-center h-full w-full text-sm text-muted-foreground font-mono'>
               Export rect not found.
             </div>
           ) : visibleLayers.length === 0 ? (
-            <div className='flex items-center justify-center h-full text-sm text-muted-foreground font-mono'>
+            <div className='flex items-center justify-center h-full w-full text-sm text-muted-foreground font-mono'>
               No visible layers in this rect.
             </div>
           ) : (
-            <ModelViewerCanvas
-              layers={visibleLayers}
-              exportRect={exportRect}
-              canvasView={canvasView}
-              layerThickness={layerThickness}
-              onThicknessChange={isControlled ? undefined : setLayerThickness}
-              reverseLayers={reverseLayers}
-              onReverseLayersChange={
-                isControlled ? undefined : setReverseLayers
-              }
-              includeCutouts={includeCutouts}
-              hideControls={isControlled}
-            />
+            shownRects.map((rect, i) => (
+              <div
+                key={rect.id}
+                className={cn(
+                  "flex-1 min-w-0 flex flex-col",
+                  i > 0 && "border-l border-border",
+                )}
+              >
+                {isMulti && (
+                  <div className='px-3 py-1.5 text-xs font-mono text-muted-foreground border-b border-border shrink-0'>
+                    {rectLabel(rect)}
+                  </div>
+                )}
+                <div className='flex-1 min-h-0'>
+                  <ModelViewerCanvas
+                    layers={visibleLayers}
+                    exportRect={rect}
+                    canvasView={canvasView}
+                    layerThickness={layerThickness}
+                    onThicknessChange={
+                      isControlled ? undefined : setLayerThickness
+                    }
+                    reverseLayers={reverseLayers}
+                    onReverseLayersChange={
+                      isControlled ? undefined : setReverseLayers
+                    }
+                    includeCutouts={includeCutouts}
+                    hideControls={isControlled || isMulti}
+                    cameraSync={syncCameras ? cameraSyncGroup : null}
+                  />
+                </div>
+              </div>
+            ))
           )}
         </div>
       </DialogContent>
