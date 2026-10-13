@@ -1,1 +1,17 @@
-[]
+[
+  {"recipe": "folded_rule", "params": {"silhouette": "octagon", "core": "diamond", "width": 21, "height": 21}, "seeds": [2, 8, 11], "title": "Folded rule · octagon + diamond core"},
+  {"recipe": "folded_rule", "params": {"silhouette": "oval", "core": "cross", "depth": 4, "rule": 150}, "seeds": [4, 11], "title": "Folded rule 150 · oval + cross"},
+  {"recipe": "life_lace", "params": {"rule": "stains", "frame": "line", "core": "cross"}, "seeds": [1, 3, 10], "title": "Stained lace · frame + cross"},
+  {"recipe": "life_lace", "params": {"rule": "coral", "frame": "line", "core": "spine", "width": 17, "height": 25}, "seeds": [1, 4, 7], "title": "Coral lace · frame + spine"},
+  {"recipe": "celtic_panel", "params": {"sym": "rot2", "loops": 1}, "seeds": [5, 9], "title": "Celtic · rot2 single thread"},
+  {"recipe": "celtic_panel", "params": {"style": "A", "walls": 0.5, "width": 21, "height": 29}, "seeds": [5, 12], "title": "Celtic · style A, more walls"},
+  {"recipe": "truchet_sparse", "params": {"core": "cross"}, "seeds": [7, 8, 12], "title": "Sparse Truchet · cross core"},
+  {"recipe": "worm_lace", "params": {"silhouette": "circle", "width": 25, "height": 25, "sym": "d4"}, "seeds": [1, 6, 10], "title": "Worm lace · D4 ring"},
+  {"recipe": "terraced_relief", "params": {"field": "radial", "source": "life_lace"}, "seeds": [9, 10], "title": "Terraced relief · radial over life lace"},
+  {"recipe": "crystal_sigil", "params": {"layers": 3}, "seeds": [5, 12], "title": "Crystal sigil · 3 layers"},
+  {"recipe": "sample_echo_anneal", "params": {"silhouette": "circle", "width": 25, "height": 25, "frame": true}, "seeds": [3, 9, 12], "title": "Sample echo · framed ring"},
+  {"recipe": "sample_echo_cross", "params": {"motif": "star"}, "seeds": [2, 4, 12], "title": "Sample echo · star motif"},
+  {"recipe": "diagonal_maze", "params": {"silhouette": "oval", "frame": "solid"}, "seeds": [9, 12], "title": "Diagonal maze · oval + frame"},
+  {"recipe": "pulse_mould", "params": {"link": true}, "seeds": [2, 10], "title": "Pulse mould · linked veins"},
+  {"recipe": "cave_skeleton", "params": {"band": 4.0, "shape": "oval"}, "seeds": [5, 10], "title": "Cave skeleton · oval band"}
+]

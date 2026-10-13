@@ -1,1 +1,1 @@
-{"title": "AI as editor", "description": "Before/after pairs: one of the user's selections plus a natural-language edit request, carried out by a Claude agent with the gridlab CLI (+ Jev routing via gl ask).", "order": 2}
+{"title": "AI as editor", "description": "Before/after pairs: one of the user's selections plus a natural-language edit request, carried out by a Claude agent with the gridlab CLI (+ Jev routing via gl ask).", "order": 2, "layout": "pairs"}

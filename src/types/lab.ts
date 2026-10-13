@@ -40,7 +40,16 @@ export interface LabSection {
   id: string
   title: string
   description?: string
+  /** "pairs": consecutive designs are before/after pairs, rendered side by side. */
+  layout?: "pairs"
   designs: LabDesign[]
+}
+
+/** Static recipe metadata shipped in gallery.json (so the page can explain designs without the server). */
+export interface LabRecipeInfo {
+  title?: string
+  section?: string
+  description?: string
 }
 
 export interface LabGallery {
@@ -48,6 +57,7 @@ export interface LabGallery {
   version: number
   generatedAt?: string
   sections: LabSection[]
+  recipes?: Record<string, LabRecipeInfo>
 }
 
 export type LabPaletteMode = "jewel" | "theme"

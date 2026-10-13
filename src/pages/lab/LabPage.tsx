@@ -42,6 +42,13 @@ function matches(d: LabDesign, q: string): boolean {
     .every((t) => hay.includes(t))
 }
 
+/** Group consecutive items into [before, after] pairs (a trailing odd item stands alone). */
+function chunkPairs<T>(items: T[]): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2))
+  return out
+}
+
 const seg = (on: boolean) =>
   cn(
     "h-6 px-2 font-mono text-[11px]",
@@ -266,28 +273,63 @@ export default function LabPage() {
         {!gallery && !error && <p className='font-mono text-[12px] text-slate-600'>loading…</p>}
         {filtered.map((s) => (
           <section key={s.id} id={`section-${s.id}`} className='mb-10 scroll-mt-4'>
-            <header className='mb-3 flex items-baseline gap-3 border-b border-white/[0.06] pb-1.5 font-mono'>
-              <h2 className='text-[12px] uppercase tracking-wider text-slate-300'>{s.title}</h2>
-              <span className='text-[11px] tabular-nums text-slate-600'>{s.items.length}</span>
-              {s.description && <p className='min-w-0 truncate text-[11px] text-slate-500'>{s.description}</p>}
+            <header className='mb-3 border-b border-white/[0.06] pb-2 font-mono'>
+              <div className='flex items-baseline gap-3'>
+                <h2 className='whitespace-nowrap text-[12px] uppercase tracking-wider text-slate-300'>{s.title}</h2>
+                <span className='text-[11px] tabular-nums text-slate-600'>{s.items.length}</span>
+              </div>
+              {s.description && (
+                <p className='mt-1 max-w-[110ch] text-[11px] leading-relaxed text-slate-500'>{s.description}</p>
+              )}
             </header>
-            <div
-              className='grid gap-x-3 gap-y-4'
-              style={{ gridTemplateColumns: `repeat(auto-fill, ${thumbPx}px)` }}
-            >
-              {s.items.map((it) => (
-                <div key={it.key} id={`card-${it.key}`}>
-                  <DesignCard
-                    design={it.design}
-                    palette={palette}
-                    thumbPx={thumbPx}
-                    selected={it.key === selectedKey}
-                    itemKey={it.key}
-                    onSelect={setSelectedKey}
-                  />
-                </div>
-              ))}
-            </div>
+            {s.layout === "pairs" && !filter ? (
+              <div
+                className='grid gap-x-8 gap-y-5'
+                style={{ gridTemplateColumns: `repeat(auto-fill, ${2 * thumbPx + 28}px)` }}
+              >
+                {chunkPairs(s.items).map((pair) => (
+                  <div key={pair[0].key} className='flex items-start gap-1'>
+                    {pair.map((it, j) => (
+                      <div key={it.key} className='contents'>
+                        {j === 1 && (
+                          <span className='w-5 shrink-0 text-center font-mono text-[12px] text-slate-600' style={{ marginTop: thumbPx / 2 - 8 }}>
+                            →
+                          </span>
+                        )}
+                        <div id={`card-${it.key}`}>
+                          <DesignCard
+                            design={it.design}
+                            palette={palette}
+                            thumbPx={thumbPx}
+                            selected={it.key === selectedKey}
+                            itemKey={it.key}
+                            onSelect={setSelectedKey}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className='grid gap-x-3 gap-y-4'
+                style={{ gridTemplateColumns: `repeat(auto-fill, ${thumbPx}px)` }}
+              >
+                {s.items.map((it) => (
+                  <div key={it.key} id={`card-${it.key}`}>
+                    <DesignCard
+                      design={it.design}
+                      palette={palette}
+                      thumbPx={thumbPx}
+                      selected={it.key === selectedKey}
+                      itemKey={it.key}
+                      onSelect={setSelectedKey}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         ))}
         {gallery && filtered.length === 0 && (
@@ -302,6 +344,7 @@ export default function LabPage() {
           item={selected}
           palette={palette}
           recipes={recipes}
+          recipeInfo={gallery?.recipes?.[selected.design.recipe]}
           position={`${selectedIndex + 1}/${flat.length}`}
           onClose={() => setSelectedKey(null)}
           onPrev={() => move(-1)}

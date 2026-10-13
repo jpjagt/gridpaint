@@ -21,6 +21,19 @@ LAB_ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = LAB_ROOT / "samples"
 CURATED = LAB_ROOT / "curated"
 
+# Recipe sections in study order (curated sections come first, by their own `order`); unknown ones go last but before basics.
+SECTION_ORDER = ["hybrids", "threads", "sigils", "sacred_geometry", "sacred_lattice", "growth", "simulation", "learned",
+                 "walkers", "layering", "automata", "ornament"]
+LAST_SECTIONS = ["basic"]
+
+
+def _section_rank(sec_id: str) -> tuple[int, int]:
+    if sec_id in SECTION_ORDER:
+        return (0, SECTION_ORDER.index(sec_id))
+    if sec_id in LAST_SECTIONS:
+        return (2, LAST_SECTIONS.index(sec_id))
+    return (1, 0)
+
 
 def curated_sections() -> list[dict]:
     """Hand/AI-made designs: lab/curated/<dir>/section.json ({title, description, order?}) + *.json designs."""
@@ -43,8 +56,11 @@ def curated_sections() -> list[dict]:
             des.title = des.title or p.stem.replace("_", " ")
             designs.append(design_to_dict(des))
         if designs:
-            out.append({"id": d.name, "title": meta.get("title", d.name), "description": meta.get("description", ""),
-                        "order": meta.get("order", 0), "designs": designs})
+            sec = {"id": d.name, "title": meta.get("title", d.name), "description": meta.get("description", ""),
+                   "order": meta.get("order", 0), "designs": designs}
+            if meta.get("layout"):  # "pairs": designs are before/after pairs, shown side by side
+                sec["layout"] = meta["layout"]
+            out.append(sec)
     out.sort(key=lambda s: s.pop("order"))
     return out
 
@@ -107,14 +123,21 @@ def build_gallery_dict(seeds: int = 3, only: list[str] | None = None, verbose: b
         for sec_id, ds in preset_designs().items():
             sec = sections.setdefault(sec_id, {**SECTIONS.get(sec_id, {"id": sec_id, "title": sec_id, "description": ""}), "designs": []})
             sec["designs"].extend(ds)
-    out_sections = [s for s in sections.values() if s["designs"]]
+    out_sections = sorted((s for s in sections.values() if s["designs"]), key=lambda s: _section_rank(s["id"]))
     if not only:
-        out_sections = curated_sections() + out_sections
-        out_sections.append({"id": "samples", "title": "Samples", "description": "The user's own reference designs.",
-                             "designs": [design_to_dict(d) for d in sample_designs()]})
+        curated = curated_sections()
+        samples = {"id": "samples", "title": "Your samples (reference)",
+                   "description": "Your own hand-drawn pieces - the taste target every generator is judged against. "
+                                  "Not generated.",
+                   "designs": [design_to_dict(d) for d in sample_designs()]}
+        # "Start here" (featured) first, then the reference samples, then the other curated sections.
+        head = [s for s in curated if s["id"] == "featured"]
+        out_sections = head + [samples] + [s for s in curated if s["id"] != "featured"] + out_sections
+    recipes = {spec.name: {"title": spec.title, "section": spec.section, "description": spec.description}
+               for spec in list_recipes()}
     return {"type": "gridlab-gallery", "version": 1,
             "generatedAt": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
-            "sections": out_sections}
+            "sections": out_sections, "recipes": recipes}
 
 
 def build_gallery(out: str | Path, seeds: int = 3, only: list[str] | None = None) -> Path:

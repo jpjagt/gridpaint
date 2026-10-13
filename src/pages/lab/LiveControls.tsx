@@ -87,9 +87,6 @@ export function LiveControls({ design, recipes, onResult, onVariants }: LiveCont
 
   return (
     <div className='space-y-2'>
-      {recipe.description && (
-        <p className='font-mono text-[11px] text-slate-500'>{recipe.description}</p>
-      )}
       <div className='grid grid-cols-[minmax(90px,auto)_1fr] items-center gap-x-3 gap-y-1.5 font-mono text-[11px]'>
         {Object.entries(recipe.params).map(([k, s]) => {
           const v = params[k]
@@ -123,7 +120,9 @@ export function LiveControls({ design, recipes, onResult, onVariants }: LiveCont
           } else if (isNumeric(s)) {
             const isInt = s.type === "int" || (Number.isInteger(s.default) && s.type !== "float")
             const step = s.step ?? (isInt ? 1 : 0.01)
-            const num = typeof v === "number" ? v : Number(v)
+            const raw = typeof v === "number" ? v : Number(v)
+            // params are filled by an effect after the first render; fall back to the default meanwhile
+            const num = Number.isFinite(raw) ? raw : Number(s.default ?? s.min ?? 0)
             const hasRange = s.min !== undefined && s.max !== undefined
             control = (
               <div className='flex items-center gap-2'>

@@ -12,7 +12,7 @@ from . import Param, recipe, register_section
 
 SAMPLES = Path(__file__).resolve().parents[2] / "samples"
 
-register_section("basic", "Basics", "Pipeline sanity checks: sample echo and symmetric noise.")
+register_section("basic", "Basics", "The baseline every other section has to beat: mirrored random cells in a capsule. Symmetry alone is not enough - this is what 'too random' looks like.")
 
 
 @recipe("sample_echo", section="basic", title="Sample echo",

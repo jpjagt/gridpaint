@@ -19,12 +19,13 @@ import { downloadJson } from "@/lib/lab/labApi"
 import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import type { CanvasViewState } from "@/stores/drawingStores"
-import type { LabBoardItem, LabDesign, LabPalette, LabRecipe } from "@/types/lab"
+import type { LabBoardItem, LabDesign, LabPalette, LabRecipe, LabRecipeInfo } from "@/types/lab"
 
 interface DesignDetailProps {
   item: LabBoardItem
   palette: LabPalette
   recipes: LabRecipe[] | null
+  recipeInfo?: LabRecipeInfo
   position: string
   onClose: () => void
   onPrev: () => void
@@ -66,6 +67,7 @@ export function DesignDetail({
   item,
   palette,
   recipes,
+  recipeInfo,
   position,
   onClose,
   onPrev,
@@ -195,6 +197,11 @@ export function DesignDetail({
   const bigH = Math.min(big, Math.max(260, window.innerHeight * 0.55))
   const splitW = layerIds.length > 0 ? Math.floor((big - 8 * (layerIds.length - 1)) / Math.min(layerIds.length, 3)) : big
   const pinned = isPinned(design)
+  const liveRecipe = recipes?.find((r) => r.name === design.recipe)
+  const recipeTitle = liveRecipe?.title ?? recipeInfo?.title
+  const recipeDescription = liveRecipe?.description ?? recipeInfo?.description
+  // Exported/curated designs append a "recipe: ..." provenance line; show only the human note up top.
+  const note = design.notes?.split("\n").filter((l) => !l.startsWith("recipe:")).join("\n").trim()
 
   return (
     <aside className='fixed inset-y-0 right-0 z-40 flex w-[min(760px,100vw)] flex-col border-l border-white/[0.07] bg-[#050b1c]/[0.97] shadow-2xl backdrop-blur'>
@@ -220,6 +227,17 @@ export function DesignDetail({
       </header>
 
       <div className='flex-1 overflow-y-auto px-5 py-4'>
+        {(note || recipeDescription) && (
+          <div className='mb-4 max-w-[80ch] font-mono'>
+            {note && <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-slate-300'>{note}</p>}
+            {recipeDescription && (
+              <p className={cn("text-[11px] leading-relaxed text-slate-500", note && "mt-1.5")}>
+                {recipeTitle && <span className='text-slate-400'>{recipeTitle} — </span>}
+                {recipeDescription}
+              </p>
+            )}
+          </div>
+        )}
         <div ref={bodyRef} className='w-full'>
           {split ? (
             <div className='flex flex-wrap gap-2'>
@@ -293,7 +311,7 @@ export function DesignDetail({
               }}
               className='h-1 flex-1 accent-slate-400'
             />
-            <span className='w-28 truncate text-right tabular-nums text-slate-400'>
+            <span className='w-44 truncate text-right tabular-nums text-slate-400'>
               {design.frames![frame]?.label ?? frame} · {frame + 1}/{frameCount}
             </span>
           </div>
@@ -355,7 +373,6 @@ export function DesignDetail({
 
         {/* params & notes */}
         <section className='mt-5 border-t border-white/[0.06] pt-4 font-mono text-[11px]'>
-          {design.notes && <p className='mb-3 whitespace-pre-wrap leading-relaxed text-slate-400'>{design.notes}</p>}
           {design.tags.length > 0 && <p className='mb-3 text-slate-500'>{design.tags.join("  ")}</p>}
           <pre className='overflow-x-auto rounded-[3px] bg-black/30 p-3 text-[10.5px] leading-relaxed text-slate-400'>
             {JSON.stringify(design.params, null, 2)}
