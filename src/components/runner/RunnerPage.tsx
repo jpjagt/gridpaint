@@ -11,11 +11,13 @@ import {
 import { startRecording } from "@/lib/runner/recording"
 import { downloadBlob, exportVideo, videoExportSupported } from "@/lib/runner/videoExport"
 import { RUNNER_ENV_MAPS } from "@/lib/runner/materials"
+import { nextPaletteName, randomPalette } from "@/lib/runner/palettes"
 
 /**
  * Infinite runner through a generated GridPaint-style landscape.
  *
- * Keys: hold Space boost · P pause · H stats · G settings · F fullscreen
+ * Keys: hold Space boost · P pause · C next palette · X random palette
+ *       H stats · G settings · F fullscreen
  *       R record realtime WebM · V export frame-exact MP4 (one loop when looping)
  * URL:  #/runner?seed=4&speed=9&depth=1&seams=0&fog=140&ui=0
  *       &biome=dream,ruins  &at=500  &loop=140&record=loop  &res=3840x2160
@@ -93,8 +95,17 @@ export default function RunnerPage() {
       wait()
     }
 
-    const gui = buildGui(config, (next) => engine.updateConfig(next), () => void runExport())
+    const { gui, refreshPalette } = buildGui(
+      config,
+      (next) => engine.updateConfig(next),
+      () => void runExport(),
+    )
     if (!showUi) gui.hide()
+    const setPalette = (name: string) => {
+      config.palette = name
+      engine.updateConfig(config)
+      refreshPalette()
+    }
 
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
@@ -111,6 +122,11 @@ export default function RunnerPage() {
       } else if (e.key === "f" || e.key === "F") {
         if (document.fullscreenElement) void document.exitFullscreen()
         else void container.requestFullscreen()
+      } else if (e.key === "c" || e.key === "C") {
+        setPalette(nextPaletteName(config))
+      } else if (e.key === "x" || e.key === "X") {
+        config.palettes.random = randomPalette()
+        setPalette("random")
       } else if (e.key === "v" || e.key === "V") {
         void runExport()
       } else if (e.key === "r" || e.key === "R") {
@@ -152,7 +168,7 @@ export default function RunnerPage() {
         position: "fixed",
         inset: 0,
         overflow: "hidden",
-        background: DEFAULT_RUNNER_CONFIG.colors.fog,
+        background: DEFAULT_RUNNER_CONFIG.palettes[DEFAULT_RUNNER_CONFIG.palette].fog,
       }}
     >
       {hud && stats && (
@@ -174,11 +190,12 @@ export default function RunnerPage() {
             `${stats.fps.toFixed(0)} fps   p99 ${stats.p99FrameMs.toFixed(1)}ms   worst ${stats.worstFrameMs.toFixed(1)}ms`,
             `${stats.chunks} chunks   ${(stats.triangles / 1000).toFixed(0)}k tris   ${(stats.lineSegments / 1000).toFixed(0)}k lines`,
             `chunk build ${stats.avgChunkBuildMs.toFixed(1)}ms (worker)   ${stats.pixelRatio}x res`,
-            `${stats.distance.toFixed(0)} tiles   ${stats.biome}`,
+            `${stats.distance.toFixed(0)} tiles   ${stats.biome}   palette: ${stats.palette}`,
             warming ? "loading world…" : paused ? "paused" : "",
             recording ? "● recording (R to stop)" : "",
             exportState,
-            "hold space boost · p pause · h stats · g settings · f fullscreen",
+            "hold space boost · p pause · c palette · x random palette",
+            "h stats · g settings · f fullscreen",
             "r record (realtime webm) · v export mp4 (frame-exact)",
           ]
             .filter(Boolean)
@@ -193,20 +210,64 @@ function buildGui(
   config: RunnerConfig,
   onChange: (c: RunnerConfig) => void,
   onExport: () => void,
-): GUI {
+): { gui: GUI; refreshPalette: () => void } {
   const gui = new GUI({ title: "runner" })
   gui.close()
   const apply = () => onChange(config)
 
   gui.add(config, "speed", 0, 40, 0.5).onChange(apply)
-  gui.add(config, "night").onChange(apply)
   const boost = gui.addFolder("boost (hold space)").close()
   boost.add(config.boost, "factor", 1, 5, 0.1).onChange(apply)
   boost.add(config.boost, "rampSeconds", 0.05, 3, 0.05).onChange(apply)
 
-  const colors = gui.addFolder("colors").close()
+  // Palette: a picker plus the active palette's colors (rebuilt on switch)
+  let paletteFolder: GUI | null = null
+  let paletteOpen = false
+  const refreshPalette = () => {
+    if (paletteFolder) {
+      paletteOpen = !paletteFolder._closed
+      paletteFolder.destroy()
+    }
+    const folder = gui.addFolder(`palette: ${config.palette}`)
+    paletteFolder = folder
+    if (!paletteOpen) folder.close()
+    folder
+      .add(config, "palette", Object.keys(config.palettes))
+      .name("palette (C)")
+      .onChange(() => {
+        apply()
+        refreshPalette()
+      })
+    const p = config.palettes[config.palette]
+    if (p) {
+      for (const key of ["front", "side", "sideTop", "line", "seam", "fog", "shadow"] as const) {
+        folder.addColor(p, key).onChange(apply)
+      }
+      folder.add(p, "invertMetal").onChange(apply)
+    }
+    folder
+      .add(
+        {
+          random: () => {
+            config.palettes.random = randomPalette()
+            config.palette = "random"
+            apply()
+            refreshPalette()
+          },
+        },
+        "random",
+      )
+      .name("random (X)")
+    // keep the palette folder near the top
+    const domParent = folder.domElement.parentElement
+    const anchor = gui.folders[0]?.domElement
+    if (domParent && anchor && anchor !== folder.domElement) domParent.insertBefore(folder.domElement, anchor)
+  }
+  refreshPalette()
+
+  const characterColors = gui.addFolder("character colors").close()
   for (const key of Object.keys(config.colors) as (keyof RunnerConfig["colors"])[]) {
-    colors.addColor(config.colors, key).onChange(apply)
+    characterColors.addColor(config.colors, key).onChange(apply)
   }
 
   const fog = gui.addFolder("fog").close()
@@ -273,5 +334,5 @@ function buildGui(
     },
     "copy",
   ).name("copy config JSON")
-  return gui
+  return { gui, refreshPalette }
 }

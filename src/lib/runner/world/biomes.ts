@@ -235,8 +235,8 @@ class DreamBiome implements Biome {
         probability: 0.45,
         minPathDistance: 4,
         factory: mix([
-          [0.3, orb],
-          [0.2, lifted(ziggurat, 6, 50, 0.7)],
+          // no ziggurats here: their big flat terraces aren't dreamy
+          [0.45, orb],
           [0.15, lifted(temple, 8, 60, 0.6)],
           [0.15, lifted(gate, 3, 40, 0.3)],
           [0.1, lifted((rng, cx, cz) => block(2 + Math.floor(rng() * 4), cx, cz), 2, 70, 0)],
@@ -254,9 +254,8 @@ class DreamBiome implements Biome {
           if (this.depthAt(cz) < 0.35) return null
           const top = -3 - Math.floor(rng() * 10)
           return weighted(rng, [
-            [0.35, (r, x, z) => sunk(ziggurat(r, x, z), top, true)],
-            [0.3, (r, x, z) => sunk(tower(r, x, z), top, false)],
-            [0.2, (r, x, z) => sunk(orb(r, x, z), top - 2, false)],
+            [0.35, (r, x, z) => sunk(tower(r, x, z), top, false)],
+            [0.4, (r, x, z) => sunk(orb(r, x, z), top - 2, false)],
             [0.15, (r, x, z) => sunk(temple(r, x, z), top, true)],
           ])(rng, cx, cz)
         },

@@ -12,6 +12,7 @@ import {
   createSolidMaterial,
   hexToVec3,
 } from "./materials"
+import { activePalette } from "./palettes"
 
 /**
  * Phase in [0, 2π) that completes once per `period` tiles. With a loop
@@ -58,8 +59,7 @@ export class RunnerCharacter {
     hexToVec3(config.colors.characterShade, this.bodyMat.uniforms.uShade.value)
     hexToVec3(config.colors.characterLine, this.bodyMat.uniforms.uLine.value)
     hexToVec3(config.colors.characterLine, this.outlineMat.uniforms.uColor.value)
-    // in night mode the ground is dark, so the shadow goes black
-    hexToVec3(config.night ? "#000000" : config.colors.shadow, this.shadowMat.uniforms.uColor.value)
+    hexToVec3(activePalette(config).shadow, this.shadowMat.uniforms.uColor.value)
     this.bodyMat.uniforms.uRadius.value = c.radius
     this.bodyMat.uniforms.uRings.value = c.kind === "ball" ? 1 : 0
     this.shadow.visible = c.shadow

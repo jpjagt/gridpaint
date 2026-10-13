@@ -4,6 +4,7 @@
  */
 
 import type { RunnerConfig, WorldGenParams } from "@/types/runner"
+import { DEFAULT_PALETTES } from "./palettes"
 
 /**
  * Lowest generated row. Rows -2 and -1 are the ground; the character runs on
@@ -20,19 +21,13 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
     factor: 2,
     rampSeconds: 0.6,
   },
-  night: false,
+  palette: "day",
+  palettes: DEFAULT_PALETTES,
   startDistance: 0,
   colors: {
-    front: "#ededed",
-    side: "#919191",
-    sideTop: "#c9c9c9",
-    line: "#999999",
-    seam: "#999999",
-    fog: "#ffffff",
     characterBody: "#f6f6f6",
     characterShade: "#d0d0d0",
     characterLine: "#777777",
-    shadow: "#b8b8b8",
   },
   fog: {
     near: 12,
@@ -142,7 +137,7 @@ export function cloneConfig(config: RunnerConfig): RunnerConfig {
  * seed, speed, depth (slice depth), seams (0/1), fog (far distance),
  * at (start distance), biome (only these biomes, comma-separated),
  * loop (loop length in tiles; the world repeats seamlessly),
- * env (metal environment, e.g. kloppenheim_soft), night (0/1), metal (share of metal structures 0..1), quality (low | high), res (export size, e.g. 3840x2160), fps (export).
+ * env (metal environment, e.g. kloppenheim_soft), palette (day, night, fog, ink, …), night (0/1), metal (share of metal structures 0..1), quality (low | high), res (export size, e.g. 3840x2160), fps (export).
  */
 export function applyUrlOverrides(
   config: RunnerConfig,
@@ -188,7 +183,9 @@ export function applyUrlOverrides(
   const env = params.get("env")
   if (env) config.metal.envMap = env
   const night = num("night")
-  if (night !== undefined) config.night = night !== 0
+  if (night !== undefined) config.palette = night !== 0 ? "night" : "day"
+  const palette = params.get("palette")
+  if (palette && palette in config.palettes) config.palette = palette
   const metal = num("metal")
   if (metal !== undefined) config.world.metalFraction = Math.min(1, Math.max(0, metal))
   const loop = num("loop")

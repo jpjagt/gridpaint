@@ -8,7 +8,8 @@
 
 // === Config ===
 
-export interface RunnerColors {
+/** World colors; switchable as a set (the character keeps its own) */
+export interface RunnerPalette {
   /** Faces that look at the camera (layer fronts) */
   front: string
   /** Layer sides (cut edges) */
@@ -21,10 +22,17 @@ export interface RunnerColors {
   seam: string
   /** Fog and background */
   fog: string
+  /** The character's shadow on the ground */
+  shadow: string
+  /** Invert the metal reflections (dark palettes) */
+  invertMetal: boolean
+}
+
+/** The character's own colors (not part of any palette) */
+export interface RunnerColors {
   characterBody: string
   characterShade: string
   characterLine: string
-  shadow: string
 }
 
 export interface RunnerFogConfig {
@@ -138,8 +146,9 @@ export interface RunnerConfig {
   /** Tiles per second */
   speed: number
   boost: RunnerBoostConfig
-  /** Night mode: invert every world color (the character keeps its own) */
-  night: boolean
+  /** Name of the active palette in `palettes` */
+  palette: string
+  palettes: Record<string, RunnerPalette>
   /** Distance (tiles) to start at */
   startDistance: number
   colors: RunnerColors
@@ -338,6 +347,7 @@ export interface RunnerStats {
   distance: number
   biome: string
   pixelRatio: number
+  palette: string
 }
 
 export interface Recording {

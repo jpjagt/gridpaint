@@ -35,6 +35,7 @@ import {
   hexToVec3,
   loadGrayscaleEnv,
 } from "./materials"
+import { activePalette } from "./palettes"
 
 interface ChunkEntry {
   index: number
@@ -203,12 +204,13 @@ export class RunnerEngine {
 
   private applyConfig(config: RunnerConfig) {
     this.config = config
-    const c = config.colors
+    const c = activePalette(config)
 
     for (const m of this.allMaterials()) {
       applyFog(m, config)
-      m.uniforms.uInvert.value = config.night ? 1 : 0
+      m.uniforms.uInvert.value = 0
     }
+    for (const m of [this.metalFrontMat, this.metalSideMat]) m.uniforms.uInvert.value = c.invertMetal ? 1 : 0
     this.applyMetal(config)
     hexToVec3(c.front, this.frontMat.uniforms.uColor.value)
     hexToVec3(c.front, this.frontMat.uniforms.uColorTop.value)
@@ -230,9 +232,7 @@ export class RunnerEngine {
     this.outlineMat.visible = config.lines.outlines
     this.seamMat.visible = config.lines.seams
 
-    let clear = hexToHexNumber(c.fog)
-    if (config.night) clear = 0xffffff - clear
-    this.renderer.setClearColor(new THREE.Color().setHex(clear, THREE.SRGBColorSpace))
+    this.renderer.setClearColor(new THREE.Color().setHex(hexToHexNumber(c.fog), THREE.SRGBColorSpace))
     const ratio = Math.min(window.devicePixelRatio, config.render.maxPixelRatio)
     if (ratio !== this.pixelRatio) {
       this.pixelRatio = ratio
@@ -619,6 +619,7 @@ export class RunnerEngine {
       distance: this.distance,
       biome: here?.biome ?? "…",
       pixelRatio: this.pixelRatio,
+      palette: this.config.palette,
     }
   }
 }

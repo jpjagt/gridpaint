@@ -5,6 +5,7 @@
 
 import * as THREE from "three"
 import type { RunnerConfig } from "@/types/runner"
+import { activePalette } from "./palettes"
 
 export function hexToVec3(hex: string, out = new THREE.Vector3()): THREE.Vector3 {
   const c = new THREE.Color()
@@ -207,7 +208,7 @@ export function createShadowMaterial(): THREE.ShaderMaterial {
 /** Copy fog settings from config into any of the materials above */
 export function applyFog(mat: THREE.ShaderMaterial, config: RunnerConfig) {
   const u = mat.uniforms
-  hexToVec3(config.colors.fog, u.uFogColor.value)
+  hexToVec3(activePalette(config).fog, u.uFogColor.value)
   u.uFogNear.value = config.fog.near
   u.uFogFar.value = Math.max(config.fog.far, config.fog.near + 0.01)
   u.uFogExp.value = config.fog.exponent
