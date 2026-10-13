@@ -9,13 +9,13 @@
 
 import { describe, it, expect } from "vitest"
 import * as THREE from "three"
-import { createLayeredModel } from "@/lib/threejs/LayeredModel"
+import { createLayeredModel, updateLayerThickness } from "@/lib/threejs/LayeredModel"
 import { DEFAULT_LAYER_RANGE } from "@/types/layers"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 
-// Per-layer grey tints from LayeredModel's getLayerGrey — used to identify
-// which mesh belongs to which layer.
+// Per-layer grey tints from LayeredModel's getLayerGrey (as linear vertex
+// colours) — used to identify which vertices belong to which layer.
 const LAYER_1_GREY = 0xf5f5f5
 const LAYER_2_GREY = 0xe8e8e8
 
@@ -46,18 +46,33 @@ const canvasView: CanvasViewState = {
   layerRange: DEFAULT_LAYER_RANGE,
 }
 
-function meshColors(group: THREE.Group): number[] {
-  return group.children
-    .filter((c): c is THREE.Mesh => c instanceof THREE.Mesh)
-    .map((m) => (m.material as THREE.MeshPhysicalMaterial).color.getHex())
+function layerMeshes(group: THREE.Group): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = []
+  group.traverse((o) => {
+    if (o instanceof THREE.Mesh) meshes.push(o)
+  })
+  return meshes
 }
 
-function meshZByColor(group: THREE.Group, color: number): number {
-  const mesh = group.children
-    .filter((c): c is THREE.Mesh => c instanceof THREE.Mesh)
-    .find((m) => (m.material as THREE.MeshPhysicalMaterial).color.getHex() === color)
-  expect(mesh).toBeDefined()
-  return mesh!.position.z
+/** World-space z range of the vertices carrying a layer's grey */
+function zRangeByColor(group: THREE.Group, hex: number): [number, number] {
+  const target = new THREE.Color(hex)
+  group.updateMatrixWorld(true)
+  let lo = Infinity
+  let hi = -Infinity
+  const v = new THREE.Vector3()
+  for (const mesh of layerMeshes(group)) {
+    const pos = mesh.geometry.attributes.position
+    const col = mesh.geometry.attributes.color
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(col.getX(i) - target.r) > 1e-6) continue
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld)
+      lo = Math.min(lo, v.z)
+      hi = Math.max(hi, v.z)
+    }
+  }
+  expect(lo).toBeLessThan(Infinity)
+  return [lo, hi]
 }
 
 describe("createLayeredModel stacking order", () => {
@@ -72,10 +87,11 @@ describe("createLayeredModel stacking order", () => {
       reverseLayers: false,
     })
     expect(result).not.toBeNull()
-    const z1 = meshZByColor(result!.group, LAYER_1_GREY)
-    const z2 = meshZByColor(result!.group, LAYER_2_GREY)
-    expect(z1).toBeGreaterThan(z2)
-    expect(z2).toBe(0)
+    const [lo1, hi1] = zRangeByColor(result!.group, LAYER_1_GREY)
+    const [lo2, hi2] = zRangeByColor(result!.group, LAYER_2_GREY)
+    expect(lo1).toBeCloseTo(hi2, 6)
+    expect(lo2).toBeCloseTo(0, 6)
+    expect(hi1).toBeCloseTo(2, 6)
   })
 
   it("puts layer 1 at the bottom when reverseLayers is true (mirrored stack)", () => {
@@ -87,13 +103,13 @@ describe("createLayeredModel stacking order", () => {
       reverseLayers: true,
     })
     expect(result).not.toBeNull()
-    const z1 = meshZByColor(result!.group, LAYER_1_GREY)
-    const z2 = meshZByColor(result!.group, LAYER_2_GREY)
-    expect(z2).toBeGreaterThan(z1)
-    expect(z1).toBe(0)
+    const [lo1, hi1] = zRangeByColor(result!.group, LAYER_1_GREY)
+    const [lo2] = zRangeByColor(result!.group, LAYER_2_GREY)
+    expect(lo2).toBeCloseTo(hi1, 6)
+    expect(lo1).toBeCloseTo(0, 6)
   })
 
-  it("renders one mesh per visible layer", () => {
+  it("merges all tile-meshed layers into one mesh with one material", () => {
     const result = createLayeredModel({
       layers,
       exportRect,
@@ -101,8 +117,62 @@ describe("createLayeredModel stacking order", () => {
       layerThickness: 1,
       reverseLayers: false,
     })
-    expect(meshColors(result!.group).sort()).toEqual(
-      [LAYER_1_GREY, LAYER_2_GREY].sort(),
-    )
+    const meshes = layerMeshes(result!.group)
+    expect(meshes).toHaveLength(1)
+    expect(result!.layerInfo.map((l) => [l.layerId, l.mode])).toEqual([
+      [2, "tiles"],
+      [1, "tiles"],
+    ])
+  })
+
+  it("scales z by thickness / mmPerUnit and updates it without a rebuild", () => {
+    const result = createLayeredModel({
+      layers,
+      exportRect,
+      canvasView: { ...canvasView, mmPerUnit: 2 },
+      layerThickness: 1,
+      reverseLayers: false,
+    })!
+    expect(zRangeByColor(result.group, LAYER_1_GREY)[1]).toBeCloseTo(1, 6)
+    updateLayerThickness(result.group, 3, 2)
+    expect(zRangeByColor(result.group, LAYER_1_GREY)[1]).toBeCloseTo(3, 6)
+  })
+
+  it("puts fallback layers in the same stack and coordinates", () => {
+    // A cutout on the outline forces layer 1 onto the legacy path
+    const withCutout: Layer = {
+      ...makeLayer(1, ["2,2", "3,2"]),
+      pointModifications: new Map([
+        ["2,2", { cutouts: [{ anchor: "w" as const, diameterMm: 0.5 }] }],
+      ]),
+    }
+    const result = createLayeredModel({
+      layers: [withCutout, makeLayer(2, ["2,2", "3,2"])],
+      exportRect,
+      canvasView,
+      layerThickness: 1,
+      reverseLayers: false,
+    })!
+    expect(result.layerInfo.map((l) => l.mode)).toEqual(["tiles", "fallback"])
+    expect(layerMeshes(result.group)).toHaveLength(2)
+    const [lo1, hi1] = zRangeByColor(result.group, LAYER_1_GREY)
+    expect([lo1, hi1]).toEqual([1, 2])
+    // Same footprint position as the tile-meshed layer below it
+    const box = (hex: number) => {
+      const target = new THREE.Color(hex)
+      const b = new THREE.Box3()
+      for (const mesh of layerMeshes(result.group)) {
+        const pos = mesh.geometry.attributes.position
+        const col = mesh.geometry.attributes.color
+        for (let i = 0; i < pos.count; i++) {
+          if (Math.abs(col.getX(i) - target.r) < 1e-6) b.expandByPoint(new THREE.Vector3().fromBufferAttribute(pos, i))
+        }
+      }
+      return b
+    }
+    const b1 = box(LAYER_1_GREY)
+    const b2 = box(LAYER_2_GREY)
+    expect(b1.min.x).toBeCloseTo(b2.min.x, 3)
+    expect(b1.max.y).toBeCloseTo(b2.max.y, 3)
   })
 })
