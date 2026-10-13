@@ -128,10 +128,16 @@ class Design:
             for g in layer.groups:
                 _as_mask(g.cells, self.shape)
         self.layers.sort(key=lambda l: l.id)
-        self.frames = [
-            (str(label), {int(k): _groups_from(v, self.shape) for k, v in fl.items()})
-            for label, fl in self.frames
-        ]
+
+    def __setattr__(self, name, value):
+        # normalise frames whenever they are assigned (also after construction)
+        if name == "frames" and value:
+            shape = (int(self.height), int(self.width))
+            value = [
+                (str(label), {int(k): _groups_from(v, shape) for k, v in fl.items()})
+                for label, fl in value
+            ]
+        object.__setattr__(self, name, value)
 
     # ---- construction -------------------------------------------------
     @property

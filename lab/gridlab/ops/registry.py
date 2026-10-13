@@ -61,6 +61,9 @@ def register_op(name: str, kind: str = "mask", doc: str | None = None):
         params = [p for p in list(sig.parameters.values())[skip:]
                   if p.kind not in (p.VAR_KEYWORD, p.VAR_POSITIONAL) and p.name not in ("origin", "region")]
         d = (doc or inspect.getdoc(fn) or "").strip()
+        prev = OPS.get(name)
+        if prev is not None and (prev.fn.__module__, prev.fn.__qualname__) != (fn.__module__, fn.__qualname__):
+            raise ValueError(f"op {name!r} already registered by {prev.fn.__module__}; pick another name")
         OPS[name] = OpSpec(name, fn, kind, d, params)
         return fn
 
