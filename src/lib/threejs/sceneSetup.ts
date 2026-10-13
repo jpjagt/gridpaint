@@ -45,33 +45,32 @@ function getThemeBackgroundColor(): number {
 //   potsdamer_platz_2k – night city; mostly black (59% dark — flowers "wet-black" look)
 const HDRI_URL = "/three-assets/hdri/kloppenheim_06_2k.hdr"
 
-// PMREM-processed environment map, cached across scene setups. Loaded async
-// (needs a renderer for PMREM), so scene.environment is set in the callback;
+// Equirectangular HDR texture, cached across scene setups. We cache the raw
+// texture (which keeps its CPU-side pixel data) rather than a PMREM-processed
+// one: PMREM output is a render-target texture tied to the GPU context of the
+// renderer that generated it, so it silently renders black once that renderer
+// is disposed (close preview → reopen). With EquirectangularReflectionMapping,
+// three.js runs PMREM internally per renderer, so the cached texture works for
+// every new context. Loaded async, so scene.environment is set in a callback;
 // the render loop picks it up on the next frame.
-let cachedEnvMap: THREE.Texture | null = null
+let cachedEnvTexture: THREE.Texture | null = null
 
-function applyEnvMap(scene: THREE.Scene, renderer: THREE.WebGLRenderer): void {
-  if (cachedEnvMap) {
-    scene.environment = cachedEnvMap
+function applyEnvMap(scene: THREE.Scene): void {
+  if (cachedEnvTexture) {
+    scene.environment = cachedEnvTexture
     return
   }
-
-  const pmrem = new THREE.PMREMGenerator(renderer)
-  pmrem.compileEquirectangularShader()
 
   new HDRLoader().load(
     HDRI_URL,
     (hdr) => {
-      const envMap = pmrem.fromEquirectangular(hdr).texture
-      hdr.dispose()
-      pmrem.dispose()
-      cachedEnvMap = envMap
-      scene.environment = envMap
+      hdr.mapping = THREE.EquirectangularReflectionMapping
+      cachedEnvTexture = hdr
+      scene.environment = hdr
     },
     undefined,
     (err) => {
       console.warn("Failed to load HDRI environment map", err)
-      pmrem.dispose()
     },
   )
 }
@@ -101,8 +100,8 @@ export function createSceneSetup(options: SceneSetupOptions): SceneSetup {
   renderer.toneMappingExposure = 1.0
   container.appendChild(renderer.domElement)
 
-  // Image-based reflections for the glossy metal material (needs the renderer).
-  applyEnvMap(scene, renderer)
+  // Image-based reflections for the glossy metal material.
+  applyEnvMap(scene)
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.9)
   scene.add(ambientLight)

@@ -14,7 +14,8 @@ import { createExtrudeGeometryFromSvg } from "./pathToShape"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 
-export type LayerThickness = 0.5 | 1 | 1.5 | 2.0
+/** Layer thickness in mm. Any positive value; presets below are shortcuts. */
+export type LayerThickness = number
 
 export const LAYER_THICKNESS_OPTIONS: LayerThickness[] = [0.5, 1, 1.5, 2.0]
 
@@ -60,7 +61,11 @@ export function createLayeredModel(
 
   if (clippedLayers.length === 0) return null
 
-  let sortedLayers = [...clippedLayers].sort((a, b) => a.id - b.id)
+  // 2D compositing is bottom-to-top (6→1): layer 1 is the visual top. The
+  // camera looks from +Z, so stack descending ids from z=0 upward to put
+  // layer 1 nearest the camera and match the drawing; reverseLayers shows
+  // the back of the physical stack (the mirrored view) instead.
+  let sortedLayers = [...clippedLayers].sort((a, b) => b.id - a.id)
   if (reverseLayers) {
     sortedLayers = sortedLayers.reverse()
   }

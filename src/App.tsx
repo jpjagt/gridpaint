@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, lazy, Suspense } from "react"
 import { Routes, Route, useParams, useNavigate } from "react-router-dom"
 import Home from "@/components/Home"
 import {
@@ -26,6 +26,8 @@ import {
   $canvasView,
   $drawingMeta,
 } from "@/stores/drawingStores"
+
+const RunnerPage = lazy(() => import("@/components/runner/RunnerPage"))
 
 // Editor page for a given drawing ID
 function EditorPage() {
@@ -216,6 +218,14 @@ export default function App() {
       <Route
         path='/grids/:drawingId/layers/:layerIndex'
         element={<LayerSvgRoute />}
+      />
+      <Route
+        path='/runner'
+        element={
+          <Suspense fallback={null}>
+            <RunnerPage />
+          </Suspense>
+        }
       />
       <Route path='/' element={<Home />} />
     </Routes>
