@@ -38,7 +38,8 @@ const pick = <T>(rng: () => number, xs: readonly T[]): T =>
 
 /** Tall thin needle, sometimes with a wider plinth */
 export function obelisk(rng: () => number, cx: number, cz: number): Structure {
-  const h = ri(rng, 7, 24)
+  const giant = rng() < 0.2
+  const h = giant ? ri(rng, 35, 80) : ri(rng, 8, 30)
   const plinth = rng() < 0.5 ? ri(rng, 1, 2) : 0
   const dz = pick(rng, [0.5, 0.5, 1, 1.5])
   return makeStructure(cx, cz, 2, dz + 1, 0, h, 4, (lx, row, lz) => {
@@ -50,8 +51,9 @@ export function obelisk(rng: () => number, cx: number, cz: number): Structure {
 
 /** Flat upright slab — the lonely monolith */
 export function monolith(rng: () => number, cx: number, cz: number): Structure {
-  const w = ri(rng, 1, 3)
-  const h = ri(rng, 6, 16)
+  const giant = rng() < 0.15
+  const w = giant ? ri(rng, 3, 7) : ri(rng, 1, 3)
+  const h = giant ? ri(rng, 30, 60) : ri(rng, 8, 24)
   return makeStructure(cx, cz, w, 0.5, 0, h, 4, (lx, row, lz) => {
     return row >= 0 && row < h && lx <= w && lz <= 0.5
   })
@@ -81,9 +83,9 @@ export function gate(rng: () => number, cx: number, cz: number): Structure {
 
 /** Stepped pyramid with a passage through its base */
 export function ziggurat(rng: () => number, cx: number, cz: number): Structure {
-  const levels = ri(rng, 3, 7)
-  const stepH = ri(rng, 1, 3)
-  const stepIn = ri(rng, 1, 2)
+  const levels = ri(rng, 3, 10)
+  const stepH = ri(rng, 2, 5)
+  const stepIn = levels > 6 ? 1 : ri(rng, 1, 2)
   const r = levels * stepIn + ri(rng, 1, 4)
   const shrine = rng() < 0.6
   const passage = rng() < 0.6
@@ -107,7 +109,7 @@ export function ziggurat(rng: () => number, cx: number, cz: number): Structure {
 export function temple(rng: () => number, cx: number, cz: number): Structure {
   const r = ri(rng, 2, 6) // column x-offset from the centre
   const len = ri(rng, 4, 12) // half length along z
-  const h = ri(rng, 4, 8)
+  const h = ri(rng, 6, 18)
   const spacing = pick(rng, [2, 2, 3])
   const roof = rng() < 0.75
   return makeStructure(cx, cz, r + 3, len + 1, 0, h + 2 + r, 4, (lx, row, lz) => {
@@ -128,8 +130,8 @@ export function temple(rng: () => number, cx: number, cz: number): Structure {
 export function castle(rng: () => number, cx: number, cz: number): Structure {
   const r = ri(rng, 3, 7) // wall x-offset
   const len = ri(rng, 8, 16)
-  const h = ri(rng, 5, 9)
-  const towerH = h + ri(rng, 3, 6)
+  const h = ri(rng, 7, 16)
+  const towerH = h + ri(rng, 4, 14)
   const gateW = ri(rng, 1, Math.max(1, r - 2))
   const gateH = Math.min(h - 1, ri(rng, 4, 7))
   const endWalls = rng() < 0.7
@@ -158,7 +160,11 @@ export function castle(rng: () => number, cx: number, cz: number): Structure {
 export function tower(rng: () => number, cx: number, cz: number): Structure {
   const w = ri(rng, 1, 4)
   const d = ri(rng, 1, 4)
-  const h = ri(rng, 9, 22) + Math.floor(Math.abs(cx) * 0.12)
+  // Taller further from the path; now and then a very tall slender spire
+  const spire = rng() < 0.15
+  const h = spire
+    ? ri(rng, 60, 98)
+    : ri(rng, 15, 45) + Math.floor(Math.abs(cx) * 0.25)
   const setback = rng() < 0.5 ? Math.floor(h * (0.55 + rng() * 0.25)) : h
   const grooves = rng() < 0.5 ? ri(rng, 3, 5) : 0
   const antenna = rng() < 0.35 ? ri(rng, 2, 5) : 0
@@ -225,6 +231,223 @@ export function block(size: number, cx: number, cz: number, lift = 0): Structure
   const half = (size - 1) / 2
   return makeStructure(cx, cz, Math.ceil(half), size / 2, lift, lift + size, 4, (lx, row, lz) => {
     return lx <= half && lz <= size / 2 && row >= lift && row < lift + size
+  })
+}
+
+// --- Forest -----------------------------------------------------------------
+
+/** Broadleaf tree: trunk with a blobby ellipsoid crown */
+export function tree(rng: () => number, cx: number, cz: number): Structure {
+  const trunk = ri(rng, 3, 9)
+  const r = 2 + rng() * 3.5
+  const ry = r * (0.6 + rng() * 0.3)
+  const cy = trunk + ry * 0.7
+  const thick = rng() < 0.25
+  return makeStructure(cx, cz, Math.ceil(r), r, 0, Math.ceil(cy + ry), 4, (lx, row, lz) => {
+    if (row < 0) return false
+    if (row < trunk && (lx === 0 || (thick && lx <= 1 && row < 2)) && lz <= (thick ? 1 : 0.5)) return true
+    const dy = (row + 0.5 - cy) / ry
+    return (lx * lx + lz * lz) / (r * r) + dy * dy < 1
+  })
+}
+
+/**
+ * Looming giant: tall trunk flaring into roots, a huge flattened crown, and
+ * lianas hanging from under the crown.
+ */
+export function giantTree(rng: () => number, cx: number, cz: number): Structure {
+  const trunk = ri(rng, 16, 50)
+  const tr = 0.5 + rng() * 1.5 // trunk radius
+  const r = 6 + rng() * 8
+  const ry = r * (0.35 + rng() * 0.25)
+  const cy = trunk + ry * 0.5
+  const salt = Math.floor(rng() * 1e6)
+  const vineChance = 0.05 + rng() * 0.1
+  const crownBottom = cy - ry * 0.7
+  return makeStructure(cx, cz, Math.ceil(r), r, 0, Math.ceil(cy + ry), 4, (lx, row, lz) => {
+    if (row < 0) return false
+    const d = Math.sqrt(lx * lx + lz * lz)
+    // trunk, flaring out into roots near the ground
+    const flare = row < 4 ? (4 - row) * 0.9 : 0
+    if (row < cy && d <= tr + flare) return true
+    const dy = (row + 0.5 - cy) / ry
+    if ((lx * lx + lz * lz) / (r * r) + dy * dy < 1) return true
+    // lianas: thin strands hanging from under the crown
+    if (row < crownBottom && d < r * 0.85 && d > tr + 1) {
+      const lzq = Math.round(lz)
+      if (Math.abs(lz - lzq) > 0.3) return false
+      const h = hash3(lx, lzq, salt, 911)
+      if (h / 4294967296 < vineChance) {
+        const len = 4 + ((h >>> 8) % 22)
+        return row >= crownBottom - len
+      }
+    }
+    return false
+  })
+}
+
+/** Conifer: thin trunk, stacked tiers narrowing to a point */
+export function pine(rng: () => number, cx: number, cz: number): Structure {
+  const giant = rng() < 0.3
+  const trunk = giant ? ri(rng, 4, 10) : ri(rng, 1, 3)
+  const tiers = giant ? ri(rng, 6, 12) : ri(rng, 3, 6)
+  const tierH = giant ? ri(rng, 3, 6) : ri(rng, 2, 3)
+  const r0 = giant ? 4 + rng() * 4 : 2 + rng() * 2.5
+  const h = trunk + tiers * tierH
+  return makeStructure(cx, cz, Math.ceil(r0), r0, 0, h + 1, 4, (lx, row, lz) => {
+    if (row < 0 || row > h) return false
+    if (row < trunk) return lx === 0 && lz <= 0.5
+    const t = row - trunk
+    const tier = Math.floor(t / tierH)
+    // each tier flares out at its bottom; the whole tree narrows upward
+    const taper = 1 - tier / tiers
+    const flare = 1 - (t % tierH) / (tierH * 1.6)
+    const rr = r0 * taper * flare
+    return Math.sqrt(lx * lx + lz * lz) <= Math.max(0.4, rr)
+  })
+}
+
+// --- Industrial ---------------------------------------------------------------
+
+/** Pipes running along the path (long in Z); bundles of a few, maybe mirrored */
+export function pipeRun(rng: () => number, cx: number, cz: number): Structure {
+  const len = ri(rng, 20, 70)
+  const count = ri(rng, 1, 4)
+  const r = pick(rng, [0.5, 0.5, 1, 1.5])
+  const gap = Math.ceil(r * 2) + 1
+  const cy = ri(rng, -10, 12)
+  const vertical = rng() < 0.5
+  const span = (count - 1) * gap
+  // flanges: rings every few tiles, the rhythm you see running past
+  const flangeEvery = pick(rng, [0, 3, 4, 6])
+  return makeStructure(cx, cz, Math.ceil(r) + (vertical ? 0 : span), len / 2, cy - Math.ceil(r) - (vertical ? span : 0), cy + Math.ceil(r), 0, (lx, row, lz) => {
+    if (Math.abs(lz) > len / 2) return false
+    const flange = flangeEvery > 0 && ((lz % flangeEvery) + flangeEvery) % flangeEvery < 0.5
+    const rr = flange ? r + 0.7 : r
+    for (let i = 0; i < count; i++) {
+      const px = vertical ? 0 : i * gap
+      const py = vertical ? cy - i * gap : cy
+      const dx = lx - px
+      const dy = row + 0.5 - (py + 0.5)
+      if (dx * dx + dy * dy <= rr * rr + 0.01) return true
+    }
+    return false
+  })
+}
+
+/** Vertical tank rising from the void, with a domed top */
+export function tank(rng: () => number, cx: number, cz: number): Structure {
+  const r = 2 + rng() * 3
+  const h = ri(rng, 2, 18)
+  const bottom = MIN_ROW
+  const dome = rng() < 0.6
+  return makeStructure(cx, cz, Math.ceil(r), r, bottom, h + Math.ceil(r), 4, (lx, row, lz) => {
+    const d2 = lx * lx + lz * lz
+    if (row < h) return row >= bottom && d2 <= r * r
+    if (!dome) return false
+    const dy = row - h + 0.5
+    return d2 + dy * dy * 2 <= r * r
+  })
+}
+
+/** Cooling tower: hyperboloid waist, open at the top */
+export function coolingTower(rng: () => number, cx: number, cz: number): Structure {
+  const h = ri(rng, 30, 75)
+  const r0 = 6 + rng() * 7
+  const waist = 0.6 + rng() * 0.15
+  const wall = 1.2
+  const bottom = MIN_ROW
+  return makeStructure(cx, cz, Math.ceil(r0), r0, bottom, h, 4, (lx, row, lz) => {
+    if (row < bottom || row >= h) return false
+    const t = (row - bottom) / (h - bottom)
+    const rr = r0 * (waist + (1 - waist) * Math.pow(2 * t - 1.1, 2))
+    const d = Math.sqrt(lx * lx + lz * lz)
+    return d <= rr && d >= rr - wall
+  })
+}
+
+/**
+ * Long wall running alongside the path (mirrored on both sides): buttresses
+ * at a fixed rhythm, horizontal bands, windows in a grid.
+ */
+export function ribbedWall(rng: () => number, cx: number, cz: number): Structure {
+  const off = ri(rng, 6, 20) // distance from the path
+  const len = ri(rng, 30, 80)
+  const h = ri(rng, 10, 50)
+  const thick = ri(rng, 1, 3)
+  const ribEvery = pick(rng, [3, 4, 6, 8])
+  const rib = ri(rng, 1, 2)
+  const band = ri(rng, 4, 9)
+  const windows = rng() < 0.6
+  return makeStructure(0, cz, off + thick + rib + 1, len / 2, MIN_ROW, h, 4, (lx, row, lz) => {
+    if (lz > len / 2 || row >= h) return false
+    const inWall = lx >= off && lx < off + thick
+    const phase = lz % ribEvery
+    if (inWall) {
+      if (windows && thick > 1 && row % band > 1 && row % band < band - 1 && phase > 1 && phase < ribEvery - 1)
+        return lx === off + thick - 1 // recessed window: only the back layer
+      return true
+    }
+    // buttresses on the outside face, and a ledge at every band
+    if (lx >= off + thick && lx < off + thick + rib) return phase < 1 || row % band === 0
+    return false
+  })
+}
+
+/** Tall thin smokestack rising from the void, banded */
+export function chimney(rng: () => number, cx: number, cz: number): Structure {
+  const h = ri(rng, 40, 95)
+  const r = 1 + rng() * 1.2
+  const band = ri(rng, 6, 12)
+  return makeStructure(cx, cz, Math.ceil(r) + 1, r + 1, MIN_ROW, h, 4, (lx, row, lz) => {
+    if (row >= h) return false
+    const d2 = lx * lx + lz * lz
+    const rr = row % band === 0 ? r + 0.8 : r
+    return d2 <= rr * rr
+  })
+}
+
+/** Very tall thin mast with crossbars (radio tower on the horizon) */
+export function mast(rng: () => number, cx: number, cz: number): Structure {
+  const h = ri(rng, 50, 98)
+  const every = ri(rng, 8, 16)
+  const arm = ri(rng, 1, 3)
+  return makeStructure(cx, cz, arm + 1, 0.5, 0, h, 4, (lx, row, lz) => {
+    if (lz > 0.5 || row < 0 || row >= h) return false
+    if (lx === 0) return true
+    return row % every === every - 1 && lx <= arm
+  })
+}
+
+/** Machine block rising from the void: a box with setbacks and vents */
+export function machine(rng: () => number, cx: number, cz: number): Structure {
+  const t = tower(rng, cx, cz)
+  const vents = rng() < 0.6
+  const top = ri(rng, 2, 30)
+  const ribEvery = pick(rng, [0, 2, 3])
+  const inner = t.contains
+  // the tower's cross-sections, stretched from the void up to `top`
+  return makeStructure(t.cx, t.cz, t.hx + 1, t.hz + 1, MIN_ROW, top, t.symmetry, (lx, row, lz) => {
+    if (row > top) return false
+    if (vents && row % 3 === 0 && lx >= t.hx - 2) return false
+    if (inner(lx, Math.min(row - MIN_ROW, t.top - 1), lz)) return true
+    // vertical ribs repeating along the path
+    return ribEvery > 0 && Math.floor(lz) % ribEvery === 0 && inner(Math.max(0, lx - 1), Math.min(row - MIN_ROW, t.top - 1), Math.max(0, lz - 1)) && lz % 1 < 0.5
+  })
+}
+
+/** Pipe or gantry crossing over the path (long in X) */
+export function crossPipe(rng: () => number, cx: number, cz: number): Structure {
+  const h = ri(rng, 5, 14)
+  const w = ri(rng, 6, 30)
+  const r = pick(rng, [0.5, 1])
+  const legs = rng() < 0.5
+  return makeStructure(cx, cz, w + 1, r + 0.5, MIN_ROW, h + Math.ceil(r), 4, (lx, row, lz) => {
+    if (lz > r + 0.5) return false
+    const dy = row + 0.5 - (h + 0.5)
+    if (lx <= w && dy * dy + lz * lz <= r * r + 0.01) return true
+    // support legs down into the void at the ends
+    return legs && lx === w && row <= h && lz <= 0.5
   })
 }
 

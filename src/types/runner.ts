@@ -127,9 +127,19 @@ export interface RunnerCaptureConfig {
   seconds: number
 }
 
+export interface RunnerBoostConfig {
+  /** Speed multiplier while holding space */
+  factor: number
+  /** Seconds to (nearly) reach the boosted speed, and to come back */
+  rampSeconds: number
+}
+
 export interface RunnerConfig {
   /** Tiles per second */
   speed: number
+  boost: RunnerBoostConfig
+  /** Night mode: invert every world color (the character keeps its own) */
+  night: boolean
   /** Distance (tiles) to start at */
   startDistance: number
   colors: RunnerColors
@@ -145,7 +155,14 @@ export interface RunnerConfig {
 
 // === World generation ===
 
-export type BiomeId = "desert" | "ruins" | "dream" | "plains" | "megacity"
+export type BiomeId =
+  | "desert"
+  | "ruins"
+  | "dream"
+  | "plains"
+  | "megacity"
+  | "forest"
+  | "industrial"
 
 /** The subset of config the generator (worker) needs */
 export interface WorldGenParams {
@@ -189,6 +206,8 @@ export interface Biome {
   id: BiomeId
   /** 1 = solid ground, 0 = only the walkway */
   ground: number
+  /** Walkway half-width in columns (0 = one tile wide) */
+  walkway: number
   /** Fill `grid` (already cleared) with this biome's cells for one slice */
   fill(ctx: SliceContext, grid: SliceGrid): void
 }
@@ -296,6 +315,8 @@ export interface WorkerChunkResponse {
   mesh: ChunkMeshData
   /** Biome (or transition) at the chunk's centre */
   biome: string
+  /** Ground amount (0..1) at the chunk's centre, for the far ground plane */
+  ground: number
   /** Milliseconds the worker spent generating + meshing */
   ms: number
 }

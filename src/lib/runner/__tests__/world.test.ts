@@ -37,7 +37,7 @@ describe("world generator", () => {
     for (let k = 0; k < 6000; k += 7) {
       gen.fillSlice(k, g)
       for (const [col, row] of p.tunnels) expect(getCell(g, col, row)).toBe(0)
-      expect(getCell(g, 0, -1)).toBe(1)
+      expect(getCell(g, 0, -1)).not.toBe(0)
     }
   })
 
@@ -45,14 +45,14 @@ describe("world generator", () => {
     const gen = new WorldGenerator(params())
     const seen = new Set<BiomeId>()
     for (let n = 0; n < 40; n++) seen.add(gen.zoneBiome(n))
-    expect(seen.size).toBe(5)
+    expect(seen.size).toBe(7)
     for (let n = 1; n < 40; n++) expect(gen.zoneBiome(n)).not.toBe(gen.zoneBiome(n - 1))
   })
 })
 
 describe("loop mode", () => {
   it("repeats exactly and wraps without a jump", () => {
-    const p = { ...params(), loopLength: 120, biomeWeights: { desert: 0, ruins: 1, dream: 0, plains: 0, megacity: 0 } }
+    const p = { ...params(), loopLength: 120, biomeWeights: { desert: 0, ruins: 1, dream: 0, plains: 0, megacity: 0, forest: 0, industrial: 0 } }
     const gen = new WorldGenerator(p)
     const period = 120 / p.sliceDepth
     const at = (k: number) => {
@@ -96,7 +96,7 @@ describe("chunk mesher", () => {
     const gen = new WorldGenerator(p)
     const results: string[] = []
     // sample a range that crosses several biomes
-    for (const chunk of [0, 40, 80, 120, 125, 130, 160, 200, 240, 280]) {
+    for (const chunk of [0, 40, 80, 120, 125, 130, 160, 200, 240, 280, 320, 360, 400]) {
       const t0 = performance.now()
       const slices = sliceRange(gen, chunk * p.chunkSlices, p.chunkSlices)
       const t1 = performance.now()

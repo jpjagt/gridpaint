@@ -43,8 +43,9 @@ class FloatBuilder {
 }
 
 /**
- * Emits line segments, merging consecutive collinear horizontal segments
- * (ground lines would otherwise be hundreds of tiny segments per slice).
+ * Emits line segments, merging collinear runs: horizontal ones as they come
+ * (ground lines would otherwise be hundreds of tiny segments per slice) and
+ * vertical ones per column (tall straight edges would be one per row).
  */
 class LineBuilder {
   out = new FloatBuilder()
@@ -52,8 +53,35 @@ class LineBuilder {
   private hz = NaN
   private hx0 = 0
   private hx1 = 0
+  private vz = NaN
+  private verticals = new Map<number, [number, number]>()
 
   segment(x0: number, y0: number, x1: number, y1: number, z: number) {
+    if (x0 === x1) {
+      if (z !== this.vz) {
+        this.flushVerticals()
+        this.vz = z
+      }
+      if (y1 < y0) {
+        const t = y0
+        y0 = y1
+        y1 = t
+      }
+      const open = this.verticals.get(x0)
+      if (open) {
+        if (open[1] === y0) {
+          open[1] = y1
+          return
+        }
+        if (open[0] === y1) {
+          open[0] = y0
+          return
+        }
+        this.push(x0, open[0], x0, open[1], z)
+      }
+      this.verticals.set(x0, [y0, y1])
+      return
+    }
     if (y0 === y1) {
       if (x1 < x0) {
         const t = x0
@@ -96,13 +124,19 @@ class LineBuilder {
     b.length = i
   }
 
+  private flushVerticals() {
+    for (const [x, [y0, y1]] of this.verticals) this.push(x, y0, x, y1, this.vz)
+    this.verticals.clear()
+  }
+
   finish(): Float32Array {
     this.flush()
+    this.flushVerticals()
     return this.out.finish()
   }
 }
 
-/** Same merging idea for wall quads: horizontal walls side by side become one */
+/** Same merging idea for wall quads: side-by-side and stacked walls become one */
 class WallBuilder {
   out = new FloatBuilder(16384)
   private hy = NaN
@@ -111,7 +145,31 @@ class WallBuilder {
   private hx0 = 0
   private hx1 = 0
 
+  private verticals = new Map<string, [number, number, number, number, number]>()
+
   wall(x0: number, y0: number, x1: number, y1: number, z0: number, z1: number) {
+    if (x0 === x1) {
+      if (y1 < y0) {
+        const t = y0
+        y0 = y1
+        y1 = t
+      }
+      const key = `${x0}|${z0}|${z1}`
+      const open = this.verticals.get(key)
+      if (open) {
+        if (open[2] === y0) {
+          open[2] = y1
+          return
+        }
+        if (open[1] === y1) {
+          open[1] = y0
+          return
+        }
+        this.push(open[0], open[1], open[0], open[2], open[3], open[4])
+      }
+      this.verticals.set(key, [x0, y0, y1, z0, z1])
+      return
+    }
     if (y0 === y1) {
       if (x1 < x0) {
         const t = x0
@@ -157,6 +215,8 @@ class WallBuilder {
 
   finish(): Float32Array {
     this.flush()
+    for (const v of this.verticals.values()) this.push(v[0], v[1], v[0], v[2], v[3], v[4])
+    this.verticals.clear()
     return this.out.finish()
   }
 }
@@ -250,6 +310,10 @@ export function buildChunkMesh(
     const cur = cases[s + 1]
     const prev = cases[s]
     const z = -s * sliceDepth
+    // runs of solid tiles, merged into rectangles across rows
+    const rects = new Map<string, { xa: number; xb: number; y0: number; y1: number; metal: boolean }>()
+    const emitRect = (r: { xa: number; xb: number; y0: number; y1: number; metal: boolean }) =>
+      pushQuad(r.metal ? metalFronts : fronts, r.xa, r.y0, r.xb, r.y1, z)
     for (let j = 0; j < tilesY; j++) {
       const y = vy0 + j
       let runStart = -1
@@ -258,7 +322,15 @@ export function buildChunkMesh(
         if (runStart < 0) return
         const xa = vx0 + runStart - 1
         const xb = vx0 + endExclusive - 1
-        pushQuad(runMetal ? metalFronts : fronts, xa, y - 0.5, xb, y + 0.5, z)
+        // stack onto the identical run in the row below, if there is one
+        const key = `${xa}|${xb}|${runMetal ? 1 : 0}`
+        const rect = rects.get(key)
+        if (rect && rect.y1 === y - 0.5) {
+          rect.y1 = y + 0.5
+        } else {
+          if (rect) emitRect(rect)
+          rects.set(key, { xa, xb, y0: y - 0.5, y1: y + 0.5, metal: runMetal })
+        }
         runStart = -1
       }
       for (let i = iMin; i <= iMax; i++) {
@@ -282,6 +354,7 @@ export function buildChunkMesh(
       }
       flushRun(iMax + 1)
     }
+    for (const r of rects.values()) emitRect(r)
   }
 
   // --- Walls (merged along Z while the tile shape stays the same) ---------

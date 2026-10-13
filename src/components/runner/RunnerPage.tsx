@@ -10,11 +10,12 @@ import {
 } from "@/lib/runner/config"
 import { startRecording } from "@/lib/runner/recording"
 import { downloadBlob, exportVideo, videoExportSupported } from "@/lib/runner/videoExport"
+import { RUNNER_ENV_MAPS } from "@/lib/runner/materials"
 
 /**
  * Infinite runner through a generated GridPaint-style landscape.
  *
- * Keys: Space pause · H stats · G settings · F fullscreen
+ * Keys: hold Space boost · P pause · H stats · G settings · F fullscreen
  *       R record realtime WebM · V export frame-exact MP4 (one loop when looping)
  * URL:  #/runner?seed=4&speed=9&depth=1&seams=0&fog=140&ui=0
  *       &biome=dream,ruins  &at=500  &loop=140&record=loop  &res=3840x2160
@@ -99,6 +100,8 @@ export default function RunnerPage() {
       if (e.target instanceof HTMLInputElement) return
       if (e.code === "Space") {
         e.preventDefault()
+        if (!e.repeat) engine.setBoost(true)
+      } else if (e.key === "p" || e.key === "P") {
         engine.setPaused(!engine.isPaused())
         setPaused(engine.isPaused())
       } else if (e.key === "h" || e.key === "H") {
@@ -121,10 +124,18 @@ export default function RunnerPage() {
         }
       }
     }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") engine.setBoost(false)
+    }
+    const onBlur = () => engine.setBoost(false)
     window.addEventListener("keydown", onKey)
+    window.addEventListener("keyup", onKeyUp)
+    window.addEventListener("blur", onBlur)
 
     return () => {
       window.removeEventListener("keydown", onKey)
+      window.removeEventListener("keyup", onKeyUp)
+      window.removeEventListener("blur", onBlur)
       rec?.stop()
       gui.destroy()
       engine.dispose()
@@ -167,7 +178,7 @@ export default function RunnerPage() {
             warming ? "loading world…" : paused ? "paused" : "",
             recording ? "● recording (R to stop)" : "",
             exportState,
-            "space pause · h stats · g settings · f fullscreen",
+            "hold space boost · p pause · h stats · g settings · f fullscreen",
             "r record (realtime webm) · v export mp4 (frame-exact)",
           ]
             .filter(Boolean)
@@ -187,7 +198,11 @@ function buildGui(
   gui.close()
   const apply = () => onChange(config)
 
-  gui.add(config, "speed", 0, 30, 0.5).onChange(apply)
+  gui.add(config, "speed", 0, 40, 0.5).onChange(apply)
+  gui.add(config, "night").onChange(apply)
+  const boost = gui.addFolder("boost (hold space)").close()
+  boost.add(config.boost, "factor", 1, 5, 0.1).onChange(apply)
+  boost.add(config.boost, "rampSeconds", 0.05, 3, 0.05).onChange(apply)
 
   const colors = gui.addFolder("colors").close()
   for (const key of Object.keys(config.colors) as (keyof RunnerConfig["colors"])[]) {
@@ -232,7 +247,7 @@ function buildGui(
   const metal = gui.addFolder("metal").close()
   metal.add(config.world, "metalFraction", 0, 1, 0.05).name("share (rebuilds)").onFinishChange(apply)
   metal
-    .add(config.metal, "envMap", ["studio_small_08_1k", "kloppenheim_06_2k", "quattro_canti_2k", "potsdamer_platz_2k"])
+    .add(config.metal, "envMap", Object.keys(RUNNER_ENV_MAPS))
     .onChange(apply)
   metal.add(config.metal, "blur", 0, 6, 0.1).onChange(apply)
   metal.add(config.metal, "exposure", 0.2, 3, 0.05).onChange(apply)

@@ -6,7 +6,7 @@
  * jitter.
  *
  * Smoothness measures:
- *  - all generation/meshing happens in a worker
+ *  - all generation/meshing happens in a small pool of workers
  *  - at most `chunksPerFrame` new chunks are handed to the GPU per frame
  *  - near chunks are rebuilt with finer arcs but only as wide as the camera
  *    can see up close; far chunks are wide but coarse
@@ -27,7 +27,10 @@ import {
   applyFog,
   createFaceMaterial,
   createFallbackEnv,
+  createGroundMask,
+  createGroundPlaneMaterial,
   createLineMaterial,
+  GROUND_MASK_SIZE,
   createMetalMaterial,
   hexToVec3,
   loadGrayscaleEnv,
@@ -48,7 +51,9 @@ interface PendingBuild {
   colLimit: number
 }
 
-const MAX_IN_FLIGHT = 2
+/** Background threads for generation + meshing (leave cores for the page) */
+const WORKER_COUNT = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 2))
+const MAX_IN_FLIGHT = 2 * WORKER_COUNT
 const FRAME_HISTORY = 240
 
 export class RunnerEngine {
@@ -66,9 +71,12 @@ export class RunnerEngine {
   private metalFrontMat = createMetalMaterial(true)
   private metalSideMat = createMetalMaterial(false)
   private envName = ""
+  private groundMask = createGroundMask()
+  private groundMat = createGroundPlaneMaterial(this.groundMask)
+  private groundPlane: THREE.Mesh
   private env: THREE.Texture = createFallbackEnv()
 
-  private worker: Worker
+  private workers: Worker[] = []
   private generation = 0
   private worldKey = ""
   private chunks = new Map<number, ChunkEntry>()
@@ -79,6 +87,8 @@ export class RunnerEngine {
   /** Tiles travelled. A double; never sent to the GPU directly. */
   private distance = 0
   private paused = false
+  private boostTarget = 1
+  private boostCurrent = 1
   /** Hold still until everything in view has loaded (after start / world reset) */
   private warmingUp = true
   private running = false
@@ -115,12 +125,19 @@ export class RunnerEngine {
 
     this.camera = new THREE.PerspectiveCamera(config.camera.fov, 1, 0.05, 400)
     this.scene.add(this.world)
+    this.groundPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.groundMat)
+    this.groundPlane.rotation.x = -Math.PI / 2
+    this.groundPlane.frustumCulled = false
+    this.scene.add(this.groundPlane)
     this.character = new RunnerCharacter(this.config)
     this.scene.add(this.character.group)
 
-    this.worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })
-    this.worker.onmessage = (e: MessageEvent<WorkerChunkResponse>) => {
-      if (e.data.generation === this.generation) this.arrivals.push(e.data)
+    for (let i = 0; i < WORKER_COUNT; i++) {
+      const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })
+      worker.onmessage = (e: MessageEvent<WorkerChunkResponse>) => {
+        if (e.data.generation === this.generation) this.arrivals.push(e.data)
+      }
+      this.workers.push(worker)
     }
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
@@ -149,6 +166,11 @@ export class RunnerEngine {
     this.paused = paused
   }
 
+  /** Hold-to-boost: speed eases to `boost.factor` × while on */
+  setBoost(on: boolean) {
+    this.boostTarget = on ? this.config.boost.factor : 1
+  }
+
   isPaused() {
     return this.paused
   }
@@ -165,12 +187,14 @@ export class RunnerEngine {
   dispose() {
     this.stop()
     this.resizeObserver.disconnect()
-    this.worker.terminate()
+    for (const w of this.workers) w.terminate()
     for (const entry of this.chunks.values()) this.disposeChunk(entry)
     this.chunks.clear()
     this.character.dispose()
     for (const m of this.allMaterials()) m.dispose()
     this.env.dispose()
+    this.groundMask.dispose()
+    this.groundPlane.geometry.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()
   }
@@ -181,11 +205,22 @@ export class RunnerEngine {
     this.config = config
     const c = config.colors
 
-    for (const m of this.allMaterials()) applyFog(m, config)
+    for (const m of this.allMaterials()) {
+      applyFog(m, config)
+      m.uniforms.uInvert.value = config.night ? 1 : 0
+    }
     this.applyMetal(config)
     hexToVec3(c.front, this.frontMat.uniforms.uColor.value)
     hexToVec3(c.front, this.frontMat.uniforms.uColorTop.value)
     hexToVec3(c.side, this.sideMat.uniforms.uColor.value)
+    hexToVec3(c.sideTop, this.groundMat.uniforms.uColor.value)
+    this.groundMat.uniforms.uInnerX.value = config.world.halfWidth
+    this.groundMat.uniforms.uChunkLength.value = config.world.chunkSlices * config.world.sliceDepth
+    // Ground plane: from just behind the camera to past the far plane, very wide
+    const near = config.camera.back + 2
+    const far = config.world.viewDistance + 80
+    this.groundPlane.scale.set(8000, near + far, 1)
+    this.groundPlane.position.set(0, 0, (near - far) / 2)
     hexToVec3(c.sideTop, this.sideMat.uniforms.uColorTop.value)
     hexToVec3(c.line, this.outlineMat.uniforms.uColor.value)
     hexToVec3(c.seam, this.seamMat.uniforms.uColor.value)
@@ -195,7 +230,9 @@ export class RunnerEngine {
     this.outlineMat.visible = config.lines.outlines
     this.seamMat.visible = config.lines.seams
 
-    this.renderer.setClearColor(new THREE.Color().setHex(hexToHexNumber(c.fog), THREE.SRGBColorSpace))
+    let clear = hexToHexNumber(c.fog)
+    if (config.night) clear = 0xffffff - clear
+    this.renderer.setClearColor(new THREE.Color().setHex(clear, THREE.SRGBColorSpace))
     const ratio = Math.min(window.devicePixelRatio, config.render.maxPixelRatio)
     if (ratio !== this.pixelRatio) {
       this.pixelRatio = ratio
@@ -227,7 +264,15 @@ export class RunnerEngine {
   }
 
   private allMaterials() {
-    return [this.frontMat, this.sideMat, this.outlineMat, this.seamMat, this.metalFrontMat, this.metalSideMat]
+    return [
+      this.frontMat,
+      this.sideMat,
+      this.outlineMat,
+      this.seamMat,
+      this.metalFrontMat,
+      this.metalSideMat,
+      this.groundMat,
+    ]
   }
 
   private applyMetal(config: RunnerConfig) {
@@ -243,7 +288,7 @@ export class RunnerEngine {
     if (m.envMap !== this.envName) {
       this.envName = m.envMap
       const name = m.envMap
-      loadGrayscaleEnv(`/three-assets/hdri/${name}.hdr`)
+      loadGrayscaleEnv(name)
         .then((tex) => {
           if (this.envName !== name) return tex.dispose()
           this.env.dispose()
@@ -262,7 +307,7 @@ export class RunnerEngine {
     this.arrivals.length = 0
     this.warmingUp = true
     const msg: WorkerRequest = { type: "init", params: toWorldGenParams(this.config) }
-    this.worker.postMessage(msg)
+    for (const w of this.workers) w.postMessage(msg)
   }
 
   private resize() {
@@ -290,7 +335,10 @@ export class RunnerEngine {
   step(dt: number) {
     if (this.warmingUp && this.isWorldReady()) this.warmingUp = false
     const moving = !this.paused && !this.warmingUp
-    if (moving) this.distance += this.config.speed * dt
+    // ease toward the boost target: ~95% of the way after rampSeconds
+    const tau = Math.max(0.01, this.config.boost.rampSeconds / 3)
+    this.boostCurrent += (this.boostTarget - this.boostCurrent) * (1 - Math.exp(-dt / tau))
+    if (moving) this.distance += this.config.speed * this.boostCurrent * dt
     this.character.update(this.distance, this.config.world.loopLength)
     this.integrateArrivals()
     this.manageChunks()
@@ -308,6 +356,7 @@ export class RunnerEngine {
 
   private positionChunks() {
     const len = this.chunkLength()
+    this.groundMat.uniforms.uDistance.value = this.distance % (GROUND_MASK_SIZE * len)
     for (const entry of this.chunks.values()) {
       // difference of doubles first, so the GPU only sees small numbers
       entry.group.position.z = this.distance - entry.index * len
@@ -371,7 +420,9 @@ export class RunnerEngine {
       generation: this.generation,
     }
     this.pending.set(chunk, { lod, colLimit })
-    this.worker.postMessage(msg)
+    // a chunk always goes to the same worker, so LOD rebuilds hit its slice cache
+    const w = this.workers.length
+    this.workers[((chunk % w) + w) % w].postMessage(msg)
   }
 
   private integrateArrivals(unlimited = false) {
@@ -391,6 +442,13 @@ export class RunnerEngine {
       const nearEdge = res.chunk * len - this.distance
       if (nearEdge + len < -this.config.camera.back - 1) continue
       this.chunks.set(res.chunk, this.createChunk(res, pend))
+      const slot = (((res.chunk % GROUND_MASK_SIZE) + GROUND_MASK_SIZE) % GROUND_MASK_SIZE) * 4
+      const maskData = this.groundMask.image.data as Uint8Array
+      const v = res.ground >= 0.5 ? 255 : 0
+      if (maskData[slot] !== v) {
+        maskData[slot] = maskData[slot + 1] = maskData[slot + 2] = v
+        this.groundMask.needsUpdate = true
+      }
       this.buildTimes.push(res.ms)
       if (this.buildTimes.length > 60) this.buildTimes.shift()
       budget--

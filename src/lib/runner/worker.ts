@@ -52,6 +52,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       generation: msg.generation,
       mesh,
       biome: gen.biomeNameAt((k0 + n / 2) * gen.params.sliceDepth),
+      ground: gen.groundAt((k0 + n / 2) * gen.params.sliceDepth),
       ms: performance.now() - t0,
     }
     ;(self as unknown as DedicatedWorkerGlobalScope).postMessage(res, [

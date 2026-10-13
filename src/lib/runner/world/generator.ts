@@ -20,7 +20,15 @@ import { SimplexNoise, rand3, smoothstep } from "../noise"
 import { createBiomes } from "./biomes"
 import { createSliceGrid } from "./grid"
 
-const BIOME_ORDER: BiomeId[] = ["desert", "ruins", "dream", "plains", "megacity"]
+const BIOME_ORDER: BiomeId[] = [
+  "desert",
+  "ruins",
+  "dream",
+  "plains",
+  "megacity",
+  "forest",
+  "industrial",
+]
 
 export class WorldGenerator {
   readonly params: WorldGenParams
@@ -192,14 +200,25 @@ export class WorldGenerator {
         }
       }
     }
-    // The walkway is always there
-    cells[g0] = 1
+    // The walkway is always there (wider in some biomes)
+    const walk = zone.t < 0.5 ? zone.from.walkway : zone.to.walkway
+    for (let col = -walk; col <= walk; col++) {
+      if (!cells[g0 + col]) cells[g0 + col] = 1
+    }
 
     for (const [col, row] of this.params.tunnels) {
       if (col >= -halfWidth && col <= halfWidth && row >= MIN_ROW && row < MIN_ROW + grid.rows) {
         cells[(row - MIN_ROW) * cols + col + halfWidth] = 0
       }
     }
+  }
+
+  /** 1 where the landscape has solid ground, 0 for walkway-only (loop-aware) */
+  groundAt(zt: number): number {
+    const L = this.params.loopLength
+    if (L > 0) zt = ((zt % L) + L) % L
+    const z = this.zoneAt(zt)
+    return z.from.ground + (z.to.ground - z.from.ground) * z.t
   }
 
   biomeNameAt(zt: number): string {

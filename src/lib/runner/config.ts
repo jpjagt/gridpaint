@@ -5,22 +5,30 @@
 
 import type { RunnerConfig, WorldGenParams } from "@/types/runner"
 
-/** Lowest generated row. Rows -2 and -1 are the ground; the character runs on row 0. */
-export const MIN_ROW = -2
+/**
+ * Lowest generated row. Rows -2 and -1 are the ground; the character runs on
+ * row 0. Rows below that are the void under the walkway (dream, industrial).
+ */
+export const MIN_ROW = -36
 
 /** Row the character occupies (sits on the ground, centre at y = 0.5) */
 export const CHARACTER_ROW = 0
 
 export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
-  speed: 7,
+  speed: 16.5,
+  boost: {
+    factor: 2,
+    rampSeconds: 0.6,
+  },
+  night: false,
   startDistance: 0,
   colors: {
     front: "#ededed",
-    side: "#d7d7d7",
-    sideTop: "#d7d7d7",
+    side: "#919191",
+    sideTop: "#c9c9c9",
     line: "#999999",
     seam: "#999999",
-    fog: "#e7e7e7",
+    fog: "#ffffff",
     characterBody: "#f6f6f6",
     characterShade: "#d0d0d0",
     characterLine: "#777777",
@@ -28,7 +36,7 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
   },
   fog: {
     near: 12,
-    far: 95,
+    far: 326,
     exponent: 0.85,
   },
   lines: {
@@ -39,11 +47,11 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
     seamFadeEnd: 55,
   },
   camera: {
-    up: 4,
-    back: 7,
+    up: 3.5,
+    back: 4.5,
     lookAhead: 10,
-    lookUp: 0.5,
-    fov: 55,
+    lookUp: 1.5,
+    fov: 74,
   },
   character: {
     kind: "ball",
@@ -51,12 +59,13 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
     shadow: true,
   },
   world: {
-    seed: 1337,
+    seed: 29933,
     sliceDepth: 0.5,
     chunkSlices: 16,
+    // Past the grid, a flat ground plane continues to the horizon
     halfWidth: 90,
-    maxRow: 34,
-    viewDistance: 100,
+    maxRow: 100,
+    viewDistance: 300,
     arcSegments: [6, 3, 2],
     lodDistances: [28, 60],
     zoneLength: 260,
@@ -67,6 +76,8 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
       dream: 1,
       plains: 0.8,
       megacity: 0.8,
+      forest: 1,
+      industrial: 1,
     },
     loopLength: 0,
     metalFraction: 0.3,
@@ -82,7 +93,7 @@ export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
     blur: 1.5,
     exposure: 1.15,
     contrast: 1.1,
-    tint: "#ffffff",
+    tint: "#e3e3e3",
   },
   capture: {
     width: 1920,
@@ -131,7 +142,7 @@ export function cloneConfig(config: RunnerConfig): RunnerConfig {
  * seed, speed, depth (slice depth), seams (0/1), fog (far distance),
  * at (start distance), biome (only these biomes, comma-separated),
  * loop (loop length in tiles; the world repeats seamlessly),
- * metal (share of metal structures 0..1), quality (low | high), res (export size, e.g. 3840x2160), fps (export).
+ * env (metal environment, e.g. kloppenheim_soft), night (0/1), metal (share of metal structures 0..1), quality (low | high), res (export size, e.g. 3840x2160), fps (export).
  */
 export function applyUrlOverrides(
   config: RunnerConfig,
@@ -174,6 +185,10 @@ export function applyUrlOverrides(
   }
   const fps = num("fps")
   if (fps !== undefined && fps > 0) config.capture.fps = fps
+  const env = params.get("env")
+  if (env) config.metal.envMap = env
+  const night = num("night")
+  if (night !== undefined) config.night = night !== 0
   const metal = num("metal")
   if (metal !== undefined) config.world.metalFraction = Math.min(1, Math.max(0, metal))
   const loop = num("loop")

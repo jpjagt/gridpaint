@@ -34,6 +34,17 @@ import {
   temple,
   tower,
   ziggurat,
+  tree,
+  giantTree,
+  pine,
+  chimney,
+  mast,
+  ribbedWall,
+  pipeRun,
+  tank,
+  coolingTower,
+  machine,
+  crossPipe,
 } from "./structures"
 
 const scratch: Structure[] = []
@@ -54,7 +65,12 @@ function mix(options: [number, StructureFactory][]): StructureFactory {
 class FieldSet {
   private fields: StructureField[] = []
 
-  constructor(private params: WorldGenParams, private baseId: number) {}
+  constructor(
+    private params: WorldGenParams,
+    private baseId: number,
+    /** Multiplies the global metal share for this biome's structures */
+    private metalScale = 1,
+  ) {}
 
   add(opts: Partial<StructureFieldOptions> & { factory: StructureFactory }) {
     this.fields.push(
@@ -72,7 +88,7 @@ class FieldSet {
         this.params.halfWidth,
         this.params.sliceDepth,
         this.params.doorHeight,
-        this.params.metalFraction,
+        Math.min(1, this.params.metalFraction * this.metalScale),
       ),
     )
     return this
@@ -83,6 +99,11 @@ class FieldSet {
     for (const f of this.fields) f.query(zt, scratch)
     stampStructures(grid, scratch, zt)
   }
+}
+
+/** Move a structure down so its top sits at `topRow`; flipped, it hangs point-down */
+function sunk(s: Structure, topRow: number, flip: boolean): Structure {
+  return floating(s, topRow - s.top, flip)
 }
 
 const stump: StructureFactory = (rng, cx, cz) => {
@@ -96,6 +117,7 @@ const stump: StructureFactory = (rng, cx, cz) => {
 class DesertBiome implements Biome {
   id: BiomeId = "desert"
   ground = 1
+  walkway = 0
   private fields: FieldSet
   private noise: SimplexNoise
 
@@ -133,6 +155,7 @@ class DesertBiome implements Biome {
 class RuinsBiome implements Biome {
   id: BiomeId = "ruins"
   ground = 1
+  walkway = 0
   private fields: FieldSet
   private noise: SimplexNoise
 
@@ -181,6 +204,7 @@ class RuinsBiome implements Biome {
 class DreamBiome implements Biome {
   id: BiomeId = "dream"
   ground = 0
+  walkway = 0
   private fields: FieldSet
   private noise: SimplexNoise
   private warp: SimplexNoise
@@ -212,25 +236,57 @@ class DreamBiome implements Biome {
         minPathDistance: 4,
         factory: mix([
           [0.3, orb],
-          [0.2, lifted(ziggurat, 6, 14, 0.7)],
-          [0.15, lifted(temple, 8, 16, 0.6)],
-          [0.15, lifted(gate, 3, 12, 0.3)],
-          [0.1, lifted((rng, cx, cz) => block(2 + Math.floor(rng() * 3), cx, cz), 2, 18, 0)],
-          [0.1, lifted(obelisk, 4, 14, 0.5)],
+          [0.2, lifted(ziggurat, 6, 50, 0.7)],
+          [0.15, lifted(temple, 8, 60, 0.6)],
+          [0.15, lifted(gate, 3, 40, 0.3)],
+          [0.1, lifted((rng, cx, cz) => block(2 + Math.floor(rng() * 4), cx, cz), 2, 70, 0)],
+          [0.1, lifted(obelisk, 4, 30, 0.5)],
         ]),
       })
       .add({ onPath: true, spacingZ: 12, probability: 1, factory: ringRun })
+      // The underworld: hanging upside-down islands, pillars rising from below
+      .add({
+        spacingX: 16,
+        spacingZ: 18,
+        probability: 0.55,
+        minPathDistance: 0,
+        factory: (rng, cx, cz) => {
+          if (this.depthAt(cz) < 0.35) return null
+          const top = -3 - Math.floor(rng() * 10)
+          return weighted(rng, [
+            [0.35, (r, x, z) => sunk(ziggurat(r, x, z), top, true)],
+            [0.3, (r, x, z) => sunk(tower(r, x, z), top, false)],
+            [0.2, (r, x, z) => sunk(orb(r, x, z), top - 2, false)],
+            [0.15, (r, x, z) => sunk(temple(r, x, z), top, true)],
+          ])(rng, cx, cz)
+        },
+      })
+  }
+
+  /** How much underworld there is below the walkway here: 0 = empty void */
+  private depthAt(zt: number): number {
+    return smoothstep(-0.15, 0.35, this.noise.noise2(zt / 160, 77.7))
   }
 
   private density(col: number, row: number, z: number): number {
-    const w = this.warp.noise3(col * 0.02, row * 0.03, z * 0.02) * 2
-    return this.noise.fbm3(col * 0.035 + w, row * 0.06, z * 0.03 - w, 2)
+    const w = this.warp.noise3(col * 0.02, row * 0.015, z * 0.02) * 2
+    return this.noise.fbm3(col * 0.035 + w, row * 0.03, z * 0.03 - w, 2)
+  }
+
+  /**
+   * Cheap reject: the first octave alone (plus the most the second can add)
+   * can't reach the threshold. Most cells in the open sky stop here.
+   */
+  private cannotReach(col: number, row: number, z: number, thr: number): boolean {
+    const w = this.warp.noise3(col * 0.02, row * 0.015, z * 0.02) * 2
+    const n1 = this.noise.noise3(col * 0.035 + w, row * 0.03, z * 0.03 - w)
+    return n1 / 1.5 + 0.34 < thr
   }
 
   fill(ctx: SliceContext, grid: SliceGrid) {
     const { cols, halfWidth, cells } = grid
     const zt = ctx.zt
-    const top = Math.min(MIN_ROW + grid.rows - 1, 26)
+    const top = MIN_ROW + grid.rows - 1
 
     // Segment-level symmetry modes, faded in/out so slices stay continuous
     const segLen = 90
@@ -242,13 +298,20 @@ class DreamBiome implements Biome {
     const mid = seg * segLen + segLen / 2
     const zMirror = mid - Math.abs(zt - mid)
 
+    const depth = this.depthAt(zt)
     for (let row = MIN_ROW; row <= top; row++) {
       const base = (row - MIN_ROW) * cols + halfWidth
-      // thinner at the top and bottom of the band, emptier near the path
-      const band = 0.5 + 0.12 * Math.abs(row - 10) / 12
+      // Above: thinner at the top and bottom of the band. Below the walkway:
+      // a second band that only exists where the underworld is "on".
+      const band =
+        row >= -2
+          ? 0.6 + (0.14 * Math.abs(row - 35)) / 35
+          : 0.46 + (0.1 * Math.abs(row + 20)) / 16 + (1 - depth) * 2
+      if (band > 0.95) continue // fbm never gets there; skip the row
       for (let col = -halfWidth; col <= halfWidth; col++) {
         const pathClear = 0.35 * Math.exp(-(col * col + (row - 2) * (row - 2)) / 20)
         const thr = band + pathClear
+        if (mirrorX === 0 && palindrome === 0 && this.cannotReach(col, row, zt, thr)) continue
         let v = this.density(col, row, zt)
         if (mirrorX > 0) v += (this.density(Math.abs(col), row, zt) - v) * mirrorX
         if (palindrome > 0) v += (this.density(col, row, zMirror) - v) * palindrome
@@ -264,12 +327,22 @@ class DreamBiome implements Biome {
 class PlainsBiome implements Biome {
   id: BiomeId = "plains"
   ground = 1
+  walkway = 0
   private seed: number
   private metalFraction: number
+  private masts: FieldSet
 
   constructor(params: WorldGenParams) {
     this.seed = params.seed
     this.metalFraction = params.metalFraction
+    // lone radio masts far off to the sides
+    this.masts = new FieldSet(params, 4).add({
+      spacingX: 50,
+      spacingZ: 90,
+      probability: 0.3,
+      minPathDistance: 25,
+      factory: mast,
+    })
   }
 
   fill(ctx: SliceContext, grid: SliceGrid) {
@@ -313,6 +386,7 @@ class PlainsBiome implements Biome {
       list.push(block(cubeSize, cx, cz), block(cubeSize, -cx, cz))
     }
     stampStructures(grid, list, zt)
+    this.masts.stamp(grid, zt)
   }
 }
 
@@ -328,6 +402,7 @@ function frameAt(w: number, h: number, cz: number): Structure {
 class MegacityBiome implements Biome {
   id: BiomeId = "megacity"
   ground = 1
+  walkway = 0
   private fields: FieldSet
 
   constructor(params: WorldGenParams) {
@@ -352,6 +427,122 @@ class MegacityBiome implements Biome {
   }
 }
 
+// === Forest: trees and pines, undergrowth, canopies arching over the path ===
+
+class ForestBiome implements Biome {
+  id: BiomeId = "forest"
+  ground = 1
+  walkway = 0
+  private fields: FieldSet
+  private noise: SimplexNoise
+
+  constructor(params: WorldGenParams) {
+    this.noise = new SimplexNoise(params.seed + 59)
+    const canopyArch: StructureFactory = (rng, cx, cz) => {
+      const w = 3 + Math.floor(rng() * 3)
+      const h = 5 + Math.floor(rng() * 4)
+      const rx = w + 2 + rng() * 2
+      const ry = 2 + rng() * 1.5
+      const rz = 2 + rng() * 2
+      return makeStructure(cx, cz, Math.ceil(rx), rz, 0, Math.ceil(h + ry * 2), 4, (lx, row, lz) => {
+        if (row < 0) return false
+        if (lx === w && row < h + 1 && lz <= 0.5) return true
+        const dy = (row + 0.5 - (h + ry)) / ry
+        return (lx * lx) / (rx * rx) + dy * dy + (lz * lz) / (rz * rz) < 1
+      })
+    }
+    this.fields = new FieldSet(params, 6, 0.5)
+      // understorey: small trees and pines
+      .add({
+        spacingX: 9,
+        spacingZ: 10,
+        probability: 0.2,
+        minPathDistance: 2,
+        factory: mix([
+          [0.55, tree],
+          [0.45, pine],
+        ]),
+      })
+      // the looming giants, sparse so their height reads
+      .add({
+        spacingX: 26,
+        spacingZ: 24,
+        probability: 0.6,
+        minPathDistance: 5,
+        factory: mix([
+          [0.7, giantTree],
+          [0.3, pine],
+        ]),
+      })
+      .add({ onPath: true, spacingZ: 40, probability: 0.4, factory: canopyArch })
+  }
+
+  fill(ctx: SliceContext, grid: SliceGrid) {
+    const { cols, halfWidth, cells } = grid
+    const base = -MIN_ROW * cols + halfWidth
+    for (let col = -halfWidth; col <= halfWidth; col++) {
+      if (this.noise.fbm2(col * 0.3, ctx.zt * 0.3, 2) > 0.62) cells[base + col] = 1
+    }
+    this.fields.stamp(grid, ctx.zt)
+  }
+}
+
+// === Industrial: a railed walkway over the void, pipes, tanks, machines ======
+
+class IndustrialBiome implements Biome {
+  id: BiomeId = "industrial"
+  ground = 0
+  walkway = 1
+  private fields: FieldSet
+
+  constructor(params: WorldGenParams) {
+    this.fields = new FieldSet(params, 7, 2)
+      // pipes along the path, mostly at a distance
+      .add({ spacingX: 8, spacingZ: 30, probability: 0.4, minPathDistance: 7, factory: pipeRun })
+      // the big machines, with room around the walkway to see them
+      .add({
+        spacingX: 20,
+        spacingZ: 20,
+        probability: 0.55,
+        minPathDistance: 14,
+        factory: mix([
+          [0.35, machine],
+          [0.25, tank],
+          [0.2, coolingTower],
+          [0.2, chimney],
+        ]),
+      })
+      // now and then something protrudes close to the walkway
+      .add({
+        spacingX: 10,
+        spacingZ: 36,
+        probability: 0.2,
+        minPathDistance: 4,
+        factory: mix([
+          [0.5, machine],
+          [0.5, pipeRun],
+        ]),
+      })
+      // long patterned walls running alongside, mirrored on both sides
+      .add({ onPath: true, spacingZ: 90, probability: 0.45, factory: ribbedWall })
+      .add({ onPath: true, spacingZ: 16, probability: 0.4, factory: crossPipe })
+      .add({ onPath: true, spacingZ: 60, probability: 0.3, factory: gate })
+  }
+
+  fill(ctx: SliceContext, grid: SliceGrid) {
+    const { cols, halfWidth, cells } = grid
+    // Railings: a rail at row 1 on both sides, posts every 2 tiles
+    const row0 = -MIN_ROW * cols + halfWidth
+    const row1 = row0 + cols
+    const post = Math.floor(ctx.zt) % 2 === 0
+    for (const col of [-2, 2]) {
+      cells[row1 + col] = 1
+      if (post) cells[row0 + col] = 1
+    }
+    this.fields.stamp(grid, ctx.zt)
+  }
+}
+
 export function createBiomes(params: WorldGenParams): Record<BiomeId, Biome> {
   return {
     desert: new DesertBiome(params),
@@ -359,5 +550,7 @@ export function createBiomes(params: WorldGenParams): Record<BiomeId, Biome> {
     dream: new DreamBiome(params),
     plains: new PlainsBiome(params),
     megacity: new MegacityBiome(params),
+    forest: new ForestBiome(params),
+    industrial: new IndustrialBiome(params),
   }
 }

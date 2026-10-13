@@ -58,7 +58,8 @@ export class RunnerCharacter {
     hexToVec3(config.colors.characterShade, this.bodyMat.uniforms.uShade.value)
     hexToVec3(config.colors.characterLine, this.bodyMat.uniforms.uLine.value)
     hexToVec3(config.colors.characterLine, this.outlineMat.uniforms.uColor.value)
-    hexToVec3(config.colors.shadow, this.shadowMat.uniforms.uColor.value)
+    // in night mode the ground is dark, so the shadow goes black
+    hexToVec3(config.night ? "#000000" : config.colors.shadow, this.shadowMat.uniforms.uColor.value)
     this.bodyMat.uniforms.uRadius.value = c.radius
     this.bodyMat.uniforms.uRings.value = c.kind === "ball" ? 1 : 0
     this.shadow.visible = c.shadow
@@ -82,7 +83,7 @@ export class RunnerCharacter {
       s.closePath()
       geo = new THREE.ExtrudeGeometry(s, { depth: r * 0.45, bevelEnabled: false })
       geo.translate(0, 0, -r * 0.225)
-      geo.rotateX(-Math.PI / 2) // lie flat, tip toward -Z
+      geo.rotateX(Math.PI / 2) // lie flat, tip toward -Z (direction of travel)
     } else {
       geo = new THREE.SphereGeometry(radius, 40, 20)
     }
