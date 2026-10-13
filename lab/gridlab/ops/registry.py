@@ -117,23 +117,96 @@ def parse_kwargs(spec: OpSpec, items: list[str]) -> dict:
     return out
 
 
+# Ops that assume the input is already symmetric and keep it so: on an off-centre design their
+# symmetry axes default to the material centre (union bbox of all layers), not the canvas centre.
+PRESERVING_SYM_OPS = {"connect", "sym-thin", "break-2x2", "sym-and", "orbit-clean", "lace-clean", "broken-mirror",
+                      "grow-coral", "grow-dla", "physarum-link", "noise-fill", "motif"}
+# Ops that *create* symmetry by copying one side: they keep the canvas centre (draw a quadrant, mirror it)
+# but warn when the material is off-centre.
+COPY_SYM_OPS = {"mirror", "symmetrize", "sym-or"}
+
+
+def material_window(design: Design) -> Rect | None:
+    """Window (possibly extending past the canvas) centred on the material bbox centre, covering the
+    whole canvas; None when the material is already centred (or the design is empty)."""
+    bb = design.bbox()
+    if bb is None:
+        return None
+    x0, y0, x1, y1 = bb
+    W, H = design.width, design.height
+    sx, sy = x0 + x1, y0 + y1  # 2 * centre
+    if sx == W - 1 and sy == H - 1:
+        return None
+    # half extents in doubled units so .5 centres stay exact
+    hx2 = max(sx, 2 * (W - 1) - sx)
+    hy2 = max(sy, 2 * (H - 1) - sy)
+    if W == H:  # keep square canvases square (d4/rot4 need it)
+        hx2 = hy2 = max(hx2, hy2)
+    hx2 += (hx2 - sx) % 2  # same parity as 2*centre -> window exactly centred
+    hy2 += (hy2 - sy) % 2
+    wx0, wx1 = (sx - hx2) // 2, (sx + hx2 + 1) // 2
+    wy0, wy1 = (sy - hy2) // 2, (sy + hy2 + 1) // 2
+    return wx0, wy0, wx1, wy1
+
+
+def centre_note(design: Design) -> str | None:
+    bb = design.bbox()
+    if bb is None:
+        return None
+    x0, y0, x1, y1 = bb
+    if x0 + x1 == design.width - 1 and y0 + y1 == design.height - 1:
+        return None
+    return (f"material centre {(x0 + x1) / 2:g},{(y0 + y1) / 2:g} != canvas centre {(design.width - 1) / 2:g},"
+            f"{(design.height - 1) / 2:g}")
+
+
 def apply_op(
     design: Design,
     name: str,
     layers: list[int] | None = None,
     group: str | None = None,
     region: Rect | None = None,
+    sel: np.ndarray | None = None,
+    centre: str = "auto",
+    notes: list[str] | None = None,
     **kwargs,
 ) -> Design:
-    """Apply a registered op to a COPY of design and return it. ``layers=None`` = all layers."""
+    """Apply a registered op to a COPY of design and return it. ``layers=None`` = all layers.
+
+    region: the op sees only that inclusive rect (crop; symmetry axes = region centre).
+    sel: bool mask; the op runs normally but cells outside ``sel`` are restored afterwards.
+    centre: auto|canvas|material - where symmetry axes go for symmetry ops when no region is given
+      (auto: material centre for symmetry-preserving ops, canvas centre + a note for copy ops).
+    notes: list that receives human-readable notes (e.g. off-centre warnings)."""
     spec = get_op(name)
+    notes = notes if notes is not None else []
+    original = design
     d = design.copy()
     ids = d.layer_ids if layers is None else [int(i) for i in layers]
     if spec.kind == "design":
-        if region is not None and "region" in inspect.signature(spec.fn).parameters:
-            kwargs["region"] = region
-        return spec.fn(d, ids, **kwargs)
+        if region is not None:
+            if "region" in inspect.signature(spec.fn).parameters:
+                kwargs["region"] = region
+            else:  # honour the region by confining the edit to it
+                from ..selection import region_sel
+                rs = region_sel(region, d)
+                sel = rs if sel is None else (sel & rs)
+        out = spec.fn(d, ids, **kwargs)
+        if sel is not None:
+            from ..selection import confine
+            out = confine(original, out, sel)
+        return out
     wants_origin = "origin" in inspect.signature(spec.fn).parameters
+    if region is None and centre != "canvas":
+        explicit_axis = any(kwargs.get(k, -1) not in (-1, -1.0, None) for k in ("cx", "cy"))
+        note = centre_note(d)
+        if note and not explicit_axis:
+            if name in PRESERVING_SYM_OPS or centre == "material":
+                region = material_window(d)
+                notes.append(f"{note}: {name} uses symmetry axes through the material centre (pass --centre canvas to override)")
+            elif name in COPY_SYM_OPS:
+                notes.append(f"WARNING {note}: {name} mirrors about the CANVAS centre; for the material centre pass "
+                             f"--centre material (or cx=/cy=), or run `op FILE center` / `op FILE trim` first")
     for lid in ids:
         layer = d.layer(lid)
         targets = [layer.group(group)] if group else layer.groups
@@ -149,6 +222,9 @@ def apply_op(
                 g.cells = paste_mask(g.cells, new, x0, y0, mode="replace")
             if g.cells.shape != d.shape:
                 raise ValueError(f"op {name} changed mask shape {g.cells.shape}")
+    if sel is not None:
+        from ..selection import confine
+        d = confine(original, d, sel)
     return d
 
 

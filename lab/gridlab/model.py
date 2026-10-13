@@ -120,6 +120,8 @@ class Design:
     frames: list[tuple[str, dict[int, list[Group]]]] = field(default_factory=list)
     # CLI edit history (list of dicts); only persisted in workspace files
     history: list[dict] = field(default_factory=list)
+    # concise op log since new/import (CLI); persisted, exported as "provenance"
+    provenance: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         self.width = int(self.width)
@@ -201,7 +203,7 @@ class Design:
             self.width, self.height, [l.copy() for l in self.layers], self.id, self.title, self.recipe,
             _copy.deepcopy(self.params), self.seed, list(self.tags), self.notes,
             [(lab, {k: [g.copy() for g in gs] for k, gs in fl.items()}) for lab, fl in self.frames],
-            _copy.deepcopy(self.history),
+            _copy.deepcopy(self.history), list(self.provenance),
         )
 
     # ---- geometry -----------------------------------------------------

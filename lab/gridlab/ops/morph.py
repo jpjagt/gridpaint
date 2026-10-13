@@ -112,3 +112,10 @@ def skeleton_points(mask) -> tuple[int, int]:
     sk = skeletonize(mask)
     nc = neighbour_count(sk, 8)
     return int((sk & (nc == 1)).sum()), int((sk & (nc >= 3)).sum())
+
+
+def filled_outline(mask, n: int = 1) -> np.ndarray:
+    """Everything inside the outline: close gaps of ~n cells (8-conn), then fill holes. Lace whose holes
+    open to the outside through 1-cell gaps still yields its full silhouette."""
+    m = np.asarray(mask, bool)
+    return fill_holes(close(m, n, 8) | m) if n > 0 else fill_holes(m)

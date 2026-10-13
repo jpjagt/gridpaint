@@ -314,15 +314,18 @@ def contact_sheet(
     margin: int = 1,
     sublabels: Sequence[str] | None = None,
     gap: int = 14,
+    layers: Iterable[int] | None = None,
 ) -> Image.Image:
-    """Grid of rendered designs (same cell_px, so sizes are comparable) with labels."""
+    """Grid of rendered designs (same cell_px, so sizes are comparable) with labels.
+    layers: only draw these layer ids (missing ids are skipped per design)."""
     if not designs:
         raise ValueError("no designs")
     tiles = []
     for i, d in enumerate(designs):
         lab = labels[i] if labels else (d.id or str(i))
         sub = sublabels[i] if sublabels else None
-        tiles.append(caption(render(d, cell_px=cell_px, show_grid=show_grid, margin=margin), lab, sub=sub))
+        ls = None if layers is None else [i for i in layers if d.has_layer(i)]
+        tiles.append(caption(render(d, cell_px=cell_px, show_grid=show_grid, margin=margin, layers=ls), lab, sub=sub))
     cols = max(1, min(cols, len(tiles)))
     rows = (len(tiles) + cols - 1) // cols
     tw = max(t.size[0] for t in tiles)
@@ -335,3 +338,32 @@ def contact_sheet(
         dr.rectangle([x - 3, y - 3, x + tw + 2, y + th + 2], outline=(30, 41, 59))
         out.paste(t, (x, y))
     return out
+
+
+def render_diff(before: Design, after: Design, cell_px: int = 14, layers: Iterable[int] | None = None) -> Image.Image:
+    """Before | after side by side; on the after panel added cells (any layer) are tinted green and
+    removed cells outlined red. Canvas sizes must match (else only the after panel is shown)."""
+    kw = dict(cell_px=cell_px, show_grid=True, margin=1, layers=layers)
+    right = render(after, **kw)
+    if before.shape != after.shape:
+        return caption(right, "after (canvas changed)")
+    ids = set(before.layer_ids) | set(after.layer_ids)
+    if layers is not None:
+        ids &= set(int(i) for i in layers)
+    add = np.zeros(after.shape, bool)
+    rem = np.zeros(after.shape, bool)
+    for lid in ids:
+        a = before.layer(lid).mask if before.has_layer(lid) else np.zeros(after.shape, bool)
+        b = after.layer(lid).mask if after.has_layer(lid) else np.zeros(after.shape, bool)
+        add |= b & ~a
+        rem |= a & ~b
+    ov = Image.new("RGBA", right.size, (0, 0, 0, 0))
+    dr = ImageDraw.Draw(ov)
+    gl, gt = 26, 16  # gutters of _grid_and_rulers
+    for (m, fill, outline) in ((add, (80, 230, 120, 110), (80, 230, 120, 255)), (rem, None, (255, 80, 80, 255))):
+        for y, x in zip(*np.nonzero(m)):
+            px, py = gl + (x + 1) * cell_px, gt + (y + 1) * cell_px
+            dr.rectangle([px + 1, py + 1, px + cell_px - 2, py + cell_px - 2], fill=fill, outline=outline, width=2)
+    right = Image.alpha_composite(right.convert("RGBA"), ov).convert("RGB")
+    return hstack([caption(render(before, **kw), "before"),
+                   caption(right, f"after: +{int(add.sum())} green, -{int(rem.sum())} red")])

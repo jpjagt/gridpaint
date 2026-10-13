@@ -338,7 +338,7 @@ def connect(mask: np.ndarray, allowed: np.ndarray | None = None, sym: str = "aut
 
 @register_op("motif")
 def _motif_op(mask, kind: str = "cross", ry: float = 0.0, rx: float = 0.0, mode: str = "or"):
-    """OR a 1-cell-stroke motif centred on the canvas/--region: kind=cross|spine|plus|star|eye|
+    """OR a 1-cell-stroke motif centred on the material centre (canvas centre if empty; --centre canvas) or --region: kind=cross|spine|plus|star|eye|
     lozenge|lorraine|orb; ry/rx = half-extents (0 = fit ~1/3 of the area). mode=or|replace|clear."""
     H, W = mask.shape
     ry = ry or max(2, (H - 1) // 3)

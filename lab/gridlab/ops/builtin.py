@@ -82,9 +82,21 @@ def _skeleton(mask):
 
 
 @register_op("fill-holes")
-def _fill_holes(mask):
-    """Fill enclosed background regions."""
-    return morph.fill_holes(mask)
+def _fill_holes(mask, max_size: int = 0):
+    """Fill enclosed background regions; max_size=N fills only holes of <= N cells (pinholes), keeping windows."""
+    if max_size <= 0:
+        return morph.fill_holes(mask)
+    from scipy import ndimage
+
+    m = np.asarray(mask, bool)
+    holes = morph.fill_holes(m) & ~m
+    lab, n = ndimage.label(holes, morph.structure(4))
+    if n == 0:
+        return m.copy()
+    sizes = np.bincount(lab.ravel())
+    small = sizes <= max_size
+    small[0] = False
+    return m | small[lab]
 
 
 @register_op("remove-small")

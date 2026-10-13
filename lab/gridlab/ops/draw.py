@@ -91,18 +91,27 @@ def set_points(mask, pts, value: bool = True) -> np.ndarray:
     return _set(mask, pts, value)
 
 
-def parse_ascii(text: str) -> tuple[np.ndarray, np.ndarray]:
+def parse_ascii(text: str, keep_blank: bool = False) -> tuple[np.ndarray, np.ndarray]:
     """Parse '#'/'.'/' ' art -> (on, care). '#','X','x','1','o' = on; '.','0','-','_' = off;
     ' ' = leave unchanged. Rows may be separated by newlines or '/'. Ragged rows are padded
-    with "leave unchanged". Common leading indentation is NOT stripped (spaces are meaningful)."""
-    rows = text.replace("/", "\n").split("\n")
-    while rows and not rows[0].strip():
-        rows.pop(0)
-    while rows and not rows[-1].strip():
-        rows.pop()
+    with "leave unchanged". Common leading indentation is NOT stripped (spaces are meaningful).
+    keep_blank: keep leading/trailing blank rows (only ONE trailing newline is dropped), so row
+    offsets stay exact; otherwise blank rows at both ends are dropped."""
+    if keep_blank:
+        if text.endswith("\n"):
+            text = text[:-1]
+        if text.endswith("\r"):
+            text = text[:-1]
+        rows = text.replace("/", "\n").split("\n")
+    else:
+        rows = text.replace("/", "\n").split("\n")
+        while rows and not rows[0].strip():
+            rows.pop(0)
+        while rows and not rows[-1].strip():
+            rows.pop()
     if not rows:
         return np.zeros((0, 0), bool), np.zeros((0, 0), bool)
-    w = max(len(r) for r in rows)
+    w = max(1, max(len(r) for r in rows))
     on = np.zeros((len(rows), w), bool)
     care = np.zeros((len(rows), w), bool)
     for y, r in enumerate(rows):
@@ -118,11 +127,11 @@ def parse_ascii(text: str) -> tuple[np.ndarray, np.ndarray]:
     return on, care
 
 
-def stamp_ascii(mask, ascii: str, at: tuple[int, int] = (0, 0), mode: str = "set") -> np.ndarray:
+def stamp_ascii(mask, ascii: str, at: tuple[int, int] = (0, 0), mode: str = "set", keep_blank: bool = False) -> np.ndarray:
     """Stamp ASCII art with its top-left at ``at`` = (x, y).
     mode set: '#' on, '.' off, ' ' unchanged; or: only '#' turn on; and: '.' turn off;
     xor: '#' toggles; clear: '#' turns off."""
-    on, care = parse_ascii(ascii)
+    on, care = parse_ascii(ascii, keep_blank)
     out = np.asarray(mask, bool).copy()
     H, W = out.shape
     x0, y0 = at

@@ -44,16 +44,18 @@ def test_cli_new_draw_gen_variants_pick(tmp_path, capsys, monkeypatch):
     rc, out = run(capsys, "gen", f, "symmetric_noise", "width=9", "height=9", "--layer-map", "1:1", "--seed", "3")
     assert rc == 0 and load_design(f).layer(1).count > 0
     rc, out = run(capsys, "variants", f, f"op {f} clear --layer 1; gen {f} symmetric_noise width=9 height=9", "--seeds", "1..3")
-    assert rc == 0 and (tmp_path / "n.variants.png").exists(), out
-    v2 = tmp_path / "n.v2.json"
+    run1 = tmp_path / "n.variants" / "run1"
+    assert rc == 0 and (run1 / "sheet.png").exists(), out
+    v2 = run1 / "v2.json"
     assert v2.exists()
     rc, out = run(capsys, "pick", v2, f, "--clean")
     assert rc == 0 and not v2.exists()
     rc, out = run(capsys, "variants", "symmetric_noise", "density=0.3", "--seeds", "1,2", "--out-dir", tmp_path)
-    assert rc == 0 and (tmp_path / "symmetric_noise.v2.json").exists(), out
+    rv = tmp_path / "symmetric_noise.variants" / "run1"
+    assert rc == 0 and (rv / "v2.json").exists(), out
     rc, out = run(capsys, "export", f, "--out", tmp_path / "sel.json")
     assert rc == 0
-    rc, out = run(capsys, "diff", f, tmp_path / "symmetric_noise.v1.json", "-q")
+    rc, out = run(capsys, "diff", f, rv / "v1.json", "-q")
     assert rc == 0
     rc, out = run(capsys, "recipes")
     assert "symmetric_noise" in out

@@ -154,7 +154,8 @@ def compact(design: Design) -> dict:
         m = l.mask
         s = symmetry_scores(m)
         d = {"cells": int(m.sum()), "pieces": int(morph.label(m, 8)[1]), "holes": count_holes(m),
-             "symx": s["x"], "symy": s["y"]}
+             "symx": s["x"], "symy": s["y"], "groups": len(l.groups),
+             "usig": hash(m.tobytes()), "gsig": hash(tuple((g.id, g.cells.tobytes()) for g in l.groups if g.cells.any()))}
         if i + 1 < len(ordered):
             d["support"] = pair_metrics(m, ordered[i + 1].mask, rendered=False)["support"]
         out[l.id] = d
@@ -180,5 +181,14 @@ def delta_text(before: dict, after: dict) -> str:
         parts.append(f"symx {b['symx']:.2f} symy {b['symy']:.2f}")
         if "support" in b:
             parts.append(f"support {b['support']:.2f}")
+        ga, gb = a.get("groups", 1), b.get("groups", 1)
+        if ga != gb:
+            parts.append(f"groups {ga}->{gb}")
+        elif gb > 1:
+            parts.append(f"groups {gb}")
+        if a.get("usig") == b.get("usig") and a.get("gsig") != b.get("gsig"):
+            parts.append("same cells but group structure changed (rendered blob bridging differs)")
+        elif a.get("usig") != b.get("usig") and a["cells"] == b["cells"]:
+            parts.append("cells moved")
         lines.append(f"  L{lid}: " + ", ".join(parts))
     return "\n".join(lines) if lines else "  (no change)"

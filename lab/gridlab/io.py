@@ -77,6 +77,8 @@ def design_to_dict(d: Design, include_history: bool = False, include_frames: boo
             {"label": lab, "layers": [{"id": k, "groups": _groups_to_json(gs)} for k, gs in sorted(fl.items(), key=lambda kv: -kv[0])]}
             for lab, fl in d.frames
         ]
+    if d.provenance:
+        out["provenance"] = list(d.provenance)
     if include_history and d.history:
         out[HISTORY_KEY] = d.history
     return out
@@ -98,6 +100,7 @@ def design_from_dict(obj: dict) -> Design:
         recipe=obj.get("recipe", "manual"), params=obj.get("params", {}) or {}, seed=obj.get("seed"),
         tags=list(obj.get("tags", []) or []), notes=obj.get("notes", "") or "", frames=frames,
         history=list(obj.get(HISTORY_KEY, []) or []),
+        provenance=[str(x) for x in (obj.get("provenance") or [])],
     )
 
 

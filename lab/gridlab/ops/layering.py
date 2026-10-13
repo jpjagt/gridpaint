@@ -337,7 +337,7 @@ def style_level(level: np.ndarray, style: str, lace: np.ndarray) -> np.ndarray:
 
 
 @register_op("contrast-layer", kind="design")
-def _contrast_layer(design: Design, layer_ids, motif: str = "spine", width: int = 1, merge: bool = True,
+def _contrast_layer(design: Design, layer_ids, motif: str = "spine", width: int = 1, merge: bool = False,
                     inset: int = 2):
     """Solid spine over lace: add a layer above the --layer with an axis motif (spine|cross|lorraine|tau|star)
     sized to its hull. merge=true also writes the motif (1 cell wider) into the lace layer so it is carried."""

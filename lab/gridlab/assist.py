@@ -32,6 +32,7 @@ APPLY_AT = 0.7
 CANDIDATES_AT = 0.5
 STATED_AT = 0.6
 
+GENERIC_TOKENS = {"layer", "layers", "the", "and", "all", "cells", "sym"}  # too common to be op keywords
 ROUTE_HIDDEN = {"invert-in-mask"}  # aliases / plumbing not worth a routing option
 
 # Human descriptions (criteria sent to Jev) + private keywords for the heuristic judge.
@@ -89,6 +90,12 @@ OP_HINTS: dict[str, tuple[dict, list[str]]] = {
                       [r"overhang", r"unsupported", r"floating .*(layer|above)"]),
     "support": ({"what": "Add material to the layer beneath so every cell of the upper layer rests on something"},
                 [r"\bsupport", r"rest on", r"backing"]),
+    "clip-to-layer": ({"what": "Keep only the cells of a layer that lie over, or inside the outline of, ANOTHER layer (mask one layer by another)"},
+                      [r"(inside|within|over) (the )?(outline of )?(layer|the (top|middle|bottom) layer)", r"mask (it |layer \d )?by"]),
+    "lattice": ({"what": "Fill an area with a regular diagonal lattice / trellis / mesh pattern (quatrefoil lace)"},
+                [r"lattice", r"trellis", r"\bmesh\b", r"\bgrid pattern", r"quatrefoil"]),
+    "scale": ({"what": "Enlarge the design or a layer by an integer factor (twice / three times as big)"},
+              [r"\bscale", r"enlarge", r"twice as (big|large)", r"\bdouble the size", r"upscale"]),
     "trim": ({"what": "Crop the canvas tightly around the design"}, [r"\btrim\b", r"crop the canvas"]),
     "pad": ({"what": "Add empty margin around the canvas"}, [r"\bpad\b", r"\bmargin\b"]),
     "resize": ({"what": "Change the canvas size"}, [r"\bresize\b", r"canvas size"]),
@@ -128,6 +135,11 @@ ARG_QUESTIONS = {
                "_fallback": "not_said"},
     "target_stated": {"type": "noul", "instructions": "Does `request` explicitly name a layer (top, middle, bottom, base plate, a layer number)?",
                       "_keywords": [r"\blayer", r"\bbase\b", r"back ?plate", r"(top|middle|bottom) one"]},
+    "details_unhandled": {"type": "noul", "instructions": "Does `request` state specific details beyond the kind of edit: "
+                          "a distance or gap, a size or thickness, a count, a new or extra layer, a symmetry order "
+                          "(e.g. 4-fold), or something that must stay unchanged?",
+                          "_keywords": [r"\d+[- ]?(cell|px|pixel|fold|times)", r"\bgap\b", r"new (top |bottom )?layer",
+                                        r"extra layer", r"\bfold\b", r"\bthick(ness)?\b", r"\bwide\b"]},
     "strength": {"type": "score", "instructions": "How strong a change does `request` ask for?",
                  "criteria": ["A subtle touch: the user says slightly, a bit, a little", "A normal change: no intensity word is used",
                               "A strong change: the user says much more, very, a lot"],
@@ -254,7 +266,7 @@ def op_options(specs: list[OpSpec] | None = None) -> tuple[dict, dict]:
             crit[s.name], kws[s.name] = OP_HINTS[s.name]
         else:
             crit[s.name] = {"what": _first_sentence(s.doc)}
-            toks = [t for t in re.split(r"[-_]", s.name) if len(t) > 2]
+            toks = [t for t in re.split(r"[-_]", s.name) if len(t) > 2 and t not in GENERIC_TOKENS]
             kws[s.name] = [r"\b" + re.escape(" ".join(re.split(r"[-_]", s.name)))] + [rf"\b{re.escape(t)}" for t in toks]
     crit["other"], kws["other"] = OTHER, OTHER_KW
     return crit, kws
@@ -461,6 +473,74 @@ def _alternatives(op: str, spec: OpSpec, args: dict, ctx: RouteContext, request:
     return [C(label, kw, pre_steps=pre)], used
 
 
+_NUM = {"one": 1, "a": 1, "single": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "eight": 8}
+_N = r"(\d+|one|a|single|two|three|four|five|six|eight)"
+
+
+def _num(t: str) -> int:
+    return int(t) if t.isdigit() else _NUM[t.lower()]
+
+
+def extract_details(request: str) -> list[dict]:
+    """Concrete details stated in the text (code, not Jev): [{text, kind, value}].
+    kinds: gap (empty cells between), thickness, distance, count, new_layer, fold, keep."""
+    r = request.lower()
+    out = []
+
+    def add(m, kind, value=None):
+        out.append({"text": m.group(0), "kind": kind, "value": value})
+
+    for m in re.finditer(_N + r"[- ]?(?:cell|px|pixel|square)s?[- ]?(?:wide )?gap|gap of " + _N + r"(?: cells?)?", r):
+        add(m, "gap", _num(m.group(1) or m.group(2)))
+    for m in re.finditer(_N + r"[- ]?(?:cell|px|pixel)s?[- ]?(?:thick|wide)\b|thickness (?:of )?" + _N, r):
+        add(m, "thickness", _num(m.group(1) or m.group(2)))
+    for m in re.finditer(_N + r"[- ]?(?:cell|px|pixel)s? (?:away|apart|out|from)", r):
+        add(m, "distance", _num(m.group(1)))
+    for m in re.finditer(r"\bby " + _N + r"(?: cells?| steps?| times)?\b", r):
+        add(m, "count", _num(m.group(1)))
+    for m in re.finditer(r"\b(?:new|extra|another|separate) (?:top |bottom |back |front )?layer|\bon a layer of its own", r):
+        add(m, "new_layer")
+    for m in re.finditer(r"\b(\d|two|three|four|six|eight)[- ]?fold\b", r):
+        add(m, "fold", _num(m.group(1)))
+    for m in re.finditer(r"\bkeep(?:ing)? (?:it |the |them )?(\w+)", r):
+        add(m, "keep", m.group(1))
+    return out
+
+
+# detail kind -> op params it can set (first existing wins), with a value transform
+DETAIL_PARAMS = {
+    "gap": [("d", lambda v: v + 1)],          # frame/outline: d=1 touches, a 1-cell gap needs d=2
+    "thickness": [("thickness", lambda v: v), ("width", lambda v: v)],
+    "distance": [("d", lambda v: v), ("reach", lambda v: v), ("max_len", lambda v: v)],
+    "count": [("n", lambda v: v), ("k", lambda v: v)],
+}
+
+
+def apply_details(op: str, spec: OpSpec, cands: list, details: list[dict], args: dict) -> tuple[list[str], list[str]]:
+    """Map details onto op params (mutates candidate steps). Returns (mapped notes, unhandled detail texts)."""
+    params = {p.name for p in spec.params}
+    mapped, unhandled = [], []
+    for det in details:
+        k = det["kind"]
+        hit = next(((p, f) for p, f in DETAIL_PARAMS.get(k, []) if p in params), None)
+        if hit:
+            p, f = hit
+            for c in cands:
+                for st in c.steps:
+                    if st.op == op:
+                        st.kwargs[p] = f(det["value"])
+            mapped.append(f"'{det['text']}' -> {p}={f(det['value'])}")
+        elif k == "fold" and op in ("symmetrize", "sym-or", "sym-and") and args.get("fold", {}).get("used"):
+            continue  # already honoured by the fold arg
+        elif k == "keep" and det["value"] in ("symmetric", "symmetry") and op in ("symmetrize", "mirror", "sym-or", "sym-and"):
+            continue
+        elif k == "count" and det["value"] in (1,):
+            continue
+        else:
+            unhandled.append(det["text"])
+    return mapped, unhandled
+
+
 def _handoff_message(plan: EditPlan, reason: str, file: str) -> str:
     likely = [(k, v) for k, v in plan.top_ops(5) if k != "other" and v >= 0.03][:4]
     lines = [f"handoff: {reason}. Not applied - the coordinator (LLM) should decide or ask the user."]
@@ -511,6 +591,18 @@ def route_edit(request: str, context: RouteContext | Design, judge=None, file: s
         plan.candidates = cands
     else:
         plan.message = _handoff_message(plan, f"argument confidence too low ({plan.confidence:.2f})", file)
+    if plan.decision != "handoff":
+        details = extract_details(request)
+        mapped, unhandled = apply_details(top, specs[top], plan.candidates, details, args)
+        for m in mapped:
+            plan.notes.append(f"detail {m}")
+        jev_flag = float(ans.get("details_unhandled", {}).get("noul", 0)) > STATED_AT
+        if unhandled or (jev_flag and not details):
+            why = (f"stated details the op can't express: {', '.join(repr(u) for u in unhandled)}" if unhandled else
+                   "Jev: the request states details the chosen op/args may not capture")
+            plan.notes.append(why + " -> not auto-applied; check the candidate(s) or edit by hand")
+            if plan.decision == "apply":
+                plan.decision = "candidates"
     if plan.decision != "handoff" and "target_layer" not in used and len(ctx.layer_ids) > 1 and specs[top].kind == "mask":
         plan.notes.append(f"no layer named -> applies to all layers {ctx.layer_ids} (pass --layer to narrow)")
     return plan

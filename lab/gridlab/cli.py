@@ -1,17 +1,19 @@
 """`gridlab` CLI — an AI-facing tool to look at and edit gridpaint designs.
 
-A workspace is a gridlab-design JSON file (e.g. lab/work/foo.json) with an embedded edit
-history (undo). Every mutating command prints a one-line confirmation plus a compact
-per-layer metrics delta. Run `gridlab` with no args for the command list.
+A workspace is a gridlab-design JSON file (e.g. work/foo.json) with an embedded edit
+history (undo) and a provenance log. Every mutating command prints a one-line confirmation plus a
+compact per-layer metrics delta, accepts --dry-run (preview, nothing saved) and, for cell edits,
+--sel SPEC (only cells inside the selection change; see gridlab/selection.py).
+Run `gridlab` with no args for the command list.
+
+Modules: cli_common (helpers, commit), cli_select (sel/erase/layer), cli_variants (variants/pick/sheet/
+frames), cli_meta (meta/export/describe).
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
-import io as _io
 import json
-import shlex
 import sys
 import time
 from pathlib import Path
@@ -20,199 +22,23 @@ import numpy as np
 
 from . import metrics as MX
 from . import view
-from .io import (copy_to_clipboard, design_from_dict, design_to_dict, load_any, save_design,
-                 selection_to_dict)
-from .model import Design, Layer
+from .cli_common import (ASCII_MAX_W, HISTORY_CAP, LAB_ROOT, RUN, WORK, CliError, apply_with_mirror,  # noqa: F401
+                         commit, default_png, load_ws, mirror_note, mutate, op_string, parse_fxy, parse_kv,
+                         parse_layers, parse_points, parse_region, parse_seeds, parse_size, parse_xy, rel, restore,
+                         save_new, size_note, snapshot, target_group, variant_line, ws_path)
+from .cli_meta import cmd_describe, cmd_export, cmd_meta
+from .cli_select import cmd_erase, cmd_layer, cmd_sel
+from .cli_variants import cmd_frames, cmd_pick, cmd_sheet, cmd_variants
+from .io import load_any, save_design
+from .model import Design
 from .ops import draw as D
-from .ops import symmetry as SYM
 from .ops.registry import apply_op, get_op, list_ops, parse_kwargs
 
-LAB_ROOT = Path(__file__).resolve().parents[1]
-WORK = LAB_ROOT / "work"
-HISTORY_CAP = 50
-ASCII_MAX_W = 80
+_variant_line = variant_line  # back-compat (assist.py)
 
 
-class CliError(Exception):
-    pass
-
-
-# ---- parsing helpers -------------------------------------------------------
-
-def parse_xy(s: str) -> tuple[int, int]:
-    try:
-        x, y = s.replace(" ", "").split(",")
-        return int(x), int(y)
-    except Exception:
-        raise CliError(f"expected x,y got {s!r}")
-
-
-def parse_fxy(s: str) -> tuple[float, float]:
-    try:
-        x, y = s.replace(" ", "").split(",")
-        return float(x), float(y)
-    except Exception:
-        raise CliError(f"expected x,y got {s!r}")
-
-
-def parse_region(s: str | None):
-    if not s:
-        return None
-    try:
-        v = [int(t) for t in s.replace(" ", "").split(",")]
-        assert len(v) == 4
-    except Exception:
-        raise CliError(f"--region expects x0,y0,x1,y1 (inclusive), got {s!r}")
-    x0, y0, x1, y1 = v
-    return min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)
-
-
-def parse_points(s: str | None) -> list[tuple[int, int]]:
-    """'x,y x,y' or 'x,y;x,y'; ranges allowed per coordinate: '3-6,2' or '4,1-5'."""
-    if not s:
-        return []
-    out = []
-    for tok in s.replace(";", " ").split():
-        try:
-            xs, ys = tok.split(",")
-        except ValueError:
-            raise CliError(f"bad point {tok!r} (want x,y)")
-
-        def rng(t):
-            if "-" in t[1:]:
-                a, b = t[0] + t[1:].split("-", 1)[0], t[1:].split("-", 1)[1]
-                a, b = int(a), int(b)
-                return range(min(a, b), max(a, b) + 1)
-            return [int(t)]
-
-        out += [(x, y) for x in rng(xs) for y in rng(ys)]
-    return out
-
-
-def parse_size(s: str) -> tuple[int, int]:
-    try:
-        w, h = s.lower().split("x")
-        return int(w), int(h)
-    except Exception:
-        raise CliError(f"--size expects WxH, got {s!r}")
-
-
-def parse_layers(s: str | None, d: Design) -> list[int] | None:
-    if s is None or s == "all":
-        return None
-    return [int(t) for t in s.split(",")]
-
-
-def parse_seeds(s: str) -> list[int]:
-    out = []
-    for part in s.split(","):
-        if ".." in part:
-            a, b = part.split("..")
-            out += list(range(int(a), int(b) + 1))
-        elif part:
-            out.append(int(part))
-    return out
-
-
-def parse_kv(items: list[str]) -> dict:
-    out = {}
-    for it in items or []:
-        if "=" not in it:
-            raise CliError(f"expected k=v, got {it!r}")
-        k, v = it.split("=", 1)
-        out[k] = v
-    return out
-
-
-# ---- workspace ---------------------------------------------------------------
-
-def ws_path(p: str) -> Path:
-    path = Path(p)
-    if path.suffix != ".json":
-        path = path.with_suffix(".json")
-    return path
-
-
-def load_ws(p: str | Path) -> Design:
-    path = Path(p)
-    if not path.exists():
-        raise CliError(f"no such workspace {path} (create with `gridlab new {path} --size WxH` or `gridlab import SRC {path}`)")
-    return load_any(path)
-
-
-def snapshot(d: Design) -> dict:
-    full = design_to_dict(d, include_frames=False)
-    return {"width": d.width, "height": d.height, "layers": full["layers"]}
-
-
-def restore(d: Design, snap: dict) -> Design:
-    tmp = design_from_dict({"type": "gridlab-design", "width": snap["width"], "height": snap["height"], "layers": snap["layers"]})
-    d.width, d.height, d.layers = tmp.width, tmp.height, tmp.layers
-    if d.frames and (d.width, d.height) != tmp.shape[::-1]:
-        d.frames = []
-    return d
-
-
-def size_note(a: Design, b: Design) -> str:
-    return f" (canvas {a.width}x{a.height} -> {b.width}x{b.height})" if a.shape != b.shape else ""
-
-
-def commit(path: Path, before: Design | None, after: Design, op: str, quiet: bool = False) -> None:
-    """Save after-state with a history entry holding the before-state; print a delta."""
-    if before is not None:
-        after.history = list(before.history) + [{"op": op, "t": int(time.time()), "prev": snapshot(before)}]
-        after.history = after.history[-HISTORY_CAP:]
-    save_design(after, path)
-    if quiet:
-        return
-    b = MX.compact(before) if before is not None else {}
-    print(f"ok: {op}{size_note(before, after) if before is not None else ''} -> {path}")
-    print(MX.delta_text(b, MX.compact(after)))
-
-
-def mutate(path: Path, op: str, fn) -> Design:
-    before = load_ws(path)
-    after = fn(before.copy())
-    if after is None:
-        raise RuntimeError("mutation returned None")
-    commit(path, before, after, op)
-    return after
-
-
-def op_string(argv: list[str]) -> str:
-    return " ".join(shlex.quote(a) for a in argv)
-
-
-def rel(p: Path | str) -> str:
-    """Path relative to cwd when possible (keeps output short)."""
-    p = Path(p)
-    try:
-        return str(p.resolve().relative_to(Path.cwd().resolve()))
-    except ValueError:
-        return str(p)
-
-
-def default_png(path: Path, suffix: str = "") -> Path:
-    WORK.mkdir(parents=True, exist_ok=True)
-    return WORK / f"{path.stem}{suffix}.png"
-
-
-def apply_with_mirror(mask: np.ndarray, on: np.ndarray | None, off: np.ndarray | None, mirror: str | None) -> np.ndarray:
-    if mirror:
-        kind = {"xy": "d2"}.get(mirror, mirror)
-        on = SYM.symmetry_or(on, kind) if on is not None else None
-        off = SYM.symmetry_or(off, kind) if off is not None else None
-    out = mask.copy()
-    if on is not None:
-        out |= on
-    if off is not None:
-        out &= ~off
-    return out
-
-
-def target_group(d: Design, layer_id: int, group: str | None, create_layer: bool = True):
-    layer = d.layer(layer_id, create=create_layer)
-    return layer.group(group or "default", create=True)
+def _variant_path(base: Path, i: int) -> Path:
+    return base.with_name(f"{base.stem}.v{i}.json")
 
 
 # ---- commands ----------------------------------------------------------------
@@ -223,9 +49,9 @@ def cmd_new(a):
         raise CliError(f"{path} exists (use --force to overwrite)")
     w, h = parse_size(a.size)
     ids = [int(t) for t in a.layers.split(",")]
-    d = Design.empty(w, h, ids, id=path.stem, title=path.stem)
-    save_design(d, path)
-    print(f"ok: new {w}x{h} layers {sorted(ids)} (1 = top) -> {path}\nnext: gridlab show {path}")
+    d = Design.empty(w, h, ids, id=path.stem, title=a.title or path.stem)
+    d.provenance = [f"new {w}x{h} --layers {a.layers}"]
+    save_new(d, path, f"ok: new {w}x{h} layers {sorted(ids)} (1 = top) -> {path}\nnext: gridlab show {path}")
 
 
 def cmd_import(a):
@@ -234,37 +60,19 @@ def cmd_import(a):
     if a.trim is not None:
         d.trim(a.trim)
     d.id = path.stem
+    if a.title:
+        d.title = a.title
+    src_name = Path(a.src).name if a.src not in ("-", "clipboard") else a.src
     if path.exists():
         before = load_ws(path)
         d.history = before.history
+        d.provenance = list(before.provenance)
         commit(path, before, d, f"import {a.src}")
     else:
         d.history = []
-        save_design(d, path)
-        print(f"ok: imported {a.src} -> {path}")
-        print(view.header(d, path.name))
-
-
-def cmd_export(a):
-    d = load_ws(a.file)
-    if a.format == "selection":
-        obj = selection_to_dict(d, trim=not a.no_trim)
-    else:
-        obj = design_to_dict(d)
-    text = json.dumps(obj, separators=(",", ":"))
-    done = False
-    if a.out:
-        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.out).write_text(text)
-        print(f"ok: wrote {a.format} JSON -> {a.out}")
-        done = True
-    if a.clipboard:
-        copy_to_clipboard(text)
-        print(f"ok: copied {a.format} JSON to clipboard ({len(text)} chars); paste in gridpaint with Cmd+V"
-              + (" (target layer ids must exist in the editor)" if a.format == "selection" else ""))
-        done = True
-    if not done:
-        print(text)
+        d.provenance = list(d.provenance) + [f"import {src_name}" + (f" --trim {a.trim}" if a.trim is not None else "")]
+        if save_new(d, path, f"ok: imported {a.src} -> {path}"):
+            print(view.header(d, path.name))
 
 
 def _auto_cell_px(d: Design, panels: int, target: int = 1400) -> int:
@@ -290,6 +98,10 @@ def cmd_show(a):
             print(view.ascii_composite(d, region))
     if a.metrics:
         print(MX.summary_text(d))
+        multi = [f"L{l.id}:{len([g for g in l.groups if g.cells.any()])}g" for l in d.layers_top_to_bottom()
+                 if len([g for g in l.groups if g.cells.any()]) > 1]
+        if multi and not a.groups:
+            print(f"groups: {' '.join(multi)} (cells only blob-bridge within their group; `show --groups`, `op merge-groups`)")
     if not a.no_png:
         from .render import render, render_layers_panel
 
@@ -334,6 +146,7 @@ def cmd_set(a):
         raise CliError("give --on and/or --off points, e.g. --on '3,4 5,6' (ranges: '3-6,2')")
 
     def fn(d: Design):
+        mirror_note(d, a.mirror)
         g = target_group(d, a.layer, a.group)
         onm = D.set_points(np.zeros(d.shape, bool), on) if on else None
         offm = D.set_points(np.zeros(d.shape, bool), off) if off else None
@@ -353,18 +166,27 @@ def cmd_set(a):
 def cmd_stamp(a):
     path = Path(a.file)
     text = a.text if a.text is not None else sys.stdin.read()
-    on, care = D.parse_ascii(text)
+    keep = not a.trim_blank
+    on, care = D.parse_ascii(text, keep_blank=keep)
     if not care.any():
         raise CliError("empty stamp (give --text '##./.#.' or ascii on stdin; '/' or newline separates rows)")
-    x, y = parse_xy(a.at)
+    h, w = on.shape
+    pts = parse_points(a.at)
+    if not pts:
+        raise CliError("--at needs x,y (or several: 'x,y x,y')")
+    if a.anchor == "center":
+        pts = [(x - (w - 1) // 2, y - (h - 1) // 2) for x, y in pts]
 
     def fn(d: Design):
+        mirror_note(d, a.mirror)
         layer = d.layer(a.layer, create=True)
         groups = [layer.group(a.group or "default", create=True)]
         if a.mode in ("set", "and", "clear") and not a.group:
             groups = layer.groups  # removals apply to all groups
         for g in groups:
-            new = D.stamp_ascii(g.cells, text, (x, y), a.mode)
+            new = g.cells
+            for (x, y) in pts:
+                new = D.stamp_ascii(new, text, (x, y), a.mode, keep_blank=keep)
             is_target = g.id == (a.group or "default")
             if not is_target:  # non-target groups only lose cells
                 new = g.cells & new
@@ -373,11 +195,15 @@ def cmd_stamp(a):
                 removed = g.cells & ~new
                 new = apply_with_mirror(g.cells, added, removed, a.mirror)
             g.cells = new
+        if a.mirror and any((y + h - 1) < (d.height - 1) / 2 and a.mirror in ("y", "xy", "d2") for _, y in pts):
+            gap = int(np.ceil((d.height - 1) / 2)) - max(y + h - 1 for _, y in pts)
+            if gap > 0:
+                print(f"note: art ends {gap} row(s) above the horizontal mirror axis; the mirrored halves won't touch")
         return d
 
-    raw = [f"<{on.shape[1]}x{on.shape[0]} art>" if t == text else t for t in a.raw]
+    raw = [f"<{w}x{h} art>" if t == text else t for t in a.raw]
     if a.text is None:
-        raw.append(f"<stdin {on.shape[1]}x{on.shape[0]} art>")
+        raw.append(f"<stdin {w}x{h} art>")
     mutate(path, "stamp " + " ".join(raw), fn)
 
 
@@ -399,6 +225,7 @@ def cmd_draw(a):
             raise CliError(f"draw {shape} needs {n} x,y args\n{DRAW_HELP}")
 
     def fn(d: Design):
+        mirror_note(d, a.mirror)
         blank = np.zeros(d.shape, bool)
         ip = [(int(round(x)), int(round(y))) for x, y in pts]
         if shape == "line":
@@ -440,7 +267,11 @@ def cmd_op(a):
         layers = parse_layers(a.layer, d)
         if spec.kind == "mask" and layers is None and a.layer is None and len(d.layers) > 1:
             print(f"note: no --layer given, applying {a.name} to all layers {d.layer_ids}")
-        return apply_op(d, a.name, layers=layers, group=a.group, region=region, **kw)
+        notes: list[str] = []
+        out = apply_op(d, a.name, layers=layers, group=a.group, region=region, centre=a.centre, notes=notes, **kw)
+        for n in notes:
+            print(f"note: {n}" if not n.startswith("WARNING") else n)
+        return out
 
     mutate(path, op_string(["op"] + a.raw), fn)
 
@@ -453,8 +284,10 @@ def cmd_ops(a):
         tag = " [design]" if s.kind == "design" else ""
         print(f"{s.name}{tag} {s.signature()}\n    {doc}")
     if not a.name:
-        print("usage: gridlab op FILE NAME [--layer ID|A,B|all] [--group G] [--region x0,y0,x1,y1] k=v ...\n"
-              "mask ops apply per group; with --region the op sees only that rectangle (mirror axes = region centre).")
+        print("usage: gridlab op FILE NAME [--layer ID|A,B|all] [--group G] [--region x0,y0,x1,y1] [--sel SPEC] k=v ...\n"
+              "(signatures above are the real parameters; docs are the op docstrings)\n"
+              "mask ops apply per group; --region: the op sees only that rectangle (mirror axes = region centre);\n"
+              "--sel: the op runs normally but only cells inside the selection change; --dry-run previews.")
 
 
 def _place(d: Design, src: Design, a) -> Design:
@@ -488,13 +321,17 @@ def cmd_gen(a):
             l.id = lm.get(l.id, l.id)
         src.layers.sort(key=lambda l: l.id)
         src.history = []
-        save_design(src, path)
-        print(f"ok: {opstr} (new workspace {src.width}x{src.height}) -> {path}")
-        print(MX.delta_text({}, MX.compact(src)))
+        from .cli_common import prov_text
+        prov = prov_text(opstr, path)
+        src.provenance = [prov + ("" if "--seed" in prov else f" --seed {a.seed}")]
+        if save_new(src, path, f"ok: {opstr} (new workspace {src.width}x{src.height}) -> {path}"):
+            print(MX.delta_text({}, MX.compact(src)))
         return
     before = load_ws(path)
     after = _place(before.copy(), src, a)
     after.notes = (after.notes + f"\n{opstr}").strip()
+    if "--seed" not in opstr:
+        opstr += f" --seed {a.seed}"
     commit(path, before, after, opstr)
 
 
@@ -508,18 +345,26 @@ def cmd_undo(a):
     before = d.copy()
     restore(d, popped[0]["prev"])
     d.history = d.history[:-n]
-    save_design(d, path)
-    print(f"ok: undid {n}: " + " | ".join(e["op"] for e in reversed(popped)) + size_note(before, d))
+    k = sum(1 for e in popped if e.get("prov"))
+    if k:
+        d.provenance = d.provenance[:-k] if k < len(d.provenance) else d.provenance[:1]
+    msg = "undid" if not RUN.get("dry_run") else "dry-run (NOT saved): would undo"
+    if not RUN.get("dry_run"):
+        save_design(d, path)
+    print(f"ok: {msg} {n}: " + " | ".join(e["op"] for e in reversed(popped)) + size_note(before, d))
     print(MX.delta_text(MX.compact(before), MX.compact(d)))
+    if d.history:
+        print(f"now at: {d.history[-1]['op']}  ({len(d.history)} undo steps left)")
 
 
 def cmd_log(a):
     d = load_ws(a.file)
     if not d.history:
         print("(no history)")
-    for i, e in enumerate(d.history[-a.n:], start=max(1, len(d.history) - a.n + 1)):
+    n0 = max(1, len(d.history) - a.n + 1)
+    for i, e in enumerate(d.history[-a.n:], start=n0):
         t = time.strftime("%H:%M:%S", time.localtime(e.get("t", 0)))
-        print(f"{i:>3} {t} {e['op']}")
+        print(f"{i:>3} {t} {e['op']}" + ("   <- latest (undo -n 1 reverts this)" if i == len(d.history) else ""))
 
 
 def cmd_diff(a):
@@ -574,126 +419,7 @@ def cmd_recipes(a):
             print(f"[{SECTIONS.get(cur, {}).get('title', cur)}]")
         ps = " ".join(f"{k}={p.default}" for k, p in r.params.items())
         print(f"  {r.name}: {r.description.split('. ')[0]} | {ps}")
-    print("details: gridlab recipes NAME ; run: gridlab gen FILE NAME --seed N k=v")
-
-
-def cmd_layer(a):
-    path = Path(a.file)
-
-    def fn(d: Design):
-        if a.action == "add":
-            if d.has_layer(a.id):
-                raise CliError(f"layer {a.id} exists")
-            d.layer(a.id, create=True)
-        elif a.action == "rm":
-            d.layer(a.id)
-            d.remove_layer(a.id)
-        return d
-
-    mutate(path, f"layer {a.action} {a.id}", fn)
-
-
-def _variant_path(base: Path, i: int) -> Path:
-    return base.with_name(f"{base.stem}.v{i}.json")
-
-
-def _variant_line(d: Design) -> str:
-    c = MX.compact(d)
-    return " ".join(f"L{k}:{v['cells']}c/{v['pieces']}p/{v['holes']}h" for k, v in c.items())
-
-
-def cmd_variants(a):
-    from .recipes import RECIPES, get_recipe, run_recipe
-    from .render import contact_sheet
-
-    seeds = parse_seeds(a.seeds)
-    designs, labels, subs, paths = [], [], [], []
-    target = a.target
-    is_file = target.endswith(".json") or Path(target).exists()
-    if is_file:
-        base = Path(target)
-        if not a.cmd:
-            raise CliError('usage: gridlab variants FILE "<cmd FILE ...>[; cmd FILE ...]" --seeds 1..6  ({seed} is substituted)')
-        orig = load_ws(base)
-        designs.append(orig)
-        labels.append("v0 current")
-        subs.append(_variant_line(orig))
-        for i, seed in enumerate(seeds, 1):
-            vp = _variant_path(base, i)
-            save_design(orig, vp)
-            for cmd in a.cmd.split(";"):
-                toks = shlex.split(cmd.replace("{seed}", str(seed)))
-                if not toks:
-                    continue
-                if len(toks) < 2:
-                    raise CliError(f"bad sub-command {cmd!r}")
-                toks[1] = str(vp)
-                if toks[0] == "gen" and "--seed" not in toks:
-                    toks += ["--seed", str(seed)]
-                buf = _io.StringIO()
-                with contextlib.redirect_stdout(buf):
-                    rc = main(toks, _nested=True)
-                if rc:
-                    raise CliError(f"variant {i} failed on: {' '.join(toks)}\n{buf.getvalue()}")
-            d = load_ws(vp)
-            designs.append(d)
-            labels.append(f"v{i} seed={seed}")
-            subs.append(_variant_line(d))
-            paths.append(vp)
-        sheet_path = default_png(base, ".variants")
-    else:
-        spec = get_recipe(target)
-        params = parse_kv(([a.cmd] if a.cmd else []) + a.kwargs)
-        sweeps = [{}]
-        if a.sweep:
-            k, vals = a.sweep.split("=", 1)
-            sweeps = [{k: v} for v in vals.split(",")]
-        out_dir = Path(a.out_dir) if a.out_dir else WORK
-        base = out_dir / f"{a.name or spec.name}.json"
-        i = 0
-        for sw in sweeps:
-            for seed in seeds:
-                i += 1
-                p = {**params, **sw}
-                d = run_recipe(spec.name, p, seed)
-                vp = _variant_path(base, i)
-                d.history = []
-                save_design(d, vp)
-                designs.append(d)
-                labels.append(f"v{i} seed={seed}" + "".join(f" {k}={v}" for k, v in sw.items()))
-                subs.append(_variant_line(d))
-                paths.append(vp)
-        sheet_path = default_png(base, ".variants")
-    mx = max(max(d.width, d.height) for d in designs)
-    cp = a.cell_px or int(max(3, min(14, 220 // max(1, mx))))
-    sheet = contact_sheet(designs, labels, cols=a.cols, cell_px=cp, sublabels=subs, show_grid=a.grid)
-    sheet.save(sheet_path)
-    for lab, sub, p in zip(labels[-len(paths):], subs[-len(paths):], paths):
-        print(f"{lab}: {sub} -> {rel(p)}")
-    print(f"sheet: {rel(sheet_path)}  ({sheet.size[0]}x{sheet.size[1]}px)  tiles: v0=current (FILE form), sublabel = per layer cells/pieces/holes")
-    dest = base if is_file else Path("<FILE>")
-    print(f"pick: gridlab pick {rel(paths[0]) if paths else 'X.vN.json'} {rel(dest) if is_file else dest} [--clean]")
-
-
-def cmd_pick(a):
-    src, dest = Path(a.src), ws_path(a.dest)
-    d = load_ws(src)
-    d.id = dest.stem
-    if dest.exists():
-        before = load_ws(dest)
-        d.history = before.history
-        commit(dest, before, d, f"pick {src.name}")
-    else:
-        d.history = []
-        save_design(d, dest)
-        print(f"ok: pick {src} -> {dest}")
-    if a.clean:
-        n = 0
-        stem = src.name.split(".v")[0]
-        for p in src.parent.glob(f"{stem}.v*.json"):
-            p.unlink()
-            n += 1
-        print(f"removed {n} variant files")
+    print("details: gridlab recipes NAME ; run: gridlab gen FILE NAME --seed N k=v ; frames: gridlab frames NAME")
 
 
 def cmd_serve(a):
@@ -711,37 +437,65 @@ def cmd_gallery(a):
 
 # ---- command table -----------------------------------------------------------
 
+SEL_HELP = ("only cells inside this selection change: rect:x0,y0,x1,y1 circle:cx,cy,r ring:cx,cy,r0,r1 "
+            "half:x<10|y>=7|left|right|top|bottom wedge:a0,a1 (deg clockwise from up) layer:ID inside:ID expr:x+y>20 "
+            "all; not:TERM; combine with & (and) and | (or)")
+MUTATING = {"new", "import", "set", "stamp", "draw", "op", "gen", "pick", "undo", "layer", "erase", "meta"}
+
+
 def _common_edit(p, layer_required=True):
     p.add_argument("file")
     p.add_argument("--layer", type=int, required=layer_required, help="layer id (1 = top)")
     p.add_argument("--group", help="connectivity group (default 'default')")
     p.add_argument("--mirror", choices=["x", "y", "xy", "d2", "d4", "rot2", "rot4", "diag"],
                    help="also apply the edit to the symmetric images (about the canvas centre)")
+    p.add_argument("--sel", help=SEL_HELP)
 
 
 def _setup(name: str) -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=f"gridlab {name}", description=COMMANDS[name][1],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    if name in MUTATING:
+        p.add_argument("--dry-run", action="store_true", help="show the delta, +/- ASCII and a before/after PNG; save nothing")
     if name == "new":
         p.add_argument("file")
         p.add_argument("--size", required=True, help="WxH")
         p.add_argument("--layers", default="1", help="comma ids, e.g. 3,2,1 (1 = top)")
+        p.add_argument("--title")
         p.add_argument("--force", action="store_true")
     elif name == "import":
         p.add_argument("src", help="path, '-' (stdin) or 'clipboard'")
         p.add_argument("file")
         p.add_argument("--trim", type=int, help="crop to material bbox + N margin")
+        p.add_argument("--title")
     elif name == "export":
         p.add_argument("file")
         p.add_argument("--clipboard", action="store_true")
         p.add_argument("--out")
         p.add_argument("--format", choices=["selection", "design"], default="selection")
         p.add_argument("--no-trim", action="store_true", help="selection bounds = full canvas instead of bbox")
+        p.add_argument("--title", help="override title in the export (store it with `meta`)")
+        p.add_argument("--notes")
+        p.add_argument("--append-notes")
+        p.add_argument("--tags")
+        p.add_argument("--add-tags")
+        p.epilog = "design format: notes get a 'recipe: ...' line from the provenance log; field `provenance` lists the steps."
+    elif name == "meta":
+        p.add_argument("file")
+        p.add_argument("--title")
+        p.add_argument("--notes", help="replace notes")
+        p.add_argument("--append-notes", help="append a line to notes")
+        p.add_argument("--tags", help="replace tags: a,b,c")
+        p.add_argument("--add-tags", help="add tags: a,b")
+        p.add_argument("--id")
+        p.add_argument("-n", type=int, default=15, help="provenance lines to print")
+    elif name == "describe":
+        p.add_argument("file")
     elif name == "show":
         p.add_argument("file")
         p.add_argument("--region", help="x0,y0,x1,y1 inclusive (coords stay absolute)")
         p.add_argument("--layer", type=int, help="show one layer ('#') + PNG of it with the layer below ghosted")
-        p.add_argument("--png", help="output path (default lab/work/<name>.png)")
+        p.add_argument("--png", help="output path (default: next to FILE, <name>.png)")
         p.add_argument("--no-png", action="store_true")
         p.add_argument("--ascii", action=argparse.BooleanOptionalAction, default=True)
         p.add_argument("--metrics", action=argparse.BooleanOptionalAction, default=True)
@@ -752,7 +506,7 @@ def _setup(name: str) -> argparse.ArgumentParser:
         p.add_argument("--force", action="store_true", help="ASCII even if wider than 80")
     elif name == "render":
         p.add_argument("file")
-        p.add_argument("--out")
+        p.add_argument("--out", help="default: next to FILE, <name>.render.png")
         p.add_argument("--cell-px", type=int, default=16)
         p.add_argument("--margin", type=int, default=1)
         p.add_argument("--grid", action="store_true")
@@ -764,9 +518,13 @@ def _setup(name: str) -> argparse.ArgumentParser:
         p.add_argument("--off", help="'x,y ...' removed from all groups of the layer (or --group)")
     elif name == "stamp":
         _common_edit(p)
-        p.add_argument("--at", required=True, help="x,y of the art's top-left")
+        p.add_argument("--at", required=True, help="x,y of the art's top-left (or centre with --anchor center); "
+                                                   "several: 'x,y x,y' stamps the art at each point")
+        p.add_argument("--anchor", choices=["topleft", "center"], default="topleft")
         p.add_argument("--mode", choices=["set", "or", "and", "xor", "clear"], default="set")
         p.add_argument("--text", help="art; rows separated by newline or '/'. '#' on, '.' off, ' ' unchanged. Else stdin.")
+        p.add_argument("--trim-blank", action="store_true",
+                       help="old behaviour: drop blank rows at the start/end (default keeps them; one trailing newline is ignored)")
     elif name == "draw":
         _common_edit(p)
         p.add_argument("shape", help="line|rect|fill-rect|ellipse|fill-ellipse|ring|point")
@@ -775,13 +533,25 @@ def _setup(name: str) -> argparse.ArgumentParser:
         p.add_argument("--filled", action="store_true")
         p.add_argument("--thickness", type=float, default=1)
         p.epilog = DRAW_HELP
+    elif name == "erase":
+        p.add_argument("file")
+        p.add_argument("--sel", required=True, help=SEL_HELP)
+        p.add_argument("--layer", help="ID, A,B or all (default all)")
+    elif name == "sel":
+        p.add_argument("file")
+        p.add_argument("spec", help=SEL_HELP)
+        p.add_argument("--force", action="store_true", help="ASCII even if wider than 80")
     elif name == "op":
         p.add_argument("file")
         p.add_argument("name")
         p.add_argument("kwargs", nargs="*", help="k=v")
         p.add_argument("--layer", help="ID, A,B or all (default all)")
         p.add_argument("--group")
-        p.add_argument("--region", help="x0,y0,x1,y1 inclusive")
+        p.add_argument("--region", help="x0,y0,x1,y1 inclusive: the op sees only this rectangle")
+        p.add_argument("--sel", help=SEL_HELP)
+        p.add_argument("--centre", "--center", dest="centre", choices=["auto", "canvas", "material"], default="auto",
+                       help="symmetry axes for symmetry ops: auto (material centre for symmetry-preserving ops like "
+                            "connect/sym-thin/grow-*, canvas centre + warning for mirror/symmetrize), canvas, material")
     elif name == "ops":
         p.add_argument("name", nargs="?")
     elif name == "gen":
@@ -793,21 +563,41 @@ def _setup(name: str) -> argparse.ArgumentParser:
         p.add_argument("--at", help="x,y top-left placement (default centred)")
         p.add_argument("--mode", choices=["or", "replace", "area"], default="or",
                        help="or: add; replace: clear target layers first; area: clear the pasted rect first")
+        p.add_argument("--sel", help=SEL_HELP)
     elif name == "variants":
         p.add_argument("target", help="workspace FILE.json or RECIPE name")
         p.add_argument("cmd", nargs="?", help='for FILE: "cmd FILE args; cmd FILE args" ({seed} substituted)')
-        p.add_argument("kwargs", nargs="*", help="for RECIPE: params k=v")
-        p.add_argument("--seeds", default="1..6", help="1..6 or 1,4,9")
+        p.add_argument("kwargs", nargs="*", help="for RECIPE: params k=v (sweeps: k={a,b} k={0.1,0.3} k={1..6})")
+        p.add_argument("--seeds", help="1..6 or 1,4,9 (default 1..6; 1 when {..} sweeps are used)")
         p.add_argument("--sweep", help="RECIPE only: k=v1,v2,v3 (x seeds)")
         p.add_argument("--cols", type=int, default=4)
         p.add_argument("--cell-px", type=int)
         p.add_argument("--grid", action="store_true")
-        p.add_argument("--out-dir", help="RECIPE only (default lab/work)")
-        p.add_argument("--name", help="RECIPE only: base name of variant files")
+        p.add_argument("--layers", "--layer", dest="layers", help="sheet shows only these layer ids, e.g. 1,2")
+        p.add_argument("--out-dir", help="parent dir of <name>.variants/runN (default: next to FILE; lab/work for RECIPE)")
+        p.add_argument("--name", help="base name (default FILE stem / RECIPE)")
     elif name == "pick":
         p.add_argument("src")
         p.add_argument("dest")
-        p.add_argument("--clean", action="store_true", help="delete the sibling variant files")
+        p.add_argument("--clean", action="store_true", help="delete the run dir (or sibling .vN files)")
+    elif name == "sheet":
+        p.add_argument("files", nargs="+")
+        p.add_argument("--cols", type=int, default=4)
+        p.add_argument("--out", help="default: next to the first file, <name>.sheet.png")
+        p.add_argument("--cell-px", type=int)
+        p.add_argument("--layers", "--layer", dest="layers", help="only these layer ids")
+        p.add_argument("--labels", help="comma labels (default: file names)")
+        p.add_argument("--grid", action="store_true")
+    elif name == "frames":
+        p.add_argument("src", help="RECIPE name or FILE with frames")
+        p.add_argument("kwargs", nargs="*", help="recipe params k=v")
+        p.add_argument("--seed", type=int, default=0)
+        p.add_argument("--as", dest="as_", choices=["sheet", "layers", "files"], default="sheet")
+        p.add_argument("--pick", help="frame indices, e.g. 0,4,8,-1 or 2..6 (default: spread; 4 for layers)")
+        p.add_argument("--out", help="PNG (sheet), workspace JSON (layers) or dir (files)")
+        p.add_argument("--cols", type=int, default=4)
+        p.add_argument("--cell-px", type=int)
+        p.add_argument("--final", action="store_true", help="sheet: append the final design")
     elif name == "undo":
         p.add_argument("file")
         p.add_argument("-n", type=int, default=1)
@@ -828,8 +618,10 @@ def _setup(name: str) -> argparse.ArgumentParser:
         p.add_argument("--json", action="store_true")
     elif name == "layer":
         p.add_argument("file")
-        p.add_argument("action", choices=["add", "rm"])
-        p.add_argument("id", type=int)
+        p.add_argument("action", choices=["add", "rm", "bool"])
+        p.add_argument("args", nargs="+", help="add|rm: ID ; bool: A and|or|sub|xor B")
+        p.add_argument("--into", type=int, help="bool: result layer (default A; created if missing)")
+        p.add_argument("--sel", help=SEL_HELP)
     elif name == "serve":
         p.add_argument("--port", type=int, default=8765)
     elif name in ("ask", "brief"):
@@ -844,25 +636,31 @@ def _setup(name: str) -> argparse.ArgumentParser:
 
 
 COMMANDS = {
-    "new": (cmd_new, "create an empty workspace: new FILE --size WxH [--layers 3,2,1]"),
-    "import": (cmd_import, "import SRC (path|clipboard|-) as workspace FILE (selection or design JSON)"),
-    "export": (cmd_export, "export FILE [--clipboard] [--out x.json] [--format selection|design]"),
+    "new": (cmd_new, "create an empty workspace: new FILE --size WxH [--layers 3,2,1] [--title T]"),
+    "import": (cmd_import, "import SRC (path|clipboard|-) as workspace FILE (selection or design JSON) [--title T]"),
+    "export": (cmd_export, "export FILE [--clipboard] [--out x.json] [--format selection|design] (design: + provenance)"),
+    "meta": (cmd_meta, "meta FILE [--title T] [--notes N] [--append-notes N] [--tags a,b]: show/set metadata + provenance"),
+    "describe": (cmd_describe, "describe FILE: compact text description (silhouette, symmetry, density, relations)"),
     "show": (cmd_show, "LOOK: ASCII + metrics + PNG panel (composite + per layer, grid & rulers)"),
     "render": (cmd_render, "plain PNG render: render FILE [--out] [--cell-px] [--grid] [--layers]"),
-    "set": (cmd_set, "set/clear cells: set FILE --layer ID --on 'x,y ...' --off 'x,y ...' [--mirror xy]"),
-    "stamp": (cmd_stamp, "stamp ASCII art: stamp FILE --layer ID --at x,y --text '##./.#.' [--mode]"),
-    "draw": (cmd_draw, "draw FILE --layer ID line|rect|fill-rect|ellipse|fill-ellipse|ring|point x,y ..."),
-    "op": (cmd_op, "op FILE NAME [--layer ID|all] [--region R] k=v  (see `gridlab ops`)"),
+    "set": (cmd_set, "set/clear cells: set FILE --layer ID --on 'x,y ...' --off 'x,y ...' [--mirror xy] [--sel S]"),
+    "stamp": (cmd_stamp, "stamp ASCII art: stamp FILE --layer ID --at 'x,y [x,y..]' [--anchor center] --text '##./.#.' [--mode]"),
+    "draw": (cmd_draw, "draw FILE --layer ID line|rect|fill-rect|ellipse|fill-ellipse|ring|point x,y ... [--sel S]"),
+    "erase": (cmd_erase, "erase FILE --sel SPEC [--layer ID|all]: clear every cell inside a selection"),
+    "sel": (cmd_sel, "sel FILE SPEC: preview a selection (count, bbox, ASCII)"),
+    "op": (cmd_op, "op FILE NAME [--layer ID|all] [--region R] [--sel S] k=v  (see `gridlab ops`)"),
     "ops": (cmd_ops, "list ops with params (ops NAME for full doc)"),
     "gen": (cmd_gen, "gen FILE RECIPE [--seed N] [k=v] [--layer-map 3:1] [--at x,y] [--mode or|replace|area]"),
-    "variants": (cmd_variants, 'variants FILE "cmd FILE ..." --seeds 1..6 | variants RECIPE --seeds 1..6 [k=v] -> contact sheet'),
-    "pick": (cmd_pick, "pick FILE.vN.json FILE  (adopt a variant; undoable)"),
+    "variants": (cmd_variants, 'variants FILE "cmd FILE ..." --seeds 1..6 | variants RECIPE [k={a,b}] -> FILE.variants/runN/ + sheet'),
+    "pick": (cmd_pick, "pick RUN/vN.json FILE  (adopt a variant; undoable; records its chain)"),
+    "sheet": (cmd_sheet, "sheet FILES... [--cols 4] [--layers 1,2] [--out P]: contact sheet of any design files"),
+    "frames": (cmd_frames, "frames RECIPE|FILE [--seed N] [--as sheet|layers|files] [--pick 0,4,8,-1]: process frames"),
     "undo": (cmd_undo, "undo FILE [-n N]"),
     "log": (cmd_log, "history of FILE"),
     "diff": (cmd_diff, "diff A B: cells added/removed per layer (+/- ASCII)"),
     "metrics": (cmd_metrics, "metrics FILE [--json]"),
     "recipes": (cmd_recipes, "list recipes (recipes NAME for params)"),
-    "layer": (cmd_layer, "layer FILE add|rm ID"),
+    "layer": (cmd_layer, "layer FILE add|rm ID | layer FILE bool A and|or|sub|xor B [--into C]"),
     "serve": (cmd_serve, "HTTP API for the /lab page (default port 8765)"),
     "ask": (lambda a: __import__("gridlab.assist", fromlist=["x"]).cmd_ask(a),
             'ask FILE "request" [--region R] [--layer ID] [--dry-run]: Jev routes text to an op (apply/candidates/handoff)'),
@@ -872,7 +670,7 @@ COMMANDS = {
 }
 
 USAGE = """gridlab — look at / edit / generate gridpaint designs (coords x,y; y down; layer 1 = top)
-workflow: show -> small edit -> show (open the PNG) ; variants + pick to choose ; undo freely
+loop: describe/show -> small edit (--dry-run first if unsure; --sel to confine) -> show ; variants + sheet + pick ; undo freely
 commands:
 """ + "\n".join(f"  {k:<9} {v[1]}" for k, v in COMMANDS.items()) + "\nhelp: gridlab CMD -h"
 
@@ -896,12 +694,18 @@ def main(argv: list[str] | None = None, _nested: bool = False) -> int:
     except SystemExit as e:
         return int(e.code or 0)
     args.raw = argv[1:]
+    saved = dict(RUN)
+    RUN["dry_run"] = bool(getattr(args, "dry_run", False)) and name in MUTATING
+    RUN["sel"] = getattr(args, "sel", None)
     try:
         COMMANDS[name][0](args)
     except (CliError, ValueError, KeyError, FileNotFoundError, json.JSONDecodeError) as e:
         msg = e.args[0] if isinstance(e, KeyError) and e.args else e
         print(f"error: {msg}", file=sys.stderr)
         return 1
+    finally:
+        RUN.clear()
+        RUN.update(saved)
     return 0
 
 
