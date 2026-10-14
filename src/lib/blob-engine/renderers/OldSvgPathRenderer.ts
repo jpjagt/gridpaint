@@ -29,7 +29,7 @@ import {
   type ViewportTransform,
 } from "./Renderer"
 import type { PointModifications } from "@/types/gridpaint"
-import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
+import { cutoutSvgPath, getCutoutGeometry } from "@/lib/gridpaint/cutoutGeometry"
 import {
   curvePrimitiveArraysToSvgPaths,
 } from "../utils/svgPathUtils"
@@ -610,7 +610,6 @@ function generateCutoutPaths(
   if (!pointModifications) return []
 
   const paths: string[] = []
-  const fmt = (n: number) => (Math.round(n * 1000) / 1000).toString()
 
   for (const [pointKey, mods] of pointModifications) {
     if (!mods.cutouts || mods.cutouts.length === 0) continue
@@ -618,19 +617,7 @@ function generateCutoutPaths(
     const [px, py] = pointKey.split(",").map(Number)
 
     for (const cutout of mods.cutouts) {
-      const anchorOffset = cutout.anchor === "custom"
-        ? (cutout.customOffset ?? { x: 0, y: 0 })
-        : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
-      const cx = px + anchorOffset.x + (cutout.offset?.x ?? 0)
-      const cy = py + anchorOffset.y + (cutout.offset?.y ?? 0)
-      const r = cutout.diameterMm / 2 / mmPerUnit
-
-      // CCW circle as two half-arcs (sweep-flag = 0 for CCW)
-      paths.push(
-        `M ${fmt(cx + r)} ${fmt(cy)} ` +
-        `A ${fmt(r)} ${fmt(r)} 0 0 0 ${fmt(cx - r)} ${fmt(cy)} ` +
-        `A ${fmt(r)} ${fmt(r)} 0 0 0 ${fmt(cx + r)} ${fmt(cy)} Z`
-      )
+      paths.push(cutoutSvgPath(getCutoutGeometry(cutout, px, py, mmPerUnit)))
     }
   }
 

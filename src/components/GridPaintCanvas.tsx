@@ -53,7 +53,8 @@ import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
 import { getLayerFillColor } from "@/lib/gridpaint/layerColors"
 import { clipLayersToSelection } from "@/lib/gridpaint/selectionUtils"
 import { getLayersWithPoint } from "@/lib/gridpaint/layerUtils"
-import { createRivetCutouts } from "@/lib/gridpaint/cutoutUtils"
+import { createRivetCutouts, cutoutFromSettings, finishPillCutout, isDuplicateCutout } from "@/lib/gridpaint/cutoutUtils"
+import { appendCutoutPath, cutoutContainsPoint, getCutoutGeometry } from "@/lib/gridpaint/cutoutGeometry"
 import { showActiveLayerOutline } from "@/stores/ui"
 import useDrawingState from "@/hooks/useDrawingState"
 import {
@@ -80,29 +81,7 @@ import {
   addGroupToActiveLayer,
   resetDrawing,
 } from "@/stores/drawingStores"
-import type { CircularCutout, PointModifications, CutoutAnchor, ShapeHandle } from "@/types/gridpaint"
-import { CUTOUT_ANCHOR_OFFSETS } from "@/types/gridpaint"
-
-const CUTOUT_DUPLICATE_TOLERANCE_MM = 0.1
-
-function isDuplicateCutout(
-  existing: CircularCutout[],
-  anchor: CutoutAnchor,
-  diameterMm: number,
-  customOffset?: { x: number; y: number },
-): boolean {
-  return existing.some((c) => {
-    if (Math.abs(c.diameterMm - diameterMm) > CUTOUT_DUPLICATE_TOLERANCE_MM) return false
-    if (c.anchor !== anchor) return false
-    if (anchor === "custom") {
-      const cOff = c.customOffset ?? { x: 0, y: 0 }
-      const nOff = customOffset ?? { x: 0, y: 0 }
-      return Math.abs(cOff.x - nOff.x) < 0.01 && Math.abs(cOff.y - nOff.y) < 0.01
-    }
-    return true
-  })
-}
-
+import type { Cutout, CutoutDraft, PointModifications, ShapeHandle } from "@/types/gridpaint"
 // Theme color utility
 const getCanvasColor = (varName: string): string => {
   const hslValue = getComputedStyle(document.documentElement)
@@ -198,11 +177,19 @@ export const GridPaintCanvas = forwardRef<
   const hoveredCutoutRef = useRef<{
     pointKey: string
     index: number
-    cx: number
-    cy: number
-    r: number
-    cutout: CircularCutout
+    cutout: Cutout
   } | null>(null)
+
+  const [cutoutDraft, setCutoutDraft] = useState<CutoutDraft | null>(null)
+  const cutoutPointerRef = useRef<{ x: number; y: number } | null>(null)
+  const cutoutRemovingRef = useRef(false)
+
+  // Never carry an unfinished pill into another tool, layer, drawing, or shape.
+  useEffect(() => {
+    setCutoutDraft(null)
+    cutoutPointerRef.current = null
+    hoveredCutoutRef.current = null
+  }, [currentTool, cutoutSettings.shape, layersState.activeLayerId, drawingId])
 
   /**
    * Shape tool: in-progress rubber-band drag (before a float exists). Start/end
@@ -599,8 +586,7 @@ export const GridPaintCanvas = forwardRef<
 
   /**
    * Given a screen-space mouse position, find the smallest cutout (across all points
-   * on the active layer) whose circle contains that position.
-   * Returns world-space circle center + radius so the render overlay can use it directly.
+   * on the active layer) whose circle or capsule contains that position.
    */
   const getHoveredCutout = useCallback(
     (clientX: number, clientY: number) => {
@@ -618,66 +604,56 @@ export const GridPaintCanvas = forwardRef<
       const activeLayer = layers.find((l) => l.id === activeLayerId)
       if (!activeLayer?.pointModifications) return null
 
-      let best: {
-        pointKey: string
-        index: number
-        cx: number
-        cy: number
-        r: number
-        cutout: CircularCutout
-      } | null = null
-
+      let best: { pointKey: string; index: number; cutout: Cutout } | null = null
+      let smallestArea = Infinity
+      const gx = wx / canvasView.gridSize - 0.5
+      const gy = wy / canvasView.gridSize - 0.5
       for (const [pointKey, mods] of activeLayer.pointModifications) {
-        if (!mods.cutouts || mods.cutouts.length === 0) continue
         const [px, py] = pointKey.split(",").map(Number)
-
-        mods.cutouts.forEach((cutout, index) => {
-          const anchorOffset =
-            cutout.anchor === "custom"
-              ? (cutout.customOffset ?? { x: 0, y: 0 })
-              : CUTOUT_ANCHOR_OFFSETS[cutout.anchor]
-          const cx =
-            (px + anchorOffset.x + (cutout.offset?.x ?? 0)) *
-              canvasView.gridSize +
-            canvasView.gridSize / 2
-          const cy =
-            (py + anchorOffset.y + (cutout.offset?.y ?? 0)) *
-              canvasView.gridSize +
-            canvasView.gridSize / 2
-          const r =
-            (cutout.diameterMm / 2 / canvasView.mmPerUnit) * canvasView.gridSize
-
-          const dist = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2)
-          if (dist <= r) {
-            // Prefer the smallest circle that contains the cursor
-            if (!best || r < best.r) {
-              best = { pointKey, index, cx, cy, r, cutout }
-            }
+        mods.cutouts?.forEach((cutout, index) => {
+          const geometry = getCutoutGeometry(cutout, px, py, canvasView.mmPerUnit)
+          const length = Math.hypot(geometry.end.x - geometry.start.x, geometry.end.y - geometry.start.y)
+          const area = Math.PI * geometry.radius ** 2 + 2 * geometry.radius * length
+          if (area < smallestArea && cutoutContainsPoint(geometry, gx, gy)) {
+            best = { pointKey, index, cutout }
+            smallestArea = area
           }
         })
       }
-
-      return best as {
-        pointKey: string
-        index: number
-        cx: number
-        cy: number
-        r: number
-        cutout: CircularCutout
-      } | null
+      return best as { pointKey: string; index: number; cutout: Cutout } | null
     },
     [canvasView],
   )
 
+  const cutoutAtPoint = useCallback((point: { x: number; y: number }) => {
+    const current = cutoutFromSettings(cutoutSettings)
+    if (!cutoutDraft) return { point, cutout: current }
+    // Keep the first anchor fixed while allowing diameter/unit changes before committing.
+    const first = {
+      ...current,
+      anchor: cutoutDraft.cutout.anchor,
+      customOffset: cutoutDraft.cutout.customOffset,
+    }
+    return {
+      point: cutoutDraft.point,
+      cutout: finishPillCutout(first, cutoutDraft.point, current, point),
+    }
+  }, [cutoutSettings, cutoutDraft])
+
   /** Handle cutout tool click: add cutout to a point, or alt+click-on-cutout to remove it */
   const handleCutoutClick = useCallback(
     (clientX: number, clientY: number, isAltHeld: boolean, isShiftHeld: boolean) => {
+      if (isAltHeld) {
+        setCutoutDraft(null)
+        hoveredCutoutRef.current = getHoveredCutout(clientX, clientY)
+      }
       // Alt+Shift: clear all cutouts at point from all layers
       if (isAltHeld && isShiftHeld) {
         const hovered = hoveredCutoutRef.current
         if (!hovered) return
 
         const { layers } = $layersState.get()
+        pushHistory(layers)
         const layersWithPoint = getLayersWithPoint(hovered.pointKey, layers)
 
         layersWithPoint.forEach((layer) => {
@@ -724,6 +700,7 @@ export const GridPaintCanvas = forwardRef<
         )
         if (!existingMods?.cutouts) return
 
+        pushHistory(layers)
         const newCutouts = existingMods.cutouts.filter(
           (_, i) => i !== hovered.index,
         )
@@ -762,81 +739,47 @@ export const GridPaintCanvas = forwardRef<
       const { activeLayerId, layers } = currentLayersState
       if (activeLayerId === null) return
 
-      const pointKey = `${coords.x},${coords.y}`
-      const { anchor, diameterMm, customOffset, mode, rivetScalePercent } = cutoutSettings
-
-      // Rivet mode: always apply to all layers with point
-      if (mode === "rivet") {
-        const rivetCutouts = createRivetCutouts(
-          pointKey,
-          anchor,
-          diameterMm,
-          rivetScalePercent,
-          customOffset,
-          layers,
-        )
-
-        rivetCutouts.forEach((cutout, layerId) => {
-          const layer = layers.find((l) => l.id === layerId)
-          if (!layer) return
-
-          const allPoints = getLayerPoints(layer)
-          if (!allPoints.has(pointKey)) return
-
-          const existingMods = layer.pointModifications?.get(pointKey)
-          const existingCutouts = existingMods?.cutouts || []
-          if (isDuplicateCutout(existingCutouts, cutout.anchor, cutout.diameterMm, cutout.customOffset)) return
-
-          const newMods: PointModifications = {
-            ...existingMods,
-            cutouts: [...existingCutouts, cutout],
-          }
-          updatePointModifications(layerId, pointKey, newMods)
-
-          blobEngine.invalidateLayer(layerId, {
-            minX: coords.x - 1,
-            minY: coords.y - 1,
-            maxX: coords.x + 1,
-            maxY: coords.y + 1,
-          })
-        })
+      const { mode, rivetScalePercent } = cutoutSettings
+      if (cutoutDraft && cutoutDraft.layerId !== activeLayerId) {
+        setCutoutDraft(null)
+        return
+      }
+      if (cutoutSettings.shape === "pill" && !cutoutDraft) {
+        const pointKey = `${coords.x},${coords.y}`
+        const targets = mode === "rivet" || isShiftHeld
+          ? getLayersWithPoint(pointKey, layers)
+          : layers.filter(layer => layer.id === activeLayerId && getLayerPoints(layer).has(pointKey))
+        if (targets.length === 0) return
+        setCutoutDraft({ point: coords, layerId: activeLayerId, cutout: cutoutFromSettings(cutoutSettings) })
+        cutoutPointerRef.current = coords
         return
       }
 
-      // Single mode: determine target layers based on Shift
-      const targetLayers = isShiftHeld
-        ? getLayersWithPoint(pointKey, layers)
-        : layers.filter((l) => l.id === activeLayerId)
-
-      targetLayers.forEach((layer) => {
-        const allPoints = getLayerPoints(layer)
-        if (!allPoints.has(pointKey)) return
-
+      const { point, cutout } = cutoutAtPoint(coords)
+      const pointKey = `${point.x},${point.y}`
+      const targets = mode === "rivet"
+        ? createRivetCutouts(pointKey, cutout, rivetScalePercent, layers)
+        : new Map((isShiftHeld ? getLayersWithPoint(pointKey, layers) : layers.filter(l => l.id === activeLayerId))
+          .filter(layer => getLayerPoints(layer).has(pointKey))
+          .map(layer => [layer.id, cutout]))
+      let savedHistory = false
+      targets.forEach((newCutout, layerId) => {
+        const layer = layers.find(l => l.id === layerId)!
         const existingMods = layer.pointModifications?.get(pointKey)
-        const existingCutouts = existingMods?.cutouts || []
-        if (isDuplicateCutout(existingCutouts, anchor, diameterMm, customOffset)) return
-
-        const newCutout: CircularCutout = {
-          anchor,
-          diameterMm,
-          ...(anchor === "custom" ? { customOffset } : {}),
+        if (isDuplicateCutout(existingMods?.cutouts ?? [], newCutout)) return
+        if (!savedHistory) {
+          pushHistory(layers)
+          savedHistory = true
         }
-
-        const newMods: PointModifications = {
+        updatePointModifications(layerId, pointKey, {
           ...existingMods,
-          cutouts: [...existingCutouts, newCutout],
-        }
-        updatePointModifications(layer.id, pointKey, newMods)
-
-        blobEngine.invalidateLayer(layer.id, {
-          minX: coords.x - 1,
-          minY: coords.y - 1,
-          maxX: coords.x + 1,
-          maxY: coords.y + 1,
+          cutouts: [...(existingMods?.cutouts ?? []), newCutout],
         })
+        blobEngine.invalidateLayer(layerId)
       })
+      setCutoutDraft(null)
     },
-    [getGridCoordinates, cutoutSettings, blobEngine],
+    [getGridCoordinates, getHoveredCutout, cutoutSettings, cutoutDraft, cutoutAtPoint, blobEngine],
   )
 
   /** Handle override tool click: set quadrant override, or alt+click to clear */
@@ -1001,30 +944,73 @@ export const GridPaintCanvas = forwardRef<
       )
     }
 
-    // Render cutout hover overlay: border ring + label for the hovered cutout
+    // Preview uses the same path as the actual hole, including both circle centers.
+    if (currentTool === "cutout" && cutoutPointerRef.current && !cutoutRemovingRef.current && renderer.context) {
+      const { point, cutout } = cutoutAtPoint(cutoutPointerRef.current)
+      const geometry = getCutoutGeometry(cutout, point.x, point.y, canvasView.mmPerUnit)
+      const ctx = renderer.context
+      const unit = canvasView.gridSize
+      const worldGeometry = {
+        start: { x: (geometry.start.x + 0.5) * unit, y: (geometry.start.y + 0.5) * unit },
+        end: { x: (geometry.end.x + 0.5) * unit, y: (geometry.end.y + 0.5) * unit },
+        radius: geometry.radius * unit,
+      }
+      ctx.save()
+      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
+      ctx.scale(canvasView.zoom, canvasView.zoom)
+      ctx.strokeStyle = getCanvasColor("--highlighted")
+      ctx.fillStyle = ctx.strokeStyle
+      ctx.lineWidth = 1.5 / canvasView.zoom
+      ctx.beginPath()
+      appendCutoutPath(ctx, worldGeometry)
+      ctx.globalAlpha = 0.15
+      ctx.fill()
+      ctx.globalAlpha = 0.9
+      ctx.setLineDash([4 / canvasView.zoom, 3 / canvasView.zoom])
+      ctx.stroke()
+      ctx.setLineDash([])
+      if (cutoutSettings.shape === "pill") {
+        for (const center of [worldGeometry.start, worldGeometry.end]) {
+          ctx.beginPath()
+          ctx.arc(center.x, center.y, 3 / canvasView.zoom, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+      ctx.restore()
+    }
+
+    // Render the hovered cutout outline and size label
     if (
       currentTool === "cutout" &&
       hoveredCutoutRef.current &&
       renderer?.context
     ) {
       const ctx = renderer.context
-      const { cx, cy, r, cutout } = hoveredCutoutRef.current
+      const { pointKey, cutout } = hoveredCutoutRef.current
+      const [px, py] = pointKey.split(",").map(Number)
+      const geometry = getCutoutGeometry(cutout, px, py, canvasView.mmPerUnit)
+      const cx = (geometry.start.x + 0.5) * canvasView.gridSize
+      const cy = (Math.min(geometry.start.y, geometry.end.y) + 0.5) * canvasView.gridSize
+      const r = geometry.radius * canvasView.gridSize
       const highlightColor = getCanvasColor("--highlighted")
 
       ctx.save()
       ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
       ctx.scale(canvasView.zoom, canvasView.zoom)
 
-      // Stroke the circle border
       ctx.beginPath()
-      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      appendCutoutPath(ctx, {
+        start: { x: (geometry.start.x + 0.5) * canvasView.gridSize, y: (geometry.start.y + 0.5) * canvasView.gridSize },
+        end: { x: (geometry.end.x + 0.5) * canvasView.gridSize, y: (geometry.end.y + 0.5) * canvasView.gridSize },
+        radius: r,
+      })
       ctx.strokeStyle = highlightColor
       ctx.lineWidth = 1.5 / canvasView.zoom
       ctx.stroke()
 
-      // Draw label: "anchor · Xmm" just above the circle
-      const anchorLabel = cutout.anchor === "custom" ? "custom" : cutout.anchor
-      const label = `${anchorLabel} · ${cutout.diameterMm}mm`
+      // Draw the shape and stored size above the cutout
+      const sizeLabel = cutout.sizeUnit === "grid" ? `${cutout.diameterGrid} gu` : `${cutout.diameterMm} mm`
+      const label = `${cutout.shape ?? "circle"} · ${sizeLabel}`
       // 11px fixed screen-space font (divide by zoom since we're inside the scaled ctx)
       const fontSize = 11 / canvasView.zoom
       ctx.font = `${fontSize}px monospace`
@@ -1100,6 +1086,8 @@ export const GridPaintCanvas = forwardRef<
     layersState,
     $showActiveLayerOutline,
     currentTool,
+    cutoutAtPoint,
+    cutoutSettings.shape,
     selection.hasSelection,
     selection.selectionStart,
     selection.selectionEnd,
@@ -1367,8 +1355,10 @@ export const GridPaintCanvas = forwardRef<
           }
         }
       } else if (currentTool === "cutout") {
-        pushHistory($layersState.get().layers)
+        cutoutRemovingRef.current = isInvertHeld
+        cutoutPointerRef.current = getGridCoordinates(e.clientX, e.clientY)
         handleCutoutClick(e.clientX, e.clientY, isInvertHeld, e.shiftKey)
+        render()
       } else if (currentTool === "override") {
         pushHistory($layersState.get().layers)
         handleOverrideClick(e.clientX, e.clientY, isInvertHeld)
@@ -1392,16 +1382,11 @@ export const GridPaintCanvas = forwardRef<
       // Always track the last mouse position so paste can use it
       lastMousePosRef.current = { x: e.clientX, y: e.clientY }
 
-      // Cutout hover hit-test runs regardless of drag state
       if (currentTool === "cutout") {
-        const hit = getHoveredCutout(e.clientX, e.clientY)
-        const prev = hoveredCutoutRef.current
-        const prevKey = prev ? `${prev.pointKey}:${prev.index}` : null
-        const hitKey = hit ? `${hit.pointKey}:${hit.index}` : null
-        if (hitKey !== prevKey) {
-          hoveredCutoutRef.current = hit
-          render()
-        }
+        cutoutPointerRef.current = getGridCoordinates(e.clientX, e.clientY)
+        cutoutRemovingRef.current = e.altKey || !!(e.buttons & 2)
+        hoveredCutoutRef.current = getHoveredCutout(e.clientX, e.clientY)
+        render()
       }
 
       // Shape-handle hover: only when not mid-gesture (resize sets it on down).
@@ -1557,7 +1542,8 @@ export const GridPaintCanvas = forwardRef<
 
     const handleMouseLeave = () => {
       handleMouseUp()
-      if (currentTool === "cutout" && hoveredCutoutRef.current !== null) {
+      if (currentTool === "cutout") {
+        cutoutPointerRef.current = null
         hoveredCutoutRef.current = null
         render()
       }
@@ -1743,6 +1729,11 @@ export const GridPaintCanvas = forwardRef<
       ) {
         e.preventDefault()
         centerCanvasToContent()
+      }
+
+      if (currentTool === "cutout" && (e.key === "Escape" || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z"))) {
+        if (e.key === "Escape") e.preventDefault()
+        setCutoutDraft(null)
       }
 
       // ── Escape: clear selection ──────────────────────────────────────────

@@ -8,7 +8,7 @@
  */
 
 import type { Layer, ExportMode, ExportFormat } from "@/stores/drawingStores"
-import type { CircularCutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
+import type { Cutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
 import type { LayerRange } from "@/types/layers"
 
 // === Serialized Types (JSON-safe) ===
@@ -22,7 +22,7 @@ export interface SerializedInteractionGroup {
 }
 
 export interface SerializedPointModifications {
-  cutouts?: CircularCutout[]
+  cutouts?: Cutout[]
   quadrantOverrides?: QuadrantOverrides
 }
 

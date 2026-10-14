@@ -50,6 +50,17 @@ describe("serialization round-trip", () => {
     expect(ser.layers[0].pointModifications).toBeUndefined()
   })
 
+  it("preserves grid-sized pill endpoints through JSON serialization", () => {
+    const doc = baseDoc()
+    doc.layers[0].pointModifications = new Map([["0,0", { cutouts: [{
+      anchor: "custom", customOffset: { x: 0.25, y: -0.5 },
+      shape: "pill", endOffset: { x: 3, y: -2 },
+      sizeUnit: "grid", diameterGrid: 0.75, diameterMm: 2,
+    }] }]])
+    const round = deserializeDocument(JSON.parse(JSON.stringify(serializeDocument(doc))))
+    expect(round.layers[0].pointModifications).toEqual(doc.layers[0].pointModifications)
+  })
+
   it("passes a v3 diameterMm cutout through unchanged", () => {
     const ser = serializeDocument(baseDoc())
     ser.layers[0].pointModifications = { "0,0": { cutouts: [{ diameterMm: 7 } as never] } }

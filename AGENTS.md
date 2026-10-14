@@ -135,7 +135,7 @@ The canvas editor UI is composed of four control components. **Keep this list up
 | `src/components/GridPaintControls.tsx` | Top-right + bottom-right overlays | Title input, home/download/shortcuts/theme buttons, sync status, grid size (+/−), mm-per-unit input, measuring bars toggle |
 | `src/components/LayerControls.tsx` | Top-left overlay | Layer select buttons (1–6), visibility toggle, render style toggle, group indicator; also owns keyboard shortcuts for layer switching (`1–6`, `[`, `]`) and tool selection (`D/E/P/S/O/V`) |
 | `src/components/ToolSelection.tsx` | Bottom-center overlay | Tool picker buttons: Draw, Erase, Pan, Select, Cutout, Override |
-| `src/components/ToolOptionsPanel.tsx` | Bottom-center overlay (above tool bar, context-sensitive) | Extra options for active tool: cutout anchor/diameter, override shape selector |
+| `src/components/ToolOptionsPanel.tsx` | Bottom-center overlay (above tool bar, context-sensitive) | Extra options for active tool: cutout circle/pill shape, anchor, mm/grid diameter and rivet settings; override shape selector |
 
 ## Keyboard Shortcuts
 
