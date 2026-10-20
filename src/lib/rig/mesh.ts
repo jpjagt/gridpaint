@@ -26,6 +26,9 @@ import {
 } from "@/lib/rig/clip"
 import { basePlate } from "@/lib/rig/plate"
 
+/** Outline grooves on the base plate: width and depth (mm) */
+const OUTLINE_WIDTH = 0.5
+const OUTLINE_DEPTH = 0.4
 /** Glue markers point at spots at most this many cells away */
 const MARKER_REACH = 4
 /** Marker triangle size (circumradius, mm) */
@@ -79,7 +82,27 @@ export function buildRigParts(
     ...pillars.map((p) => p.sections[0] ?? []),
   )
   const plate = basePlate(everything)
-  if (plate.length > 0) slabs.push({ z0: 0, z1: b, region: plate })
+  if (plate.length > 0) {
+    // Shape outlines as shallow grooves in the plate's top, centred on each
+    // edge so they show as a line around every piece
+    const grooves = setup.plateOutlines
+      ? union(
+          ...layers.map((l) =>
+            difference(
+              offset(l.footprint, OUTLINE_WIDTH / 2),
+              offset(l.footprint, -OUTLINE_WIDTH / 2),
+            ),
+          ),
+        )
+      : []
+    const depth = Math.min(OUTLINE_DEPTH, b / 3)
+    if (grooves.length > 0) {
+      slabs.push({ z0: 0, z1: b - depth, region: plate })
+      slabs.push({ z0: b - depth, z1: b, region: difference(plate, grooves) })
+    } else {
+      slabs.push({ z0: 0, z1: b, region: plate })
+    }
+  }
 
   const parts: RigPart[] = []
   const transform = (p: Vec2) => ({ x: reverse ? -p.x : p.x, y: -p.y })

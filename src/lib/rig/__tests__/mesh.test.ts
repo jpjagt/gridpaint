@@ -23,6 +23,7 @@ const setup: PrintSetup = {
   glueDiameter: 1.5,
   glueMargin: 0.5,
   glueMarkers: true,
+  plateOutlines: true,
 }
 const base = {
   rect: { id: "r", minX: 0, minY: 0, maxX: 4, maxY: 4, quantity: 1 },
@@ -77,6 +78,20 @@ describe("buildRigParts", () => {
     const count = (markers: boolean) =>
       buildRigParts(a, { ...setup, glueMarkers: markers }, false)[0].geometry.getIndex()!.count
     expect(count(true)).toBeGreaterThan(count(false))
+  })
+
+  it("engraves the shape outlines into the base plate", () => {
+    const a = analyzeRig({ ...base, pillars: [{ x: 5, y: 2 }] })
+    const rig = (plateOutlines: boolean) =>
+      buildRigParts(a, { ...setup, plateOutlines }, false)[0].geometry
+    const plain = rig(false)
+    const engraved = rig(true)
+    expect(engraved.getIndex()!.count).toBeGreaterThan(plain.getIndex()!.count)
+    // Groove floors sit 0.4 mm below the plate top
+    const pos = engraved.getAttribute("position")
+    const zs = new Set<number>()
+    for (let i = 0; i < pos.count; i++) zs.add(Math.round(pos.getZ(i) * 100) / 100)
+    expect(zs.has(0.8)).toBe(true)
   })
 
   it("mirrors the rig when assembling face down", () => {

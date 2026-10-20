@@ -405,15 +405,25 @@ function PrintSetupFields({ setup }: { setup: PrintSetup }) {
           </span>
         </label>
       ))}
-      <label className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground cursor-pointer select-none'>
-        <input
-          type='checkbox'
-          checked={setup.glueMarkers}
-          onChange={(e) => $printSetup.setKey("glueMarkers", e.target.checked)}
-          className='w-3 h-3'
-        />
-        Glue markers on pillars
-      </label>
+      {(
+        [
+          ["glueMarkers", "Glue markers on pillars"],
+          ["plateOutlines", "Shape outlines on base plate"],
+        ] as const
+      ).map(([key, label]) => (
+        <label
+          key={key}
+          className='flex items-center gap-1.5 text-xs font-mono text-muted-foreground cursor-pointer select-none'
+        >
+          <input
+            type='checkbox'
+            checked={setup[key]}
+            onChange={(e) => $printSetup.setKey(key, e.target.checked)}
+            className='w-3 h-3'
+          />
+          {label}
+        </label>
+      ))}
     </div>
   )
 }

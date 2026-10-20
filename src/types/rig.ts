@@ -57,6 +57,8 @@ export interface PrintSetup {
   glueMargin: number
   /** Engrave triangles on pillars pointing at nearby glue spots */
   glueMarkers: boolean
+  /** Engrave every layer's outline into the top of the base plate */
+  plateOutlines: boolean
 }
 
 export type RigToolMode = "pillars" | "glue"

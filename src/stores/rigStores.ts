@@ -34,6 +34,7 @@ export const DEFAULT_PRINT_SETUP: PrintSetup = {
   glueDiameter: 1.5,
   glueMargin: 0.5,
   glueMarkers: true,
+  plateOutlines: true,
 }
 
 function loadPrintSetup(): PrintSetup {
