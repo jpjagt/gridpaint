@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingMetadata } from "@/lib/storage/types"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,9 @@ import { toast } from "sonner"
  * - Provide a way to create a new drawing
  * - Allow deleting existing drawings
  */
+/** Parallel full-doc fetches when backfilling cloud-only thumbnails. */
+const THUMBNAIL_FETCH_CONCURRENCY = 3
+
 export default function Home() {
   const [drawings, setDrawings] = useState<DrawingMetadata[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -29,15 +32,87 @@ export default function Home() {
   const [showPassphraseModal, setShowPassphraseModal] = useState(false)
   const authState = useStore($authState)
 
-  // Load metadata and set the list sorted by last-modified descending.
+  const [isCloudLoading, setIsCloudLoading] = useState(false)
+  // Bumped on every refresh and on unmount; async work from an older
+  // generation must not touch state.
+  const loadGenRef = useRef(0)
+
+  // Two-phase load: local metadata first (instant), then the merged
+  // local+cloud list, then lazily fetch thumbnails for cloud-only drawings.
   const refreshDrawings = useCallback(async () => {
-    const metadata = await drawingStore.list()
-    setDrawings([...metadata].sort((a, b) => b.updatedAt - a.updatedAt))
+    const gen = ++loadGenRef.current
+    const isCurrent = () => loadGenRef.current === gen
+    const sortDesc = (list: DrawingMetadata[]) =>
+      [...list].sort((a, b) => b.updatedAt - a.updatedAt)
+
+    let localIds = new Set<string>()
+    if (drawingStore.listLocal) {
+      try {
+        const local = await drawingStore.listLocal()
+        if (!isCurrent()) return
+        localIds = new Set(local.map((d) => d.id))
+        setDrawings(sortDesc(local))
+        setIsLoading(false)
+      } catch (error) {
+        console.error("Failed to list local drawings:", error)
+      }
+    }
+
+    if (!isCurrent()) return
+    setIsCloudLoading(true)
+    let merged: DrawingMetadata[]
+    try {
+      merged = await drawingStore.list()
+    } finally {
+      if (isCurrent()) setIsCloudLoading(false)
+    }
+    if (!isCurrent()) return
+    setDrawings(sortDesc(merged))
+    setIsLoading(false)
+
+    // Cloud-only drawings have no thumbnail in the list; fetch the full docs
+    // in the background (get() also caches them locally for next time).
+    const missing = merged
+      .filter((d) => !d.thumbnail && !localIds.has(d.id))
+      .map((d) => d.id)
+    let next = 0
+    const worker = async () => {
+      while (next < missing.length && isCurrent()) {
+        const id = missing[next++]
+        try {
+          const full = await drawingStore.get(id)
+          const thumbnail = full?.thumbnail
+          if (!thumbnail || !isCurrent()) continue
+          setDrawings((prev) =>
+            prev.map((d) => (d.id === id ? { ...d, thumbnail } : d)),
+          )
+        } catch (error) {
+          console.warn("Failed to fetch thumbnail for", id, error)
+        }
+      }
+    }
+    // Not awaited: callers (e.g. import) shouldn't wait on thumbnails.
+    void Promise.all(
+      Array.from(
+        { length: Math.min(THUMBNAIL_FETCH_CONCURRENCY, missing.length) },
+        worker,
+      ),
+    )
   }, [])
 
   useEffect(() => {
+    let mounted = true
     setIsLoading(true)
-    refreshDrawings().finally(() => setIsLoading(false))
+    refreshDrawings()
+      .catch((error) => console.error("Failed to load drawings:", error))
+      .finally(() => {
+        if (mounted) setIsLoading(false)
+      })
+    return () => {
+      mounted = false
+      // Invalidate in-flight loads so nothing sets state after unmount.
+      loadGenRef.current++
+    }
   }, [refreshDrawings])
 
   const createNew = () => {
@@ -90,7 +165,14 @@ export default function Home() {
   return (
     <div className='p-8'>
       <div className='flex items-center justify-between mb-6'>
-        <h1 className='text-2xl font-medium'>your grids</h1>
+        <h1 className='text-2xl font-medium'>
+          your grids
+          {isCloudLoading && !isLoading && (
+            <span className='ml-3 text-sm font-normal text-muted-foreground animate-pulse'>
+              syncing…
+            </span>
+          )}
+        </h1>
         <div className='flex gap-2'>
           {authState.isAuthenticated && (
             <Button
@@ -158,6 +240,8 @@ export default function Home() {
                       <img
                         src={drawing.thumbnail}
                         alt={`Preview of ${drawing.name}`}
+                        loading='lazy'
+                        decoding='async'
                         className='w-full h-full object-contain bg-muted rounded border border-border'
                       />
                     ) : (

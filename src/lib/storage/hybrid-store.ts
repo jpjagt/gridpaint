@@ -91,8 +91,17 @@ export class HybridDrawingStore implements DrawingStore {
       
       for (const drawing of cloudDrawings) {
         const existing = merged.get(drawing.id)
-        if (!existing || drawing.updatedAt > existing.updatedAt) {
+        if (!existing) {
           merged.set(drawing.id, drawing)
+        } else if (drawing.updatedAt > existing.updatedAt) {
+          // Cloud list metadata carries no thumbnail; keep the local one
+          // (slightly stale beats none).
+          merged.set(
+            drawing.id,
+            !drawing.thumbnail && existing.thumbnail
+              ? { ...drawing, thumbnail: existing.thumbnail }
+              : drawing,
+          )
         }
       }
       
@@ -105,6 +114,13 @@ export class HybridDrawingStore implements DrawingStore {
   }
 
   /**
+   * List only drawings present in the local store (fast, no network)
+   */
+  async listLocal(): Promise<DrawingMetadata[]> {
+    return this.localStore.list()
+  }
+
+  /**
    * Get a drawing (try local first, then cloud)
    */
   async get(id: string): Promise<DrawingDocument | null> {
@@ -113,7 +129,17 @@ export class HybridDrawingStore implements DrawingStore {
       if (!this.cloudStore) return localDoc
 
       const cloudDoc = await this.cloudStore.get(id)
-      if (!localDoc) return cloudDoc
+      if (!localDoc) {
+        if (cloudDoc) {
+          // Cache cloud-only docs locally so the next list has its thumbnail.
+          try {
+            await this.localStore.save(cloudDoc)
+          } catch (error) {
+            console.warn("[HybridStore] Failed to cache cloud doc locally:", error)
+          }
+        }
+        return cloudDoc
+      }
       if (!cloudDoc) return localDoc
 
       if (chooseNewer(localDoc, cloudDoc) === "cloud") {

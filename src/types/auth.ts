@@ -2,10 +2,19 @@
  * Authentication and user types
  */
 
+/** Metadata stored per drawing in the user doc (no thumbnail: 1MB doc cap). */
+export interface DrawingMetaEntry {
+  name: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface UserProfile {
   userId: string // SHA-256 hash of passphrase
   writeToken: string // PBKDF2 derived from passphrase
   drawing_ids: string[] // Array of drawing UUIDs
+  /** Lightweight per-drawing metadata so listing needn't read drawing docs. */
+  drawing_meta?: Record<string, DrawingMetaEntry>
   createdAt: number
   updatedAt: number
 }

@@ -12,6 +12,7 @@ import {
   arrayRemove,
   updateDoc,
   runTransaction,
+  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/firestore'
 import { removeUndefined } from '@/lib/firebase/utils'
@@ -22,7 +23,30 @@ import type {
   DrawingDocument,
   InnerDrawingDocument,
 } from './types'
-import type { UserProfile } from '@/types/auth'
+import type { DrawingMetaEntry, UserProfile } from '@/types/auth'
+
+/** Max parallel drawing-doc reads when listing legacy drawings. */
+const LEGACY_FETCH_CONCURRENCY = 6
+
+/** Run `fn` over `items` with at most `limit` in flight; preserves order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  )
+  return results
+}
 
 /**
  * Firestore-backed implementation of DrawingStore
@@ -58,26 +82,60 @@ export class FirestoreDrawingStore implements DrawingStore {
         return []
       }
       
-      // Fetch all drawings
+      const metaMap = userData.drawing_meta || {}
       const metadata: DrawingMetadata[] = []
+      const legacyIds: string[] = []
       for (const id of drawingIds) {
-        const drawingRef = doc(db, 'drawings', id)
-        const drawingSnap = await getDoc(drawingRef)
-        
-        if (drawingSnap.exists()) {
-          const data = drawingSnap.data() as InnerDrawingDocument
+        const meta = metaMap[id]
+        if (meta) {
           metadata.push({
-            id: data.id,
-            name: data.name,
-            createdAt: data.createdAt,
-            updatedAt: data.updatedAt,
-            ...(data.thumbnail !== undefined
-              ? { thumbnail: data.thumbnail }
-              : {}),
+            id,
+            name: meta.name,
+            createdAt: meta.createdAt,
+            updatedAt: meta.updatedAt,
           })
+        } else {
+          legacyIds.push(id)
         }
       }
-      
+
+      // Legacy drawings (saved before drawing_meta existed): read their docs
+      // in parallel, then backfill drawing_meta so the next list is cheap.
+      if (legacyIds.length > 0) {
+        const fetched = await mapWithConcurrency(
+          legacyIds,
+          LEGACY_FETCH_CONCURRENCY,
+          async (id) => {
+            const drawingSnap = await getDoc(doc(db, 'drawings', id))
+            if (!drawingSnap.exists()) return null
+            const data = drawingSnap.data() as InnerDrawingDocument
+            return {
+              id,
+              name: data.name,
+              createdAt: data.createdAt,
+              updatedAt: data.updatedAt,
+            } satisfies DrawingMetadata
+          },
+        )
+        const backfill: Record<string, DrawingMetaEntry> = {}
+        for (const m of fetched) {
+          if (!m) continue
+          metadata.push(m)
+          backfill[`drawing_meta.${m.id}`] = {
+            name: m.name,
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+          }
+        }
+        if (Object.keys(backfill).length > 0) {
+          try {
+            await updateDoc(userRef, backfill)
+          } catch (error) {
+            console.warn('[FirestoreStore] drawing_meta backfill failed:', error)
+          }
+        }
+      }
+
       console.log('[FirestoreStore] Listed', metadata.length, 'drawings')
       return metadata
     } catch (error) {
@@ -143,6 +201,11 @@ export class FirestoreDrawingStore implements DrawingStore {
       const userRef = doc(db, "users", this.userId)
       await updateDoc(userRef, {
         drawing_ids: arrayUnion(drawingDoc.id),
+        [`drawing_meta.${drawingDoc.id}`]: {
+          name: drawingDoc.name,
+          createdAt: drawingDoc.createdAt,
+          updatedAt: drawingDoc.updatedAt,
+        } satisfies DrawingMetaEntry,
         updatedAt: Date.now(),
       })
     }
@@ -159,6 +222,7 @@ export class FirestoreDrawingStore implements DrawingStore {
       const userRef = doc(db, 'users', this.userId)
       await updateDoc(userRef, {
         drawing_ids: arrayRemove(id),
+        [`drawing_meta.${id}`]: deleteField(),
         updatedAt: Date.now(),
       })
       
@@ -200,6 +264,7 @@ export class FirestoreDrawingStore implements DrawingStore {
       // Clear user's drawing list
       await updateDoc(userRef, {
         drawing_ids: [],
+        drawing_meta: {},
         updatedAt: Date.now(),
       })
       

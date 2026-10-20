@@ -20,6 +20,8 @@ import { getDrawingStore } from './storage-manager'
 export interface DrawingStore {
   /** List all saved drawing metadata */
   list(): Promise<DrawingMetadata[]>
+  /** List only locally available metadata (fast path, no network) */
+  listLocal?(): Promise<DrawingMetadata[]>
   /** Retrieve a full drawing document by ID */
   get(id: string): Promise<DrawingDocument | null>
   /** Save or update a drawing document */
