@@ -192,3 +192,16 @@ A promo tool: a ball runs forever through generated landscapes built from the sa
 - **Output**: `R` records a realtime WebM; `V` / `?record=loop` exports a frame-exact MP4 via WebCodecs (`videoExport.ts`), exactly one loop when `loop` is set.
 - **URL params**: `seed, speed, depth, seams, fog, at, biome, loop, metal, env, palette, night, quality=low|high, res=WxH, fps, record=loop, ui=0`. Keys: hold Space boost, P pause, C next palette, X random palette, G settings, H stats, V export, R record.
 - **Far ground**: past the grid, a flat plane (masked per chunk by a ground ring-buffer texture) continues to the horizon. Rows run from `MIN_ROW` (-36, the void) to `maxRow`.
+
+## Assembly Rig (tool `A`)
+
+Generates a 3D-printable jig for gluing an export rect's metal layers, plus glue stencils. Code in `src/lib/rig/`, state in `src/stores/rigStores.ts`, panel `src/components/RigPanel.tsx`, types in `src/types/rig.ts`, design in `docs/superpowers/specs/2026-10-20-assembly-rig-design.md`.
+
+- **Thickness**: `$canvasView.layerThickness` (per drawing, default 1mm) with `ExportRect.customThickness` override; resolve with `resolveRectThickness` / `resolveRectMmPerUnit` (`src/lib/export/rectSettings.ts`). Used by the 3D preview, STL export and the rig.
+- **Assembly order**: highest layer id first (face up), `rig.reverse` = face down (mirrors the rig in x).
+- **Pillars** (`analyze.ts`): a pillar at grid point (x, y) is its cell minus the clearance-grown union of all layers placed so far, per band, so every layer drops straight in. It holds the layers whose outline it hugs; a layer is "locked" when its contacts block ≥95% of sampled in-plane motions (translation + rotation). Suggestions are greedy (most newly blocked motion per plastic), then pruned.
+- **Glue spots**: stored per drawing in `$glueSpots`, keyed by the higher layer id of a pair (layer 2 = glue between 1 and 2); glue goes on whichever of the pair is placed first. Spots not covered by both layers are flagged.
+- **Geometry**: mm, SVG frame (grid point centred at x·mmPerUnit). Outlines come from `svgRings.ts` (DOM-free SVG path flattening) so analysis runs in `worker.ts`. Polygon booleans/offsets via `clipper-lib` wrapped in `clip.ts`.
+- **Export** (`mesh.ts`, `exportRig.ts`): 3MF with the rig and one stencil per glued pair as separate objects, or a zip of STLs. Pillars get triangular slots pointing at nearby glue spots, cut from the pillar top down to the glued layer's top.
+- **Print setup** (clearance, base plate, min wall, stencil thickness, glue spot size/margin) is per browser in localStorage (`$printSetup`).
+

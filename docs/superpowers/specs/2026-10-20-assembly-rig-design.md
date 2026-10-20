@@ -157,12 +157,16 @@ One button in the rig panel exports, for the rect:
 - **Glue stencils:** one per interface, a flat plate of stencil thickness
   whose outline is layer *k*'s footprint (the layer the glue goes onto)
   shrunk by the clearance, with round holes at that interface's glue
-  spots, plus a small engraved layer number. Because it has the layer's
+  spots. *(Not built: an engraved layer number. The part name in the 3MF
+  says which layer it is for.)* Because it has the layer's
   own outline it drops into the rig and registers on the same pillars.
-- **Glue markers:** small triangles on top of pillars (on the top face of
-  the pillar step ending at layer k's top) pointing toward the nearest glue
-  spot of that interface within a few cells. Engraved or raised by
-  ~0.3 mm; on by default, toggle in panel.
+- **Glue markers:** triangular slots in the pillar tops pointing toward the
+  nearest glue spot (within a few cells) of each pair whose glue goes on a
+  layer the pillar holds. *(Changed while building)* Each slot is cut from
+  the pillar top down to that layer's top surface, so it stays visible from
+  above while gluing and its depth tells which layer it is for. Engraving
+  step faces didn't work, because pillars that hug several layers equally
+  have no step face. Toggle in the panel, on by default.
 - Format: **3MF** with rig and each stencil as separate named objects
   (hand-written XML zipped with `fflate`), plus a fallback zip of STLs.
   All in mm.
