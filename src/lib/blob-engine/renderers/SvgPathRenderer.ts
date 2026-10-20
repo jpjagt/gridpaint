@@ -418,6 +418,11 @@ function deduplicateEdges(edges: Edge[], debugMode: boolean): Edge[] {
   return result
 }
 
+/** The oriented boundary edges of the union of `primitives` (internal edges cancelled) */
+export function boundaryEdges(primitives: readonly BlobPrimitive[]): Edge[] {
+  return deduplicateEdges(primitives.flatMap(primitiveToEdges), false)
+}
+
 // ---------------------------------------------------------------------------
 // Path stitching
 //

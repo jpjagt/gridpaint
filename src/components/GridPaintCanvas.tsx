@@ -41,18 +41,14 @@ import { registerThumbnailCanvas } from "@/lib/storage/thumbnail"
 // New blob engine imports
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
-import { layerToGridLayer } from "@/lib/blob-engine/convertLayers"
+import { TiledLayerGeometry } from "@/lib/blob-engine/TiledLayerGeometry"
+import { TiledOutline } from "@/lib/gridpaint/activeOutline"
 import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 import type {
-  BlobGeometry,
   CompositeGeometry,
-  GridLayer as BlobGridLayer,
   LayerGeometry,
-  SpatialRegion,
 } from "@/lib/blob-engine/types"
 
-// Existing imports for compatibility
-import { drawActiveLayerOutline } from "@/lib/gridpaint/drawActiveOutline"
 import { getLayerFillColor } from "@/lib/gridpaint/layerColors"
 import { clipLayersToSelection } from "@/lib/gridpaint/selectionUtils"
 import { getLayersWithPoint } from "@/lib/gridpaint/layerUtils"
@@ -77,11 +73,9 @@ import {
   toggleLayerVisibility,
   toggleLayerRenderStyle,
   createOrActivateLayer,
-  updateLayerPoints,
   updateGroupPoints,
   updatePointModifications,
   clearPointModifications,
-  addGroupToActiveLayer,
   resetDrawing,
 } from "@/stores/drawingStores"
 import type { Cutout, CutoutDraft, PointModifications, ShapeHandle } from "@/types/gridpaint"
@@ -131,11 +125,6 @@ export const GridPaintCanvas = forwardRef<
   const rigAnalysis = useStore($rigAnalysis)
   const rigToolSettings = useStore($rigToolSettings)
   const canvasView = useStore($canvasView)
-  const {
-    zoom: canvasZoom,
-    panOffset: canvasPanOffset,
-    gridSize: canvasGridSize,
-  } = canvasView
   const layersState = useStore($layersState)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -235,16 +224,20 @@ export const GridPaintCanvas = forwardRef<
   const exportRects = useStore($exportRects)
   const selectedExportRectIds = useStore($selectedExportRectIds)
 
-  const [didInitialize, setDidInitialize] = useState(false)
+  // The <canvas> element the renderer is bound to. Tracked by element (not a
+  // boolean) because the canvas unmounts while loading: the renderer must be
+  // re-created for the new element or it keeps painting a detached canvas.
+  const initializedCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   // Initialize canvas and renderer
   const initializeCanvas = useCallback(
     (didResize = false) => {
       const canvas = canvasRef.current
       if (!canvas) return
-      if (didInitialize && !didResize) return
+      const isNewCanvas = initializedCanvasRef.current !== canvas
+      if (!isNewCanvas && !didResize) return
 
-      setDidInitialize(true)
+      initializedCanvasRef.current = canvas
 
       const pixelRatio = window.devicePixelRatio || 1
       const displayWidth = window.innerWidth
@@ -260,66 +253,21 @@ export const GridPaintCanvas = forwardRef<
         ctx.scale(pixelRatio, pixelRatio)
       }
 
-      // Initialize renderer
-      const newRenderer = new Canvas2DRenderer(canvas, false)
-      setRenderer(newRenderer)
+      // A resize keeps the renderer (and its path caches); only a new
+      // element needs a new one
+      if (isNewCanvas) setRenderer(new Canvas2DRenderer(canvas, false))
     },
-    [didInitialize],
-  )
-
-  // Helper: expand a viewport by N grid cells
-  const expandViewport = useCallback(
-    (vp: SpatialRegion, pad: number): SpatialRegion => ({
-      minX: vp.minX - pad,
-      minY: vp.minY - pad,
-      maxX: vp.maxX + pad,
-      maxY: vp.maxY + pad,
-    }),
     [],
   )
 
-  const calculateCurrentViewport = useCallback((): SpatialRegion => {
-    const displayWidth = window.innerWidth
-    const displayHeight = window.innerHeight
-
-    const viewportMinX =
-      Math.floor(-canvasPanOffset.x / (canvasGridSize * canvasZoom)) - 2
-    const viewportMaxX =
-      Math.ceil(
-        (displayWidth - canvasPanOffset.x) / (canvasGridSize * canvasZoom),
-      ) + 2
-    const viewportMinY =
-      Math.floor(-canvasPanOffset.y / (canvasGridSize * canvasZoom)) - 2
-    const viewportMaxY =
-      Math.ceil(
-        (displayHeight - canvasPanOffset.y) / (canvasGridSize * canvasZoom),
-      ) + 2
-
-    return {
-      minX: viewportMinX,
-      minY: viewportMinY,
-      maxX: viewportMaxX,
-      maxY: viewportMaxY,
-    }
-  }, [canvasZoom, canvasPanOffset, canvasGridSize])
-
-  // Per-layer geometry cache. Store updates are immutable and preserve the
-  // object identity of untouched layers, so identity (+ grid settings) tells
-  // us exactly which layers need regeneration. During a paint stroke only the
-  // active layer is regenerated; the other layers keep their BlobGeometry
+  // Per-layer incremental geometry. Store updates are immutable and preserve
+  // the identity of untouched layers, groups and point sets, so each layer's
+  // TiledLayerGeometry can diff against the previous version and regenerate
+  // only the tiles around an edit. Unchanged layers keep their BlobGeometry
   // identity, which also keeps the renderer's Path2D caches warm for them.
-  const layerGeometryCacheRef = useRef(
-    new Map<
-      number,
-      {
-        layer: Layer
-        gridSize: number
-        borderWidth: number
-        gridLayer: BlobGridLayer
-        geometry: BlobGeometry
-      }
-    >(),
-  )
+  // Store layers are passed straight through: they are structurally GridLayers
+  // and are never mutated, so no defensive copy is needed.
+  const layerGeometryCacheRef = useRef(new Map<number, TiledLayerGeometry>())
 
   // Cache geometry generation - only regenerate when layers or settings change.
   // Zoom/pan do not trigger geometry regeneration; they are pure canvas transforms
@@ -343,38 +291,28 @@ export const GridPaintCanvas = forwardRef<
       if (!layer.isVisible) continue
       seenLayerIds.add(layer.id)
 
-      let entry = cache.get(layer.id)
-      if (
-        !entry ||
-        entry.layer !== layer ||
-        entry.gridSize !== gridSize ||
-        entry.borderWidth !== borderWidth
-      ) {
-        const gridLayer = layerToGridLayer(layer)
-        const geometry = blobEngine.generateLayerGeometry(
-          gridLayer,
-          gridSize,
-          borderWidth,
-        )
-        entry = { layer, gridSize, borderWidth, gridLayer, geometry }
-        cache.set(layer.id, entry)
+      let tiled = cache.get(layer.id)
+      if (!tiled) {
+        tiled = new TiledLayerGeometry(blobEngine)
+        cache.set(layer.id, tiled)
       }
+      const geometry = tiled.update(layer, gridSize, borderWidth)
 
       layerGeometries.push({
-        layer: entry.gridLayer,
-        geometry: entry.geometry,
+        layer,
+        geometry,
         renderOrder: -layer.id, // Higher layer IDs render on top (any integer id)
       })
-      totalPrimitives += entry.geometry.primitives.length
+      totalPrimitives += geometry.primitives.length
 
-      if (entry.geometry.primitives.length > 0) {
+      if (geometry.primitives.length > 0) {
         // Per-layer scale is applied about the origin at render time, so the
         // scaled bbox is the unscaled bbox times the factor
         const sf = scaleToFactor(layer.scale)
-        minX = Math.min(minX, entry.geometry.boundingBox.min.x * sf)
-        minY = Math.min(minY, entry.geometry.boundingBox.min.y * sf)
-        maxX = Math.max(maxX, entry.geometry.boundingBox.max.x * sf)
-        maxY = Math.max(maxY, entry.geometry.boundingBox.max.y * sf)
+        minX = Math.min(minX, geometry.boundingBox.min.x * sf)
+        minY = Math.min(minY, geometry.boundingBox.min.y * sf)
+        maxX = Math.max(maxX, geometry.boundingBox.max.x * sf)
+        maxY = Math.max(maxY, geometry.boundingBox.max.y * sf)
       }
     }
 
@@ -401,73 +339,53 @@ export const GridPaintCanvas = forwardRef<
     canvasView.borderWidth,
   ])
 
-  // Compatibility function for active layer outline (renders only active group)
-  const renderActiveLayerOutlineCompat = useCallback(
-    (activeLayer: Layer) => {
-      if (!renderer || !renderer.context) return
+  // Active-group outline, traced from the same primitives that are filled so
+  // it follows curves, overrides and half offsets. A single-group layer reuses
+  // the layer geometry; otherwise the active group gets its own incremental
+  // geometry (with the overrides that aren't on other groups' points).
+  const outlineGeometryRef = useRef(new TiledLayerGeometry(blobEngine))
+  const tiledOutlineRef = useRef(new TiledOutline())
+  const activeOutline = useMemo(() => {
+    if (!$showActiveLayerOutline || !cachedGeometry) return null
+    const { activeLayerId, layers } = layersState
+    const layer = layers.find((l) => l.id === activeLayerId)
+    if (!layer || !layer.isVisible) return null
+    const entry = cachedGeometry.layers.find((lg) => lg.layer === layer)
+    if (!entry) return null
 
-      const ctx = renderer.context
-      ctx.save()
-      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
-      ctx.scale(canvasView.zoom, canvasView.zoom)
-
-      // Get points for the active group only (not all groups)
-      const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
-      const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
-      const outlinePoints = activeGroup
-        ? activeGroup.points
-        : getLayerPoints(activeLayer)
-
-      // Iterate the group's points (skipping offscreen ones) rather than every
-      // viewport cell — zoomed out, the viewport can span far more cells than
-      // the group has points
-      const viewport = calculateCurrentViewport()
-      const outlineColor = getCanvasColor("--canvas-outline-active")
-      for (const pointKey of outlinePoints) {
-        const [x, y] = pointKey.split(",").map(Number)
-        if (
-          x < viewport.minX ||
-          x > viewport.maxX ||
-          y < viewport.minY ||
-          y > viewport.maxY
-        ) {
-          continue
+    let geometry = entry.geometry
+    if (layer.groups.length > 1) {
+      const group =
+        layer.groups[Math.max(0, Math.min(activeGroupIndex, layer.groups.length - 1))]
+      let mods: Map<string, PointModifications> | undefined
+      if (layer.pointModifications) {
+        mods = new Map()
+        for (const [key, m] of layer.pointModifications) {
+          const onOtherGroup = layer.groups.some(
+            (g) => g !== group && g.points.has(key),
+          )
+          if (!onOtherGroup) mods.set(key, m)
         }
-
-        // Create temporary RasterPoint for compatibility
-        const point = {
-          x,
-          y,
-          neighbors: [
-            [false, false, false],
-            [false, false, false],
-            [false, false, false],
-          ],
-        }
-
-        // Update neighbors
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx
-            const ny = y + dy
-            const nkey = `${nx},${ny}`
-            point.neighbors[dx + 1][dy + 1] = outlinePoints.has(nkey)
-          }
-        }
-
-        drawActiveLayerOutline(
-          ctx,
-          point,
-          canvasView.gridSize,
-          outlineColor,
-          2,
-        )
       }
+      geometry = outlineGeometryRef.current.update(
+        { ...layer, groups: [group], pointModifications: mods },
+        canvasView.gridSize,
+        canvasView.borderWidth,
+      )
+    }
 
-      ctx.restore()
-    },
-    [renderer, canvasView, activeGroupIndex, calculateCurrentViewport],
-  )
+    return {
+      path: tiledOutlineRef.current.path(geometry),
+      scale: scaleToFactor(layer.scale),
+    }
+  }, [
+    $showActiveLayerOutline,
+    cachedGeometry,
+    layersState,
+    activeGroupIndex,
+    canvasView.gridSize,
+    canvasView.borderWidth,
+  ])
 
   const getGridCoordinates = useCallback(
     (clientX: number, clientY: number) => {
@@ -893,14 +811,19 @@ export const GridPaintCanvas = forwardRef<
       getLayerStyle,
     )
 
-    // Render active layer outline if enabled (only for active group)
-    if ($showActiveLayerOutline && layersState.activeLayerId !== null) {
-      const activeLayer = layersState.layers.find(
-        (l) => l.id === layersState.activeLayerId,
-      )
-      if (activeLayer && activeLayer.isVisible) {
-        renderActiveLayerOutlineCompat(activeLayer)
-      }
+    // Active group outline: a constant 2px on screen at any zoom
+    if (activeOutline && renderer.context) {
+      const ctx = renderer.context
+      const scale = canvasView.zoom * activeOutline.scale
+      ctx.save()
+      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
+      ctx.scale(scale, scale)
+      ctx.strokeStyle = getCanvasColor("--canvas-outline-active")
+      ctx.lineWidth = 2 / scale
+      ctx.lineCap = "round"
+      ctx.lineJoin = "round"
+      ctx.stroke(activeOutline.path)
+      ctx.restore()
     }
 
     // Render selection rectangle if active
@@ -1103,7 +1026,7 @@ export const GridPaintCanvas = forwardRef<
     cachedGeometry,
     canvasView,
     layersState,
-    $showActiveLayerOutline,
+    activeOutline,
     currentTool,
     cutoutAtPoint,
     cutoutSettings.shape,
@@ -1118,7 +1041,6 @@ export const GridPaintCanvas = forwardRef<
     exportRectsHook.draftBounds,
     showCenterOfGravity,
     selectionState.bounds,
-    renderActiveLayerOutlineCompat,
     rigAnalysis,
     rigToolSettings,
   ])
@@ -1178,35 +1100,33 @@ export const GridPaintCanvas = forwardRef<
     }
   }, [render])
 
+  // Latest render function, for listeners that shouldn't re-subscribe on
+  // every state change
+  const renderRef = useRef(render)
+  renderRef.current = render
+
   // Initialize canvas on mount and when ready
   useEffect(() => {
     if (!isReady) return
 
     initializeCanvas()
-    render()
 
     const handleResize = () => {
       initializeCanvas(true)
-      render()
+      renderRef.current()
     }
 
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
-  }, [initializeCanvas, render, isReady])
+  }, [initializeCanvas, isReady])
 
-  // Trigger render when stores change
+  // Repaint when anything render depends on changes, at most once per frame
+  // (wheel/trackpad and pointer events can arrive faster than the display)
   useEffect(() => {
-    if (isReady) {
-      render()
-    }
+    if (!isReady) return
+    const frame = requestAnimationFrame(() => renderRef.current())
+    return () => cancelAnimationFrame(frame)
   }, [render, isReady])
-
-  // Invalidate caches when layers change (covers non-paint edits like paste/selection)
-  useEffect(() => {
-    layersState.layers.forEach((layer) => {
-      blobEngine.invalidateLayer(layer.id)
-    })
-  }, [layersState.layers, blobEngine])
 
   const paintAtPosition = useCallback(
     (
@@ -1269,8 +1189,11 @@ export const GridPaintCanvas = forwardRef<
           newPoints.add(key)
         } else if (effectiveTool === "erase") {
           newPoints.delete(key)
-          // Also clear point modifications when erasing
-          clearPointModifications(activeLayerId, key)
+          // Also clear point modifications when erasing (each clear is a
+          // store update, so skip points that have none)
+          if (activeLayer.pointModifications?.has(key)) {
+            clearPointModifications(activeLayerId, key)
+          }
         }
       })
 

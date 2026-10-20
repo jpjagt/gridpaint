@@ -5,8 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    // .claire holds agent worktrees with duplicated sources; don't run their tests
-    exclude: [...configDefaults.exclude, ".claire/**"],
+    // .claire / .claude hold agent worktrees with duplicated sources; don't run their tests
+    exclude: [...configDefaults.exclude, ".claire/**", ".claude/**"],
   },
   resolve: {
     alias: {

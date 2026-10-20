@@ -12,7 +12,9 @@
  *   continue (no corner points at the start of slopes).
  *
  * - Paths are cached per BlobGeometry identity in cell-aligned tiles
- *   (TILE_CELLS × TILE_CELLS grid cells per tile). Pan/zoom never rebuilds
+ *   (GEOMETRY_TILE_CELLS² grid cells per tile). When the geometry carries its
+ *   own tiles (TiledLayerGeometry), each tile's path is cached by tile
+ *   identity, so an edit only rebuilds the tiles it touched. Pan/zoom never rebuilds
  *   geometry or paths: each frame merges the tiles intersecting the viewport
  *   (cached until the visible tile set changes) and issues one fill per
  *   layer. Frame cost is therefore bounded by visible content, not by
@@ -23,9 +25,11 @@ import type {
   BlobGeometry,
   BlobPrimitive,
   CompositeGeometry,
+  GeometryTile,
   GridLayer,
   RenderStyle,
 } from "../types"
+import { GEOMETRY_TILE_CELLS } from "../types"
 import type { PointModifications } from "@/types/gridpaint"
 import { appendCutoutPath, getCutoutGeometry } from "@/lib/gridpaint/cutoutGeometry"
 
@@ -40,8 +44,7 @@ import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 // Debug visualization constants
 const SHOW_SUBGRID = false // Set to true to show quadrant grid lines
 
-/** Grid cells per cached path tile (matches GeometryCache region size) */
-const TILE_CELLS = 16
+const TILE_CELLS = GEOMETRY_TILE_CELLS
 
 interface PathTile {
   path: Path2D
@@ -52,8 +55,8 @@ interface PathTile {
 
 interface LayerPathCache {
   tiles: Map<string, PathTile>
-  /** Union of all tiles — used when everything is visible */
-  fullPath: Path2D
+  /** Union of all tiles — used when everything is visible (built lazily) */
+  fullPath: Path2D | null
   totalPrimitives: number
   /** Cache of the last merged visible-tile path */
   mergedKey: string | null
@@ -77,6 +80,8 @@ export class Canvas2DRenderer extends Renderer {
    * rebuilt when a layer's geometry actually changes.
    */
   private pathCaches = new WeakMap<BlobGeometry, LayerPathCache>()
+  /** Paths of immutable geometry tiles, reused across geometry versions */
+  private tilePaths = new WeakMap<GeometryTile, Path2D>()
   private stats: RenderStats = {
     primitivesRendered: 0,
     primitivesCulled: 0,
@@ -268,34 +273,55 @@ export class Canvas2DRenderer extends Renderer {
   private buildLayerPathCache(geometry: BlobGeometry): LayerPathCache {
     const tiles = new Map<string, PathTile>()
 
-    for (const primitive of geometry.primitives) {
-      const tileX = Math.floor(primitive.center.x / TILE_CELLS)
-      const tileY = Math.floor(primitive.center.y / TILE_CELLS)
-      const key = `${tileX},${tileY}`
-
-      let tile = tiles.get(key)
-      if (!tile) {
-        tile = { path: new Path2D(), primitiveCount: 0, tileX, tileY }
-        tiles.set(key, tile)
+    if (geometry.tiles) {
+      for (const [key, tile] of geometry.tiles) {
+        let path = this.tilePaths.get(tile)
+        if (!path) {
+          path = new Path2D()
+          for (const p of tile.primitives) appendPrimitivePath(path, p, geometry.gridSize)
+          this.tilePaths.set(tile, path)
+        }
+        tiles.set(key, {
+          path,
+          primitiveCount: tile.primitives.length,
+          tileX: tile.tileX,
+          tileY: tile.tileY,
+        })
       }
+    } else {
+      for (const primitive of geometry.primitives) {
+        const tileX = Math.floor(primitive.center.x / TILE_CELLS)
+        const tileY = Math.floor(primitive.center.y / TILE_CELLS)
+        const key = `${tileX},${tileY}`
 
-      appendPrimitivePath(tile.path, primitive, geometry.gridSize)
-      tile.primitiveCount++
-    }
+        let tile = tiles.get(key)
+        if (!tile) {
+          tile = { path: new Path2D(), primitiveCount: 0, tileX, tileY }
+          tiles.set(key, tile)
+        }
 
-    const fullPath = new Path2D()
-    for (const tile of tiles.values()) {
-      fullPath.addPath(tile.path)
+        appendPrimitivePath(tile.path, primitive, geometry.gridSize)
+        tile.primitiveCount++
+      }
     }
 
     return {
       tiles,
-      fullPath,
+      fullPath: null,
       totalPrimitives: geometry.primitives.length,
       mergedKey: null,
       mergedPath: null,
       mergedCount: 0,
     }
+  }
+
+  private getFullPath(cache: LayerPathCache): Path2D {
+    if (!cache.fullPath) {
+      const fullPath = new Path2D()
+      for (const tile of cache.tiles.values()) fullPath.addPath(tile.path)
+      cache.fullPath = fullPath
+    }
+    return cache.fullPath
   }
 
   /**
@@ -318,7 +344,7 @@ export class Canvas2DRenderer extends Renderer {
       !(worldScale > 0)
     ) {
       // Without a usable viewport, render everything
-      return { path: cache.fullPath, count: cache.totalPrimitives }
+      return { path: this.getFullPath(cache), count: cache.totalPrimitives }
     }
 
     // Visible range in cell coordinates (+1 cell padding: a primitive extends
@@ -350,7 +376,7 @@ export class Canvas2DRenderer extends Renderer {
     }
 
     if (visibleTiles.length === cache.tiles.size) {
-      return { path: cache.fullPath, count: cache.totalPrimitives }
+      return { path: this.getFullPath(cache), count: cache.totalPrimitives }
     }
     if (visibleTiles.length === 0) {
       return { path: null, count: 0 }

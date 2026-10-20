@@ -11,6 +11,9 @@ import { useState, useCallback } from "react"
 import { $exportRects, $selectedExportRectIds, removeFromExportRectSelection } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 
+const isSingleCell = (b: { minX: number; minY: number; maxX: number; maxY: number }) =>
+  b.minX === b.maxX && b.minY === b.maxY
+
 /** Generate a simple unique id */
 const newId = () => `er-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
@@ -66,15 +69,16 @@ export const useExportRects = () => {
   const commitDraw = useCallback(() => {
     if (!drawStart || !drawEnd) return
     const bounds = getDraftBounds(drawStart, drawEnd)
-    // Reject if an existing rect has exactly the same bounds
-    const duplicate = $exportRects.get().some(
+    // Reject a click (a drag that never left its start cell) and exact
+    // duplicates of an existing rect
+    const rejected = isSingleCell(bounds) || $exportRects.get().some(
       (r) =>
         r.minX === bounds.minX &&
         r.minY === bounds.minY &&
         r.maxX === bounds.maxX &&
         r.maxY === bounds.maxY,
     )
-    if (!duplicate) {
+    if (!rejected) {
       const newRect: ExportRect = { id: newId(), ...bounds, quantity: 1 }
       $exportRects.set([...$exportRects.get(), newRect])
     }
@@ -148,8 +152,9 @@ export const useExportRects = () => {
     setDrawEnd(null)
   }, [])
 
-  const draftBounds =
-    drawStart && drawEnd ? getDraftBounds(drawStart, drawEnd) : null
+  // No preview until the drag reaches a second cell, matching commitDraw
+  const rawDraft = drawStart && drawEnd ? getDraftBounds(drawStart, drawEnd) : null
+  const draftBounds = rawDraft && !isSingleCell(rawDraft) ? rawDraft : null
 
   return {
     draftBounds,

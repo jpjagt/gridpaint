@@ -91,6 +91,40 @@ class RecordingSink implements PathSink {
     cur.anchors.push([x, y])
   }
 
+  /**
+   * Records a quarter arc as its equivalent tangent-handle cubic (so the
+   * endpoint/tangent assertions apply unchanged) and samples the true circle.
+   */
+  arc(
+    x: number,
+    y: number,
+    r: number,
+    a0: number,
+    a1: number,
+    ccw = false,
+  ): void {
+    const cur = this.current!
+    // Snap trig noise (cos(π/2) ≈ 6e-17) so axis-aligned values stay exact
+    const snap = (v: number) => Math.round(v * 1e12) / 1e12
+    const cos = (t: number) => snap(Math.cos(t))
+    const sin = (t: number) => snap(Math.sin(t))
+    const at = (t: number): Pt => [x + r * cos(t), y + r * sin(t)]
+    const start = at(a0)
+    const end = at(a1)
+    const last = cur.polygon[cur.polygon.length - 1]
+    expect(Math.hypot(last[0] - start[0], last[1] - start[1])).toBeLessThan(1e-9)
+    let delta = a1 - a0
+    if (ccw && delta > 0) delta -= 2 * Math.PI
+    if (!ccw && delta < 0) delta += 2 * Math.PI
+    expect(Math.abs(Math.abs(delta) - Math.PI / 2)).toBeLessThan(1e-9)
+    const k = (4 / 3) * Math.tan(delta / 4) * r
+    const c1: Pt = [start[0] - k * sin(a0), start[1] + k * cos(a0)]
+    const c2: Pt = [end[0] + k * sin(a1), end[1] - k * cos(a1)]
+    cur.beziers.push([start, c1, c2, end])
+    for (let i = 1; i <= 16; i++) cur.polygon.push(at(a0 + (delta * i) / 16))
+    cur.anchors.push(end)
+  }
+
   closePath(): void {
     this.current!.closed = true
   }

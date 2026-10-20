@@ -16,10 +16,9 @@ import type {
 import { QUADRANT_NEIGHBOR_PATTERNS } from "./types"
 
 export class NeighborhoodAnalyzer {
-  // Scope caches by the specific Set instance for a layer's points to avoid
-  // expensive content hashing and cross-layer collisions.
-  private neighborCache = new WeakMap<Set<string>, Map<string, NeighborhoodMap>>()
-  private analysisCache = new WeakMap<Set<string>, Map<string, NeighborAnalysis>>()
+  // No memoization: each generation pass looks at every cell once, with a
+  // fresh point Set, so caches never hit and cost more (string keys) than the
+  // nine Set lookups they would save.
 
   /**
    * Get the 3x3 neighborhood map for a point within a specific layer
@@ -28,12 +27,6 @@ export class NeighborhoodAnalyzer {
     point: GridPoint,
     layerPoints: Set<string>,
   ): NeighborhoodMap {
-    const subCache = this.ensureNeighborSubcache(layerPoints)
-    const cacheKey = this.generateNeighborhoodCacheKey(point)
-
-    const hit = subCache.get(cacheKey)
-    if (hit) return hit
-
     const neighborhood: NeighborhoodMap = [
       [false, false, false],
       [false, false, false],
@@ -53,7 +46,6 @@ export class NeighborhoodAnalyzer {
       }
     }
 
-    subCache.set(cacheKey, neighborhood)
     return neighborhood
   }
 
@@ -65,12 +57,8 @@ export class NeighborhoodAnalyzer {
     layerPoints: Set<string>,
     centerPoint: GridPoint,
   ): NeighborAnalysis {
-    const subCache = this.ensureAnalysisSubcache(layerPoints)
-    const cacheKey = `${centerPoint.x},${centerPoint.y}:${this.serializeNeighborhood(neighborhood)}`
-
-    const hit = subCache.get(cacheKey)
-    if (hit) return hit
-
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const analyzer = this
     const analysis: NeighborAnalysis = {
       // 8-directional neighbors
       north: neighborhood[1][0],
@@ -103,11 +91,13 @@ export class NeighborhoodAnalyzer {
         !neighborhood[0][2] &&
         !neighborhood[0][0],
 
-      // Calculate adjacent bridge information
-      adjacentBridges: this.computeAdjacentBridges(centerPoint, layerPoints),
+      // Adjacent bridge information: 72 extra lookups and rarely read, so
+      // computed on first access only
+      get adjacentBridges() {
+        return analyzer.computeAdjacentBridges(centerPoint, layerPoints)
+      },
     }
 
-    subCache.set(cacheKey, analysis)
     return analysis
   }
 
@@ -248,45 +238,6 @@ export class NeighborhoodAnalyzer {
     return false
   }
 
-  /**
-   * Clear caches (call when layer data changes significantly)
-   */
-  clearCache(): void {
-    this.neighborCache = new WeakMap()
-    this.analysisCache = new WeakMap()
-  }
-
-  /**
-   * Generate cache key for neighborhood lookup
-   */
-  private generateNeighborhoodCacheKey(point: GridPoint): string {
-    return `${point.x},${point.y}`
-  }
-
-  private ensureNeighborSubcache(layerPoints: Set<string>): Map<string, NeighborhoodMap> {
-    let sub = this.neighborCache.get(layerPoints)
-    if (!sub) {
-      sub = new Map<string, NeighborhoodMap>()
-      this.neighborCache.set(layerPoints, sub)
-    }
-    return sub
-  }
-
-  private ensureAnalysisSubcache(layerPoints: Set<string>): Map<string, NeighborAnalysis> {
-    let sub = this.analysisCache.get(layerPoints)
-    if (!sub) {
-      sub = new Map<string, NeighborAnalysis>()
-      this.analysisCache.set(layerPoints, sub)
-    }
-    return sub
-  }
-
-  /**
-   * Serialize neighborhood map for caching
-   */
-  private serializeNeighborhood(neighborhood: NeighborhoodMap): string {
-    return neighborhood
-      .map((row) => row.map((cell) => (cell ? "1" : "0")).join(""))
-      .join("")
-  }
+  /** Kept for API compatibility; the analyzer holds no caches */
+  clearCache(): void {}
 }

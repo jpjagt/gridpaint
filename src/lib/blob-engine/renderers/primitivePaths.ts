@@ -20,11 +20,11 @@
  *     quadrant exactly.
  *
  * Coordinates are computed directly in world space using exact 90° integer
- * rotations — no canvas transforms, no trigonometry, no per-primitive state.
+ * rotations — no canvas transforms and no per-primitive state. Quarter circles
+ * are true arcs (not Bézier approximations), matching the SVG export.
  */
 
 import type { BlobPrimitive, PathSink, Quadrant } from "../types"
-import { magicNr } from "@/lib/constants"
 
 // Rotation basis per quadrant: world = center + [a b; c d] · local.
 // Quadrant rotations are 0°/90°/180°/270°, so entries are exact integers
@@ -57,25 +57,29 @@ export function appendPrimitivePath(
     sink.moveTo(cx + a * x + b * y, cy + c * x + d * y)
   const line = (x: number, y: number) =>
     sink.lineTo(cx + a * x + b * y, cy + c * x + d * y)
-  const curve = (
-    c1x: number,
-    c1y: number,
-    c2x: number,
-    c2y: number,
-    x: number,
-    y: number,
-  ) =>
-    sink.bezierCurveTo(
-      cx + a * c1x + b * c1y,
-      cy + c * c1x + d * c1y,
-      cx + a * c2x + b * c2y,
-      cy + c * c2x + d * c2y,
-      cx + a * x + b * y,
-      cy + c * x + d * y,
-    )
+  // Quarter circle from the current point (fx,fy) to (tx,ty) around (ox,oy),
+  // all in local coordinates. A true arc rather than a Bézier: the cubic
+  // approximation is slightly flat near its ends, which shows up as a faint
+  // kink where two arcs meet in an S-curve.
+  const quarter = (
+    fx: number,
+    fy: number,
+    tx: number,
+    ty: number,
+    ox: number,
+    oy: number,
+  ) => {
+    const wox = cx + a * ox + b * oy
+    const woy = cy + c * ox + d * oy
+    const a0 = Math.atan2(c * fx + d * fy - (c * ox + d * oy), a * fx + b * fy - (a * ox + b * oy))
+    const a1 = Math.atan2(c * tx + d * ty - (c * ox + d * oy), a * tx + b * ty - (a * ox + b * oy))
+    let delta = a1 - a0
+    if (delta > Math.PI) delta -= 2 * Math.PI
+    if (delta < -Math.PI) delta += 2 * Math.PI
+    sink.arc(wox, woy, primitive.size, a0, a1, delta < 0)
+  }
 
   const s = primitive.size
-  const cp = s * magicNr
   const rq = primitive.renderQuadrant ?? primitive.quadrant
   const rel = (((rq - primitive.quadrant) % 4) + 4) % 4
 
@@ -94,19 +98,19 @@ export function appendPrimitivePath(
       if (rel === 0) {
         move(0, 0)
         line(s, 0)
-        curve(s, cp, cp, s, 0, s)
+        quarter(s, 0, 0, s, 0, 0)
       } else if (rel === 1) {
         move(0, 0)
         line(s, 0)
         line(s, s)
-        curve(s - cp, s, 0, cp, 0, 0)
+        quarter(s, s, 0, 0, 0, s)
       } else if (rel === 2) {
         move(s, s)
         line(0, s)
-        curve(0, s - cp, s - cp, 0, s, 0)
+        quarter(0, s, s, 0, s, s)
       } else {
         move(0, 0)
-        curve(cp, 0, s, s - cp, s, s)
+        quarter(0, 0, s, s, s, 0)
         line(0, s)
       }
       sink.closePath()
@@ -118,18 +122,18 @@ export function appendPrimitivePath(
       if (rel === 0) {
         move(s, s)
         line(0, s)
-        curve(cp, s, s, cp, s, 0)
+        quarter(0, s, s, 0, 0, 0)
       } else if (rel === 1) {
         move(0, 0)
-        curve(0, cp, s - cp, s, s, s)
+        quarter(0, 0, s, s, 0, s)
         line(0, s)
       } else if (rel === 2) {
         move(0, 0)
         line(s, 0)
-        curve(s - cp, 0, 0, s - cp, 0, s)
+        quarter(s, 0, 0, s, s, s)
       } else {
         move(s, s)
-        curve(s, s - cp, cp, 0, 0, 0)
+        quarter(s, s, 0, 0, s, 0)
         line(s, 0)
       }
       sink.closePath()

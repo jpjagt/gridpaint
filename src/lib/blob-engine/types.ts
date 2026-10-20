@@ -86,6 +86,26 @@ export interface BlobGeometry {
   boundingBox: { min: GridPoint; max: GridPoint }
   gridSize: number
   borderWidth: number
+  /**
+   * Optional: the same primitives bucketed into cell-aligned tiles (see
+   * TiledLayerGeometry). Tiles keep their object identity until their content
+   * changes, so renderers can cache per-tile paths across edits.
+   */
+  tiles?: Map<string, GeometryTile>
+}
+
+/** Grid cells per side of a geometry tile */
+export const GEOMETRY_TILE_CELLS = 16
+
+/**
+ * The primitives whose cell (floor of the primitive center) lies in one
+ * GEOMETRY_TILE_CELLS² block. Immutable: a changed tile is a new object.
+ */
+export interface GeometryTile {
+  tileX: number
+  tileY: number
+  primitives: BlobPrimitive[]
+  boundingBox: { min: GridPoint; max: GridPoint }
 }
 
 export interface CurvePrimitive {
@@ -173,6 +193,14 @@ export interface PathSink {
     c2y: number,
     x: number,
     y: number,
+  ): void
+  arc(
+    x: number,
+    y: number,
+    radius: number,
+    startAngle: number,
+    endAngle: number,
+    counterclockwise?: boolean,
   ): void
   closePath(): void
 }

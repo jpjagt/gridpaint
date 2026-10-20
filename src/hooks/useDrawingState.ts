@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react"
-import { useEffect, useLayoutEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import {
   $loadingState,
   $drawingMeta,
@@ -23,6 +23,9 @@ function useDrawingState(drawingId: string) {
   const glueSpots = useStore($glueSpots)
   const initRef = useRef(false)
   const persistenceEnabledRef = useRef(false)
+  // The global loading store can still read "ready" from the previously open
+  // drawing when this hook mounts; only trust it once this instance has loaded.
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   // Initialize drawing state on mount.
   //
@@ -38,6 +41,7 @@ function useDrawingState(drawingId: string) {
       initializeDrawingState(drawingId).then(() => {
         // Enable persistence only after initialization is complete
         persistenceEnabledRef.current = true
+        setHasLoaded(true)
       })
     }
   }, [drawingId])
@@ -58,7 +62,7 @@ function useDrawingState(drawingId: string) {
     drawingMeta,
     canvasView,
     layersState,
-    isReady: loadingState === "ready",
+    isReady: hasLoaded && loadingState === "ready",
   }
 }
 

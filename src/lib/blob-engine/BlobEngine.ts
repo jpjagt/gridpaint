@@ -178,7 +178,7 @@ export class BlobEngine {
   /**
    * Check if a layer needs the multi-group merge path
    */
-  private needsGroupMerge(layer: GridLayer): boolean {
+  needsGroupMerge(layer: GridLayer): boolean {
     return (
       layer.groups.length > 1 ||
       (layer.pointModifications !== undefined && layer.pointModifications.size > 0) ||
@@ -196,6 +196,14 @@ export class BlobEngine {
     gridSize: number,
     borderWidth: number = 0,
     viewport?: SpatialRegion,
+    options: {
+      /**
+       * Take the group-merge path even if this layer alone wouldn't need it.
+       * Used when generating a window of a larger layer, so the window
+       * produces exactly the primitives the full layer would.
+       */
+      forceGroupMerge?: boolean
+    } = {},
   ): BlobGeometry {
     const allLayerPoints = getGridLayerPoints(layer)
     const hasPointMods = layer.pointModifications !== undefined && layer.pointModifications.size > 0
@@ -204,7 +212,7 @@ export class BlobEngine {
     }
 
     // Use GroupMerger path for multi-group layers or layers with overrides
-    if (this.needsGroupMerge(layer)) {
+    if (options.forceGroupMerge || this.needsGroupMerge(layer)) {
       const { primitives } = this.groupMerger.generateMergedPrimitives(
         layer,
         gridSize,
