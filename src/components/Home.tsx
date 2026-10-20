@@ -31,6 +31,12 @@ import { toast } from "sonner"
  * - Provide a way to create a new drawing
  * - Allow deleting existing drawings
  */
+/**
+ * How long the merged (cloud) list may take before the local list is shown
+ * on its own. Showing local first means a visible reorder when cloud lands.
+ */
+const CLOUD_LIST_GRACE_MS = 1200
+
 /** Parallel full-doc fetches when backfilling cloud-only thumbnails. */
 const THUMBNAIL_FETCH_CONCURRENCY = 3
 
@@ -55,26 +61,44 @@ export default function Home() {
     const sortDesc = (list: DrawingMetadata[]) =>
       [...list].sort((a, b) => b.updatedAt - a.updatedAt)
 
+    // Start the merged (local + cloud) list right away, and give it a short
+    // head start: when it lands in time, it's the first thing shown and the
+    // grid never reorders. Only a slow cloud gets the local list shown first.
+    setIsCloudLoading(true)
+    const mergedPromise = drawingStore.list().finally(() => {
+      if (isCurrent()) setIsCloudLoading(false)
+    })
+
+    let local: DrawingMetadata[] = []
     let localIds = new Set<string>()
     if (drawingStore.listLocal) {
       try {
-        const local = await drawingStore.listLocal()
+        local = await drawingStore.listLocal()
         if (!isCurrent()) return
         localIds = new Set(local.map((d) => d.id))
-        setDrawings(sortDesc(local))
-        setIsLoading(false)
+        const mergedInTime = await Promise.race([
+          mergedPromise.then(
+            () => true,
+            () => true,
+          ),
+          new Promise<false>((r) => setTimeout(() => r(false), CLOUD_LIST_GRACE_MS)),
+        ])
+        if (!isCurrent()) return
+        if (!mergedInTime) {
+          setDrawings(sortDesc(local))
+          setIsLoading(false)
+        }
       } catch (error) {
         console.error("Failed to list local drawings:", error)
       }
     }
 
-    if (!isCurrent()) return
-    setIsCloudLoading(true)
     let merged: DrawingMetadata[]
     try {
-      merged = await drawingStore.list()
-    } finally {
-      if (isCurrent()) setIsCloudLoading(false)
+      merged = await mergedPromise
+    } catch (error) {
+      console.error("Failed to list drawings:", error)
+      merged = local
     }
     if (!isCurrent()) return
     setDrawings(sortDesc(merged))
