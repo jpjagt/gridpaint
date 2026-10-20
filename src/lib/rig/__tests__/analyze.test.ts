@@ -80,6 +80,11 @@ describe("analyzeRig", () => {
     const locked = analyzeRig({ ...base, pillars: a.suggestedPillars })
     expect(locked.locks.every((l) => l.locked)).toBe(true)
     expect(a.suggestedPillars.every((p) => p.touches.length === 2)).toBe(true)
+    // Identical outlines: one straight wall, no hairline steps between bands
+    for (const p of locked.pillars) {
+      const [first, ...rest] = [...p.sections, ...(p.capSection ? [p.capSection] : [])]
+      for (const section of rest) expect(section).toBe(first)
+    }
   })
 
   it("pillars hold the layers they hug, reusing across layers", () => {

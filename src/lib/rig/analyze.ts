@@ -52,6 +52,8 @@ const LOCKED_FRACTION = 0.95
 const GAP_PROBES = [0.03, 0.08, CONTACT_SLACK]
 /** How far (beyond the clearance) a held layer may still shift (mm) */
 const MAX_PLAY = 0.25
+/** Steps between bands narrower than this are merged into one wall (mm) */
+const HAIRLINE = 0.15
 /** Glue suggestions are spaced at least this many grid units apart */
 const GLUE_SPACING = 2.5
 /** Smallest glue spot we suggest (mm) */
@@ -248,9 +250,27 @@ function analyzePillar(
     capSection = printable(next, setup.minWall) ? next : null
   }
   sections.length = keep
+
+  // Where the layers share (nearly) the same outline, bands differ only by
+  // hairline slivers from flattening their curves separately. Give the lower
+  // band the upper band's section so the wall is one smooth surface; taking
+  // material away never blocks a layer from dropping in.
+  const stack = capSection ? [...sections, capSection] : sections
+  for (let k = stack.length - 2; k >= 0; k--) {
+    if (isHairline(difference(stack[k], stack[k + 1]))) stack[k] = stack[k + 1]
+  }
+  if (capSection) {
+    capSection = stack.pop()!
+    sections.splice(0, sections.length, ...stack)
+  }
   const volume = sections.reduce((s, r) => s + area(r), 0) * ctx.thickness
 
   return { x, y, sections, touches, topBand, capSection, blocked, volume, placed }
+}
+
+/** True when a region has no part wider than HAIRLINE (or is empty). */
+function isHairline(region: Region): boolean {
+  return isEmpty(offset(region, -HAIRLINE / 2), 1e-4)
 }
 
 function printable(region: Region, minWall: number): boolean {

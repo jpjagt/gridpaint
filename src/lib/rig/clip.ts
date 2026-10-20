@@ -20,8 +20,11 @@ function toPaths(region: Region): ClipperNS.Paths {
   )
 }
 
+/** Vertices closer than this are merged, removing jitter from booleans */
+const CLEAN_DISTANCE = 0.005 * SCALE
+
 function fromPaths(paths: ClipperNS.Paths): Region {
-  return paths
+  return CL.Clipper.CleanPolygons(paths, CLEAN_DISTANCE)
     .filter((p) => p.length >= 3)
     .map((path) => path.map((p) => ({ x: p.X / SCALE, y: p.Y / SCALE })))
 }
