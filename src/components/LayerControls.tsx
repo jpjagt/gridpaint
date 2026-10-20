@@ -16,13 +16,14 @@ import {
   $activeGroupIndex,
   setActiveGroupIndex,
   $currentTool,
-  setCurrentTool,
+  selectTool,
   prevGroup,
   nextGroup,
   type Tool,
   $showCenterOfGravity,
 } from "@/stores/ui"
 import { undo, redo } from "@/stores/historyStore"
+import { TOOL_KEYS } from "@/lib/keymap"
 
 // Scale options: label → scale value (undefined = 1×)
 const SCALE_OPTIONS: { label: string; value: Layer["scale"] }[] = [
@@ -165,16 +166,14 @@ export const LayerControls = ({
         return
       }
 
-      // Tool shortcuts: D, E, P, S, O, V, T, X
-      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        const toolMap: Record<string, Tool> = {
-          d: "draw", e: "erase", p: "pan", s: "select",
-          o: "cutout", v: "override", t: "measure", x: "export",
-        }
-        const lowerKey = key.toLowerCase()
-        if (lowerKey in toolMap) {
+      // Tool shortcuts (see keymap.ts)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        const tool = (Object.keys(TOOL_KEYS) as Tool[]).find(
+          (t) => TOOL_KEYS[t].toLowerCase() === key,
+        )
+        if (tool) {
           e.preventDefault()
-          setCurrentTool(toolMap[lowerKey])
+          selectTool(tool)
         }
       }
     }

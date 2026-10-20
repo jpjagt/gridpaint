@@ -11,6 +11,15 @@ export const setCurrentTool = (tool: Tool) => {
   $currentTool.set(tool)
 }
 
+/** Switch tools from the UI (toolbar or keyboard), dropping tool-local state */
+export const selectTool = (tool: Tool) => {
+  // A finished measurement shouldn't linger once you leave the measure tool
+  if (tool !== "measure") {
+    $measureState.set({ start: null, end: null, isDragging: false })
+  }
+  $currentTool.set(tool)
+}
+
 // === Active group tracking ===
 
 /** Index of the currently active group within the active layer (0-based) */

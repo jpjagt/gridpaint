@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button"
-import { Brush, Eraser, Hand, MousePointer, Circle, Layers, Ruler, BoxSelect, Square } from "lucide-react"
+import { Brush, Eraser, Hand, MousePointer, Circle, Layers, Ruler, BoxSelect, Square, Fence } from "lucide-react"
 import { useStore } from "@nanostores/react"
-import { $currentTool, setCurrentTool, $measureState, type Tool } from "@/stores/ui"
+import { $currentTool, selectTool, type Tool } from "@/stores/ui"
+import { TOOL_KEYS } from "@/lib/keymap"
 
 interface ToolSelectionProps {
   currentTool?: Tool // kept for backward compat but ignored if omitted
@@ -14,23 +15,20 @@ export const ToolSelection = ({ onToolSelect }: ToolSelectionProps) => {
   const currentTool = useStore($currentTool)
 
   const tools = [
-    { id: "draw" as const, icon: Brush, label: "Draw", shortcut: "D" },
-    { id: "erase" as const, icon: Eraser, label: "Erase", shortcut: "E" },
-    { id: "pan" as const, icon: Hand, label: "Pan", shortcut: "P" },
-    { id: "select" as const, icon: MousePointer, label: "Select", shortcut: "S" },
-    { id: "cutout" as const, icon: Circle, label: "Cutout", shortcut: "O" },
-    { id: "override" as const, icon: Layers, label: "Override", shortcut: "V" },
-    { id: "shape" as const, icon: Square, label: "Shape", shortcut: "R" },
-    { id: "measure" as const, icon: Ruler, label: "Measure", shortcut: "T" },
-    { id: "export" as const, icon: BoxSelect, label: "Export", shortcut: "X" },
-  ]
+    { id: "draw" as const, icon: Brush, label: "Draw" },
+    { id: "erase" as const, icon: Eraser, label: "Erase" },
+    { id: "pan" as const, icon: Hand, label: "Pan" },
+    { id: "select" as const, icon: MousePointer, label: "Select" },
+    { id: "cutout" as const, icon: Circle, label: "Cutout" },
+    { id: "override" as const, icon: Layers, label: "Override" },
+    { id: "shape" as const, icon: Square, label: "Shape" },
+    { id: "measure" as const, icon: Ruler, label: "Measure" },
+    { id: "export" as const, icon: BoxSelect, label: "Export" },
+    { id: "rig" as const, icon: Fence, label: "Assembly rig" },
+  ].map((t) => ({ ...t, shortcut: TOOL_KEYS[t.id] }))
 
   const handleSelect = (tool: Tool) => {
-    // Clear any active measurement when switching away from measure tool
-    if (tool !== "measure") {
-      $measureState.set({ start: null, end: null, isDragging: false })
-    }
-    setCurrentTool(tool)
+    selectTool(tool)
     onToolSelect?.(tool)
   }
 

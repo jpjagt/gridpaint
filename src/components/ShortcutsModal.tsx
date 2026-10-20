@@ -4,6 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { FULL_KEY, TOOL_KEYS } from "@/lib/keymap"
 
 interface ShortcutsModalProps {
   isOpen: boolean
@@ -54,14 +55,15 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
         <div className="flex flex-col gap-5 mt-2">
           <Section title="Tools">
-            <KbdRow keys="D" description="Draw — paint points on the active group" />
-            <KbdRow keys="E" description="Erase — remove points (also clears overrides + cutouts)" />
-            <KbdRow keys="P" description="Pan — drag to pan the canvas" />
-            <KbdRow keys="S" description="Select — rectangle select, copy/paste/delete" />
-            <KbdRow keys="O" description="Cutout — add circle or pill cutouts to existing points" />
-            <KbdRow keys="V" description="Override — paint per-quadrant shape overrides" />
-            <KbdRow keys="T" description="Measure — drag to measure distance in mm" />
-            <KbdRow keys="X" description="Export — draw rects to define SVG export regions" />
+            <KbdRow keys={TOOL_KEYS.draw} description="Draw — paint points on the active group" />
+            <KbdRow keys={TOOL_KEYS.erase} description="Erase — remove points (also clears overrides + cutouts)" />
+            <KbdRow keys={TOOL_KEYS.pan} description="Pan — drag to pan the canvas" />
+            <KbdRow keys={TOOL_KEYS.select} description="Select — rectangle select, copy/paste/delete" />
+            <KbdRow keys={TOOL_KEYS.shape} description="Shape — drag a rectangle or ellipse, then place it" />
+            <KbdRow keys={TOOL_KEYS.cutout} description="Cutout (hole) — add circle or pill cutouts to existing points" />
+            <KbdRow keys={TOOL_KEYS.override} description="Override — paint per-quadrant shape overrides" />
+            <KbdRow keys={TOOL_KEYS.measure} description="Measure (tape) — drag to measure distance in mm" />
+            <KbdRow keys={TOOL_KEYS.export} description="Export — drag rects to define export regions" />
           </Section>
 
           <Section title="Drawing">
@@ -114,12 +116,8 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys={["shift", "Delete"]} description="Delete selected points from all layers" />
           </Section>
 
-          <Section title="Cutout Tool (O)">
-            <KbdRow keys="Q" description="Anchor: center" />
-            <KbdRow keys="X" description="Anchor: SE" />
-            <KbdRow keys="Z" description="Anchor: SW" />
-            <KbdRow keys="A" description="Anchor: NW" />
-            <KbdRow keys="W" description="Anchor: NE" />
+          <Section title={`Cutout Tool (${TOOL_KEYS.cutout})`}>
+            <KbdRow keys={["I", "O", "K", "L"]} description="Anchor: NW, NE, SW, SE corner (laid out like the corners)" />
             <KbdRow keys="click" description="Place circle, or set first / second pill center" />
             <KbdRow keys="Escape" description="Cancel unfinished pill" />
             <KbdRow keys={["shift", "click"]} description="Add cutout to all layers with point" />
@@ -127,17 +125,11 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             <KbdRow keys={["alt", "shift", "click"]} description="Clear all cutouts at point from all layers" />
           </Section>
 
-          <Section title="Override Tool (V)">
-            <KbdRow keys="F" description="Shape: full" />
-            <KbdRow keys="R" description="Shape: empty" />
-            <KbdRow keys="T" description="Shape: convex-SE" />
-            <KbdRow keys="G" description="Shape: convex-SW" />
-            <KbdRow keys="B" description="Shape: convex-NW" />
-            <KbdRow keys="Y" description="Shape: convex-NE" />
-            <KbdRow keys="H" description="Shape: concave-SE" />
-            <KbdRow keys="N" description="Shape: concave-SW" />
-            <KbdRow keys="U" description="Shape: concave-NW" />
-            <KbdRow keys="J" description="Shape: concave-NE" />
+          <Section title={`Override Tool (${TOOL_KEYS.override})`}>
+            <KbdRow keys={FULL_KEY} description="Shape: full" />
+            <KbdRow keys={["shift", FULL_KEY]} description="Shape: empty" />
+            <KbdRow keys={["I", "O", "K", "L"]} description="Shape: convex NW, NE, SW, SE (laid out like the quadrants)" />
+            <KbdRow keys={["shift", "I O K L"]} description="Shape: concave NW, NE, SW, SE" />
             <KbdRow keys="alt + click" description="Clear override on a quadrant" />
           </Section>
         </div>

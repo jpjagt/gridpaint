@@ -26,6 +26,13 @@ import {
 } from "@/stores/drawingStores"
 import type { CutoutAnchor, CutoutToolSettings, ExportRect, QuadrantState } from "@/types/gridpaint"
 import { Button } from "@/components/ui/button"
+import {
+  cutoutAnchorForKey,
+  cutoutAnchorKeyLabel,
+  isIgnorableKeyEvent,
+  overrideKeyLabel,
+  overrideShapeForKey,
+} from "@/lib/keymap"
 import { cn } from "@/lib/utils"
 import { exportExportRectsSvg } from "@/lib/export/exportRectsSvg"
 import { exportSeparateZip } from "@/lib/export/exportZip"
@@ -62,55 +69,21 @@ const ANCHOR_GRID: { id: CutoutAnchor; label: string }[][] = [
   ],
 ]
 
+// Corner shapes are ordered like their keys (I O K L); see keymap.ts
 const SHAPE_OPTIONS: {
   id: QuadrantState
   label: string
   renderIcon: () => JSX.Element
-  shortcut: string
 }[] = [
   {
     id: "full",
     label: "Full",
     renderIcon: () => <span>■</span>,
-    shortcut: "F",
   },
   {
     id: "empty",
     label: "Empty",
     renderIcon: () => <span>□</span>,
-    shortcut: "R",
-  },
-  {
-    id: "convex-se",
-    label: "Convex SE",
-    renderIcon: () => (
-      <svg width='16' height='16' viewBox='0 0 1 1' className='inline-block'>
-        <title>Convex SE</title>
-        <path
-          d='M 1 0.5 C 1 0.776 0.776 1 0.5 1 L 0.5 0.5 L 1 0.5 Z'
-          fill='currentColor'
-          stroke='currentColor'
-          strokeWidth='0.04'
-        />
-      </svg>
-    ),
-    shortcut: "T",
-  },
-  {
-    id: "convex-sw",
-    label: "Convex SW",
-    renderIcon: () => (
-      <svg width='16' height='16' viewBox='0 0 1 1' className='inline-block'>
-        <title>Convex SW</title>
-        <path
-          d='M 0 0.5 C 0 0.776 0.224 1 0.5 1 L 0.5 0.5 L 0 0.5 Z'
-          fill='currentColor'
-          stroke='currentColor'
-          strokeWidth='0.04'
-        />
-      </svg>
-    ),
-    shortcut: "G",
   },
   {
     id: "convex-nw",
@@ -126,7 +99,6 @@ const SHAPE_OPTIONS: {
         />
       </svg>
     ),
-    shortcut: "B",
   },
   {
     id: "convex-ne",
@@ -142,39 +114,36 @@ const SHAPE_OPTIONS: {
         />
       </svg>
     ),
-    shortcut: "Y",
   },
   {
-    id: "concave-se",
-    label: "Concave SE",
+    id: "convex-sw",
+    label: "Convex SW",
     renderIcon: () => (
       <svg width='16' height='16' viewBox='0 0 1 1' className='inline-block'>
-        <title>Concave SE</title>
+        <title>Convex SW</title>
         <path
-          d='M 0.5 1 C 0.776 1 1 0.776 1 0.5 L 1 1 L 0.5 1 Z'
+          d='M 0 0.5 C 0 0.776 0.224 1 0.5 1 L 0.5 0.5 L 0 0.5 Z'
           fill='currentColor'
           stroke='currentColor'
           strokeWidth='0.04'
         />
       </svg>
     ),
-    shortcut: "H",
   },
   {
-    id: "concave-sw",
-    label: "Concave SW",
+    id: "convex-se",
+    label: "Convex SE",
     renderIcon: () => (
       <svg width='16' height='16' viewBox='0 0 1 1' className='inline-block'>
-        <title>Concave SW</title>
+        <title>Convex SE</title>
         <path
-          d='M 0.5 1 C 0.224 1 0 0.776 0 0.5 L 0 1 L 0.5 1 Z'
+          d='M 1 0.5 C 1 0.776 0.776 1 0.5 1 L 0.5 0.5 L 1 0.5 Z'
           fill='currentColor'
           stroke='currentColor'
           strokeWidth='0.04'
         />
       </svg>
     ),
-    shortcut: "N",
   },
   {
     id: "concave-nw",
@@ -190,7 +159,6 @@ const SHAPE_OPTIONS: {
         />
       </svg>
     ),
-    shortcut: "U",
   },
   {
     id: "concave-ne",
@@ -206,7 +174,36 @@ const SHAPE_OPTIONS: {
         />
       </svg>
     ),
-    shortcut: "J",
+  },
+  {
+    id: "concave-sw",
+    label: "Concave SW",
+    renderIcon: () => (
+      <svg width='16' height='16' viewBox='0 0 1 1' className='inline-block'>
+        <title>Concave SW</title>
+        <path
+          d='M 0.5 1 C 0.224 1 0 0.776 0 0.5 L 0 1 L 0.5 1 Z'
+          fill='currentColor'
+          stroke='currentColor'
+          strokeWidth='0.04'
+        />
+      </svg>
+    ),
+  },
+  {
+    id: "concave-se",
+    label: "Concave SE",
+    renderIcon: () => (
+      <svg width='16' height='16' viewBox='0 0 1 1' className='inline-block'>
+        <title>Concave SE</title>
+        <path
+          d='M 0.5 1 C 0.776 1 1 0.776 1 0.5 L 1 1 L 0.5 1 Z'
+          fill='currentColor'
+          stroke='currentColor'
+          strokeWidth='0.04'
+        />
+      </svg>
+    ),
   },
 ]
 
@@ -634,6 +631,20 @@ function CutoutOptions({
   settings: CutoutToolSettings
   mmPerUnit: number
 }) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isIgnorableKeyEvent(e)) return
+      const anchor = cutoutAnchorForKey(e)
+      if (anchor) {
+        e.preventDefault()
+        $cutoutToolSettings.setKey("anchor", anchor)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
   const sizeKey = settings.sizeUnit === "grid" ? "diameterGrid" : "diameterMm"
   const diameter = settings[sizeKey]
   const minimum = settings.sizeUnit === "grid" ? 0.01 : 0.1
@@ -671,22 +682,27 @@ function CutoutOptions({
           anchor
         </span>
         <div className='grid grid-cols-3 gap-0.5'>
-          {ANCHOR_GRID.flat().map(({ id, label }) => (
-            <button
-              key={id}
-              type='button'
-              onClick={() => $cutoutToolSettings.setKey("anchor", id)}
-              title={label}
-              aria-label={label}
-              aria-pressed={settings.anchor === id}
-              className={cn(
-                "w-6 h-6 border rounded-sm transition-colors",
-                settings.anchor === id
-                  ? "bg-foreground border-foreground"
-                  : "bg-transparent border-border hover:border-foreground/50",
-              )}
-            />
-          ))}
+          {ANCHOR_GRID.flat().map(({ id, label }) => {
+            const keyLabel = cutoutAnchorKeyLabel(id)
+            return (
+              <button
+                key={id}
+                type='button'
+                onClick={() => $cutoutToolSettings.setKey("anchor", id)}
+                title={keyLabel ? `${label} (${keyLabel})` : label}
+                aria-label={label}
+                aria-pressed={settings.anchor === id}
+                className={cn(
+                  "w-6 h-6 border rounded-sm transition-colors text-[8px] font-mono leading-none",
+                  settings.anchor === id
+                    ? "bg-foreground border-foreground text-background"
+                    : "bg-transparent border-border hover:border-foreground/50 text-muted-foreground",
+                )}
+              >
+                {keyLabel}
+              </button>
+            )
+          })}
         </div>
         {/* Custom option */}
         <button
@@ -942,17 +958,14 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
 }
 
 function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input
-      if (e.target instanceof HTMLInputElement) return
-
-      const key = e.key.toUpperCase()
-      const option = SHAPE_OPTIONS.find((opt) => opt.shortcut === key)
-      if (option) {
+      // Shift is part of the override keymap, so only check the other modifiers
+      if (isIgnorableKeyEvent(e)) return
+      const shape = overrideShapeForKey(e)
+      if (shape) {
         e.preventDefault()
-        $overrideToolSettings.setKey("shape", option.id)
+        $overrideToolSettings.setKey("shape", shape)
       }
     }
 
@@ -965,7 +978,7 @@ function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
       {/* Full/Empty group */}
       <div className='flex gap-1'>
         {SHAPE_OPTIONS.slice(0, 2).map(
-          ({ id, label, renderIcon, shortcut }) => (
+          ({ id, label, renderIcon }) => (
             <Button
               key={id}
               type='button'
@@ -973,8 +986,8 @@ function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
               variant={settings.shape === id ? "default" : "ghost"}
               onClick={() => $overrideToolSettings.setKey("shape", id)}
               className='w-8 h-8 font-mono'
-              title={label}
-              kbShortcut={shortcut}
+              title={`${label} (${overrideKeyLabel(id)})`}
+              kbShortcut={overrideKeyLabel(id)}
             >
               {renderIcon()}
             </Button>
@@ -987,7 +1000,7 @@ function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
       {/* Convex group */}
       <div className='flex gap-1'>
         {SHAPE_OPTIONS.slice(2, 6).map(
-          ({ id, label, renderIcon, shortcut }) => (
+          ({ id, label, renderIcon }) => (
             <Button
               key={id}
               type='button'
@@ -995,8 +1008,8 @@ function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
               variant={settings.shape === id ? "default" : "ghost"}
               onClick={() => $overrideToolSettings.setKey("shape", id)}
               className='w-8 h-8 font-mono'
-              title={label}
-              kbShortcut={shortcut}
+              title={`${label} (${overrideKeyLabel(id)})`}
+              kbShortcut={overrideKeyLabel(id)}
             >
               {renderIcon()}
             </Button>
@@ -1008,7 +1021,7 @@ function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
 
       {/* Concave group */}
       <div className='flex gap-1'>
-        {SHAPE_OPTIONS.slice(6).map(({ id, label, renderIcon, shortcut }) => (
+        {SHAPE_OPTIONS.slice(6).map(({ id, label, renderIcon }) => (
           <Button
             key={id}
             type='button'
@@ -1016,8 +1029,8 @@ function OverrideOptions({ settings }: { settings: { shape: QuadrantState } }) {
             variant={settings.shape === id ? "default" : "ghost"}
             onClick={() => $overrideToolSettings.setKey("shape", id)}
             className='w-8 h-8 font-mono'
-            title={label}
-            kbShortcut={shortcut}
+            title={`${label} (${overrideKeyLabel(id)})`}
+            kbShortcut={overrideKeyLabel(id)}
           >
             {renderIcon()}
           </Button>
