@@ -15,7 +15,7 @@ import {
   Settings,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ModeToggle"
-import { ThicknessPicker } from "@/components/ThicknessPicker"
+import { ThicknessSelect } from "@/components/ThicknessSelect"
 import { $syncStatus, $authState } from "@/stores/authStores"
 import { $history, undo, redo } from "@/stores/historyStore"
 
@@ -196,13 +196,10 @@ export const GridPaintControls = ({
         </Button>
 
         {/* Metal thickness */}
-        <div
-          className='bg-white/10 backdrop-blur-sm rounded-md px-1 py-0.5'
-          title='Metal thickness per layer (mm)'
-        >
-          <ThicknessPicker
+        <div className='bg-white/10 backdrop-blur-sm rounded-md px-2 py-1'>
+          <ThicknessSelect
             value={layerThickness}
-            onChange={(t) => t && onLayerThicknessChange(t)}
+            onChange={onLayerThicknessChange}
           />
         </div>
 
