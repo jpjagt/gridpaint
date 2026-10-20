@@ -8,6 +8,7 @@
  */
 
 import type { Layer, ExportMode, ExportFormat } from "@/stores/drawingStores"
+import type { GlueSpot } from "@/types/rig"
 import type { Cutout, ExportRect, QuadrantOverrides } from "@/types/gridpaint"
 import type { LayerRange } from "@/types/layers"
 
@@ -90,6 +91,8 @@ export interface DrawingDocument extends DrawingMetadata {
   exportFormat?: ExportFormat
   /** IDs of deselected export rects (empty array = all selected) */
   deselectedExportRectIds?: string[]
+  /** Assembly-rig glue spots */
+  glueSpots?: GlueSpot[]
   /** Owner user ID (hashed passphrase) - for cloud storage */
   ownerId?: string
   /** Write token for authentication - for cloud storage */

@@ -27,6 +27,9 @@ import { useSelectionRenderer } from "@/hooks/useSelectionRenderer"
 import { computeCenterOfGravity } from "@/lib/gridpaint/cog"
 import { useExportRects } from "@/hooks/useExportRects"
 import { renderExportRects } from "@/lib/gridpaint/renderExportRects"
+import { renderRigOverlay } from "@/lib/rig/renderRigOverlay"
+import { handleRigClick } from "@/lib/rig/rigInteraction"
+import { $rigAnalysis, $rigToolSettings, rigRect } from "@/stores/rigStores"
 import { ExportRectOverlay } from "@/components/ExportRectOverlay"
 import { ModelViewerModal } from "@/components/ModelViewerModal"
 import {
@@ -125,6 +128,8 @@ export const GridPaintCanvas = forwardRef<
   const overrideSettings = useStore($overrideToolSettings)
   const $showActiveLayerOutline = useStore(showActiveLayerOutline)
   const showCenterOfGravity = useStore($showCenterOfGravity)
+  const rigAnalysis = useStore($rigAnalysis)
+  const rigToolSettings = useStore($rigToolSettings)
   const canvasView = useStore($canvasView)
   const {
     zoom: canvasZoom,
@@ -934,6 +939,20 @@ export const GridPaintCanvas = forwardRef<
       )
     }
 
+    // Assembly rig: pillars and glue spots for the rect being rigged
+    if (currentTool === "rig" && renderer?.context) {
+      const rigTarget = rigRect(exportRects, rigToolSettings.rectId)
+      if (rigTarget) {
+        renderRigOverlay(renderer.context, {
+          analysis: rigAnalysis,
+          rect: rigTarget,
+          mode: rigToolSettings.mode,
+          activeLayerId: layersState.activeLayerId,
+          canvasView,
+        })
+      }
+    }
+
     // Render floating paste overlay if active
     if (selectionState.floatingPaste && renderer) {
       renderFloatingPaste(
@@ -1100,6 +1119,8 @@ export const GridPaintCanvas = forwardRef<
     showCenterOfGravity,
     selectionState.bounds,
     renderActiveLayerOutlineCompat,
+    rigAnalysis,
+    rigToolSettings,
   ])
 
   // Center canvas to fit all visible content
@@ -1370,6 +1391,10 @@ export const GridPaintCanvas = forwardRef<
         })
       } else if (currentTool === "export") {
         exportRectsHook.startDraw(e.clientX, e.clientY, getGridCoordinates)
+      } else if (currentTool === "rig") {
+        if (canvasRef.current) {
+          handleRigClick(canvasRef.current, e.clientX, e.clientY, canvasView)
+        }
       } else {
         // draw or erase — snapshot before the stroke begins
         pushHistory($layersState.get().layers)
@@ -1491,6 +1516,8 @@ export const GridPaintCanvas = forwardRef<
           }
         } else if (currentTool === "export") {
           exportRectsHook.updateDraw(e.clientX, e.clientY, getGridCoordinates)
+        } else if (currentTool === "rig") {
+          // Click-only
         } else {
           // draw or erase
           const newCoords = paintAtPosition(

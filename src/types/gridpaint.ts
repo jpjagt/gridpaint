@@ -185,6 +185,8 @@ export interface ExportRect {
   customMmPerUnit?: number
   /** Optional override for layer thickness in mm. Undefined/0 means use global canvasView.layerThickness */
   customThickness?: number
+  /** Assembly rig pillars and options for this rect */
+  rig?: ExportRectRig
 }
 
 // === Validation ===
@@ -199,6 +201,7 @@ export interface ValidationIssue {
 // === Clipboard / Selection Types ===
 
 import type { SerializedPointModifications } from "@/lib/storage/types"
+import type { ExportRectRig } from "@/types/rig"
 
 export interface SelectionBounds {
   minX: number

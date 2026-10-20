@@ -3,7 +3,7 @@ import type { CutoutToolSettings, QuadrantState, SelectionBounds, ClipboardData,
 
 // === Tool types ===
 
-export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure" | "export" | "shape"
+export type Tool = "draw" | "erase" | "pan" | "select" | "cutout" | "override" | "measure" | "export" | "shape" | "rig"
 
 export const $currentTool = atom<Tool>("draw")
 

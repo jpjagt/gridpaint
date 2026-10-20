@@ -11,6 +11,7 @@ import { ShortcutsModal } from "@/components/ShortcutsModal"
 import { LayerControls } from "@/components/LayerControls"
 import { ToolSelection } from "@/components/ToolSelection"
 import { ToolOptionsPanel } from "@/components/ToolOptionsPanel"
+import { RigPanel } from "@/components/RigPanel"
 import { MeasuringBars } from "@/components/MeasuringBars"
 import { MeasuringTapeOverlay } from "@/components/MeasuringTapeOverlay"
 import { ImageImportOverlay } from "@/components/ImageImportOverlay"
@@ -129,6 +130,7 @@ function EditorPage() {
       />
       <ToolSelection />
       <ToolOptionsPanel />
+      <RigPanel />
       <MeasuringBars show={showMeasuringBars} />
       <MeasuringTapeOverlay />
     </div>

@@ -10,6 +10,7 @@ import type {
 import { pushHistory, clearHistory } from "@/stores/historyStore"
 import { captureThumbnail } from "@/lib/storage/thumbnail"
 import { DEFAULT_LAYER_RANGE, type LayerRange } from "@/types/layers"
+import type { GlueSpot } from "@/types/rig"
 
 export interface Layer {
   id: number
@@ -94,6 +95,9 @@ export const $exportMode = atom<ExportMode>("separate")
 /** Export format (svg vs dxf) — only used for combined/holder modes, persisted with the drawing */
 export type ExportFormat = "svg" | "dxf"
 export const $exportFormat = atom<ExportFormat>("svg")
+
+/** Assembly-rig glue spots, per layer interface — persisted with the drawing */
+export const $glueSpots = atom<GlueSpot[]>([])
 
 /** IDs of selected export rects for export. Empty set = all rects selected. */
 export const $selectedExportRectIds = atom<Set<string>>(new Set())
@@ -208,6 +212,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
       $exportMode.set(stored.exportMode ?? "separate")
       $exportFormat.set(stored.exportFormat ?? "svg")
       $selectedExportRectIds.set(new Set(stored.deselectedExportRectIds ?? []))
+      $glueSpots.set(stored.glueSpots ?? [])
     } else {
       // Create new drawing
       const now = Date.now()
@@ -239,6 +244,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
       $exportMode.set("separate")
       $exportFormat.set("svg")
       $selectedExportRectIds.set(new Set())
+      $glueSpots.set([])
     }
 
     clearHistory()
@@ -304,6 +310,7 @@ export async function saveDrawingState(): Promise<void> {
     exportMode: $exportMode.get(),
     exportFormat: $exportFormat.get(),
     deselectedExportRectIds: Array.from($selectedExportRectIds.get()),
+    glueSpots: $glueSpots.get(),
     updatedAt,
     thumbnail: lastThumbnail,
   }

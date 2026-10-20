@@ -7,6 +7,7 @@ import {
   $layersState,
   $exportRects,
   $selectedExportRectIds,
+  $glueSpots,
   initializeDrawingState,
   saveDrawingState,
   type LoadingState,
@@ -19,6 +20,7 @@ function useDrawingState(drawingId: string) {
   const layersState = useStore($layersState)
   const exportRects = useStore($exportRects)
   const selectedExportRectIds = useStore($selectedExportRectIds)
+  const glueSpots = useStore($glueSpots)
   const initRef = useRef(false)
   const persistenceEnabledRef = useRef(false)
 
@@ -49,7 +51,7 @@ function useDrawingState(drawingId: string) {
 
       return () => clearTimeout(timeoutId)
     }
-  }, [loadingState, drawingMeta.name, canvasView, layersState, exportRects, selectedExportRectIds])
+  }, [loadingState, drawingMeta.name, canvasView, layersState, exportRects, selectedExportRectIds, glueSpots])
 
   return {
     loadingState,
