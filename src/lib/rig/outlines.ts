@@ -12,7 +12,7 @@ import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { SvgPathRenderer } from "@/lib/blob-engine/renderers/SvgPathRenderer"
 import { svgPathRings } from "@/lib/rig/svgRings"
 import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
-import { union, ringArea } from "@/lib/rig/clip"
+import { pieces, union, ringArea } from "@/lib/rig/clip"
 
 /** Spacing of outline samples used for contact tests (mm). */
 export const SAMPLE_STEP = 0.25
@@ -80,7 +80,10 @@ export function rigLayers(
       layerId: layer.id,
       order: out.length,
       footprint,
-      ...outlineSamples(footprint),
+      pieces: pieces(footprint).map((piece) => {
+        const region = [piece.outer, ...piece.holes]
+        return { footprint: region, ...outlineSamples(region) }
+      }),
     })
   }
   return out

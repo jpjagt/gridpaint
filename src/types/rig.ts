@@ -67,6 +67,17 @@ export interface RigToolSettings {
   rectId: string | null
 }
 
+/** One separate shape of a layer: a loose part that must be held on its own. */
+export interface RigPiece {
+  /** Footprint in mm (outer ring plus its holes) */
+  footprint: Region
+  /** Point on the outline with its outward normal, for contact tests */
+  samples: { p: Vec2; n: Vec2 }[]
+  /** Centroid and radius used to weigh rotation against translation */
+  center: Vec2
+  radius: number
+}
+
 /** One layer as it goes into the rig. */
 export interface RigLayer {
   layerId: number
@@ -74,11 +85,8 @@ export interface RigLayer {
   order: number
   /** Footprint in mm */
   footprint: Region
-  /** Point on the outline with its outward normal, for contact tests */
-  samples: { p: Vec2; n: Vec2 }[]
-  /** Centroid and radius used to weigh rotation against translation */
-  center: Vec2
-  radius: number
+  /** Separate shapes of this layer inside the rect */
+  pieces: RigPiece[]
 }
 
 /** Analysis of one pillar position. */
@@ -96,7 +104,7 @@ export interface PillarInfo {
    * register too); null when the next band's section isn't printable
    */
   capSection: Region | null
-  /** Bitset per layer order of blocked motion directions */
+  /** Blocked motion directions, per piece (index into the flat piece list) */
   blocked: Map<number, Uint8Array>
   /** Printed volume (mm³), used to prefer cheap pillars */
   volume: number
@@ -105,9 +113,11 @@ export interface PillarInfo {
 
 export interface LayerLockStatus {
   layerId: number
-  /** Fraction of in-plane motions blocked (1 = locked) */
+  /** Fraction of in-plane motions blocked for its loosest piece (1 = locked) */
   blockedFraction: number
   locked: boolean
+  pieces: number
+  lockedPieces: number
 }
 
 export type GlueSpotIssue = "uncovered" | "tight" | null
@@ -140,6 +150,8 @@ export interface RigAnalysis {
   pillars: PillarInfo[]
   suggestedPillars: PillarInfo[]
   locks: LayerLockStatus[]
+  /** Pieces not yet held in place, for highlighting */
+  loosePieces: { layerId: number; footprint: Region }[]
   interfaces: GlueInterface[]
   glueSpots: GlueSpotInfo[]
   suggestedGlueSpots: GlueSpotInfo[]

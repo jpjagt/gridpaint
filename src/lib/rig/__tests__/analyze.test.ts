@@ -87,6 +87,29 @@ describe("analyzeRig", () => {
     }
   })
 
+  it("holds every separate shape of a layer on its own", () => {
+    // Layer 1: two separate 2x2 blocks; one pillar can't hold both
+    const twoBlocks = [...block(0, 0, 1, 1), ...block(4, 0, 5, 1)]
+    const base = inputs({
+      rect: { id: "r", minX: 0, minY: 0, maxX: 5, maxY: 1, quantity: 1 },
+      layers: [makeLayer(1, twoBlocks)],
+    })
+    const a = analyzeRig(base)
+    expect(a.layers[0].pieces).toHaveLength(2)
+    expect(a.locks[0]).toMatchObject({ pieces: 2, lockedPieces: 0, locked: false })
+    expect(a.loosePieces).toHaveLength(2)
+
+    // Pillars only around the left block: right block stays loose
+    const leftOnly = a.suggestedPillars.filter((p) => p.x <= 2.5)
+    const half = analyzeRig({ ...base, pillars: leftOnly })
+    expect(half.locks[0]).toMatchObject({ lockedPieces: 1, locked: false })
+    expect(half.suggestedPillars.every((p) => p.x >= 3)).toBe(true)
+
+    const all = analyzeRig({ ...base, pillars: a.suggestedPillars })
+    expect(all.locks[0]).toMatchObject({ lockedPieces: 2, locked: true })
+    expect(all.loosePieces).toHaveLength(0)
+  })
+
   it("pillars hold the layers they hug, reusing across layers", () => {
     // Next to the block's corner, away from the plus: holds only the block
     const a = analyzeRig(inputs({ pillars: [{ x: -1, y: 0 }] }))

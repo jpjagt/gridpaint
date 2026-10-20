@@ -146,8 +146,12 @@ function RigPanelContent() {
                   )}
                 >
                   {lock.locked
-                    ? "held ✓"
-                    : `${Math.round(lock.blockedFraction * 100)}% held ⚠`}
+                    ? lock.pieces > 1
+                      ? `${lock.pieces} pieces held ✓`
+                      : "held ✓"
+                    : lock.pieces > 1
+                      ? `${lock.lockedPieces}/${lock.pieces} pieces held ⚠`
+                      : `${Math.round(lock.blockedFraction * 100)}% held ⚠`}
                 </span>
               </div>
             ))}

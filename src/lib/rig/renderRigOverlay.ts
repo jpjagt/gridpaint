@@ -11,6 +11,7 @@ import type { GlueSpotInfo, PillarInfo, Region, RigAnalysis, RigToolMode } from 
 const COLORS = {
   rect: "rgba(96, 165, 250, 0.8)",
   pillar: "rgba(234, 179, 8, 0.85)",
+  loose: "rgba(249, 115, 22, 0.9)",
   pillarStroke: "rgba(133, 77, 14, 0.95)",
   suggestion: "rgba(234, 179, 8, 0.28)",
   overlap: "rgba(34, 197, 94, 0.22)",
@@ -128,6 +129,15 @@ export function renderRigOverlay(
     }
 
     if (mode === "pillars") {
+      // Pieces that can still shift: dashed orange outline
+      ctx.setLineDash([5 * px, 3 * px])
+      ctx.strokeStyle = COLORS.loose
+      ctx.lineWidth = 2 * px
+      for (const piece of analysis.loosePieces) {
+        tracePath(piece.footprint)
+        ctx.stroke()
+      }
+      ctx.setLineDash([])
       for (const p of analysis.suggestedPillars) drawPillar(p, false)
       for (const p of analysis.pillars) drawPillar(p, true)
     } else {

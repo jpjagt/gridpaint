@@ -22,6 +22,7 @@ import type {
   Region,
   RigAnalysis,
   RigLayer,
+  RigPiece,
   RigPillar,
   Vec2,
 } from "@/types/rig"
@@ -101,12 +102,12 @@ interface Contact {
  * that stays within clearance + MAX_PLAY.
  */
 function blockedBy(
-  layer: RigLayer,
+  piece: RigPiece,
   contacts: Contact[],
   clearance: number,
 ): Uint8Array {
   const bits = new Uint8Array(DIRECTIONS.length)
-  const { center: c, radius: R } = layer
+  const { center: c, radius: R } = piece
   const maxShift = clearance + MAX_PLAY
   for (let d = 0; d < DIRECTIONS.length; d++) {
     const [tx, ty, w] = DIRECTIONS[d]
@@ -135,10 +136,19 @@ function orInto(target: Uint8Array, src: Uint8Array): void {
 
 // --- Pillars ----------------------------------------------------------------
 
+/** A piece of some layer; each is held (or not) on its own */
+interface Body {
+  /** Layer position in assembly order */
+  band: number
+  piece: RigPiece
+  /** Outline samples bucketed by the grid cell they fall in */
+  buckets: Map<string, RigPiece["samples"]>
+}
+
 interface Context {
   layers: RigLayer[]
-  /** Outline samples per layer, bucketed by the grid cell they fall in */
-  buckets: Map<string, RigLayer["samples"]>[]
+  /** Every piece of every layer, in assembly order */
+  bodies: Body[]
   /** Union of grown footprints of layers 0..k, per band k */
   occupied: Region[]
   mmPerUnit: number
@@ -162,19 +172,21 @@ function buildContext(inputs: RigInputs): Context {
     occupied.push(acc)
   }
   const m = inputs.mmPerUnit
-  const buckets = layers.map((layer) => {
-    const map = new Map<string, RigLayer["samples"]>()
-    for (const s of layer.samples) {
-      const key = `${Math.round(s.p.x / m)},${Math.round(s.p.y / m)}`
-      let list = map.get(key)
-      if (!list) map.set(key, (list = []))
-      list.push(s)
-    }
-    return map
-  })
+  const bodies: Body[] = layers.flatMap((layer, band) =>
+    layer.pieces.map((piece) => {
+      const buckets = new Map<string, RigPiece["samples"]>()
+      for (const s of piece.samples) {
+        const key = `${Math.round(s.p.x / m)},${Math.round(s.p.y / m)}`
+        let list = buckets.get(key)
+        if (!list) buckets.set(key, (list = []))
+        list.push(s)
+      }
+      return { band, piece, buckets }
+    }),
+  )
   return {
     layers,
-    buckets,
+    bodies,
     occupied,
     mmPerUnit: inputs.mmPerUnit,
     thickness: inputs.thickness,
@@ -187,12 +199,12 @@ export function cellRegion(x: number, y: number, mmPerUnit: number): Region {
   return rectRegion(x * mmPerUnit - h, y * mmPerUnit - h, x * mmPerUnit + h, y * mmPerUnit + h)
 }
 
-/** Outline samples of layer k in the 3×3 cells around (x, y). */
-function nearbySamples(ctx: Context, k: number, x: number, y: number) {
-  const out: RigLayer["samples"] = []
+/** Outline samples of a body in the 3×3 cells around (x, y). */
+function nearbySamples(body: Body, x: number, y: number) {
+  const out: RigPiece["samples"] = []
   for (let dy = -1; dy <= 1; dy++)
     for (let dx = -1; dx <= 1; dx++) {
-      const list = ctx.buckets[k].get(`${x + dx},${y + dy}`)
+      const list = body.buckets.get(`${x + dx},${y + dy}`)
       if (list) out.push(...list)
     }
   return out
@@ -219,23 +231,25 @@ function analyzePillar(
     if (!printable(section, setup.minWall)) break
     sections.push(section)
 
-    const layer = layers[k]
-    const contacts: Contact[] = []
-    for (const { p, n } of nearbySamples(ctx, k, x, y)) {
-      for (const gap of GAP_PROBES) {
-        const r = setup.clearance + gap
-        const q = { x: p.x + n.x * r, y: p.y + n.y * r }
-        if (inCell(q) && contains(section, q)) {
-          contacts.push({ p, n, gap })
-          break
+    ctx.bodies.forEach((body, b) => {
+      if (body.band !== k) return
+      const contacts: Contact[] = []
+      for (const { p, n } of nearbySamples(body, x, y)) {
+        for (const gap of GAP_PROBES) {
+          const r = setup.clearance + gap
+          const q = { x: p.x + n.x * r, y: p.y + n.y * r }
+          if (inCell(q) && contains(section, q)) {
+            contacts.push({ p, n, gap })
+            break
+          }
         }
       }
-    }
-    if (contacts.length * SAMPLE_STEP >= MIN_CONTACT) {
-      touches.push(layer.layerId)
-      blocked.set(k, blockedBy(layer, contacts, setup.clearance))
-      topBand = k
-    }
+      if (contacts.length * SAMPLE_STEP >= MIN_CONTACT) {
+        blocked.set(b, blockedBy(body.piece, contacts, setup.clearance))
+        if (!touches.includes(layers[k].layerId)) touches.push(layers[k].layerId)
+        topBand = k
+      }
+    })
   }
 
   // Stop at the highest layer held; a placed pillar holding nothing keeps
@@ -278,12 +292,13 @@ function printable(region: Region, minWall: number): boolean {
   return !isEmpty(offset(region, -minWall / 2), 1e-3)
 }
 
+/** Blocked motion directions per body, from all given pillars. */
 function lockStatus(ctx: Context, pillars: PillarInfo[]): Uint8Array[] {
-  return ctx.layers.map((_, k) => {
+  return ctx.bodies.map((_, b) => {
     const bits = new Uint8Array(DIRECTIONS.length)
     for (const p of pillars) {
-      const b = p.blocked.get(k)
-      if (b) orInto(bits, b)
+      const blocked = p.blocked.get(b)
+      if (blocked) orInto(bits, blocked)
     }
     return bits
   })
@@ -292,7 +307,7 @@ function lockStatus(ctx: Context, pillars: PillarInfo[]): Uint8Array[] {
 /**
  * Greedily add pillars until every layer is locked: each step takes the
  * candidate that blocks the most still-free motions (summed over layers)
- * for the least plastic, skipping cells next to existing pillars.
+ * for the least plastic, preferring cells away from existing pillars.
  */
 function suggestPillars(
   ctx: Context,
@@ -306,7 +321,7 @@ function suggestPillars(
     for (let x = rect.minX - PILLAR_MARGIN; x <= rect.maxX + PILLAR_MARGIN; x++) {
       if (taken.has(`${x},${y}`)) continue
       // Only cells next to some outline can hold anything
-      if (!ctx.layers.some((_, k) => nearbySamples(ctx, k, x, y).length > 0)) continue
+      if (!ctx.bodies.some((body) => nearbySamples(body, x, y).length > 0)) continue
       const info = analyzePillar(ctx, x, y, false)
       if (info.topBand >= 0) candidates.push(info)
     }
@@ -330,13 +345,18 @@ function suggestPillars(
     return g
   }
 
-  for (let iter = 0; iter < 60; iter++) {
+  for (let iter = 0; iter < 200; iter++) {
     if (state.every((s) => countBits(s) / D >= LOCKED_FRACTION)) break
     let best: PillarInfo | null = null
-    let bestScore = 0.01
+    let bestScore = 0
     for (const c of candidates) {
-      if (placed.some((p) => near(p, c)) || chosen.some((p) => near(p, c))) continue
-      const score = gain(c) - 0.01 * (c.volume / cellVolume)
+      const g = gain(c)
+      if (g < 2 / D) continue
+      // Neighbouring pillars are allowed (corners often need one next to a
+      // side pillar) but spread-out ones are preferred
+      const crowded = placed.some((p) => near(p, c)) || chosen.some((p) => near(p, c))
+      // Plastic and crowding only break ties between similar gains
+      const score = g - 0.003 * (c.volume / cellVolume) - (crowded ? 0.01 : 0)
       if (score > bestScore) {
         best = c
         bestScore = score
@@ -522,14 +542,24 @@ export function analyzeRig(inputs: RigInputs): RigAnalysis {
   const suggestedPillars = suggestPillars(ctx, inputs.rect, pillars)
 
   const state = lockStatus(ctx, pillars)
+  const fraction = (b: number) => countBits(state[b]) / DIRECTIONS.length
   const locks: LayerLockStatus[] = ctx.layers.map((layer, k) => {
-    const blockedFraction = countBits(state[k]) / DIRECTIONS.length
+    const own = ctx.bodies.map((_, b) => b).filter((b) => ctx.bodies[b].band === k)
+    const lockedPieces = own.filter((b) => fraction(b) >= LOCKED_FRACTION).length
     return {
       layerId: layer.layerId,
-      blockedFraction,
-      locked: blockedFraction >= LOCKED_FRACTION,
+      blockedFraction: Math.min(1, ...own.map(fraction)),
+      locked: lockedPieces === own.length,
+      pieces: own.length,
+      lockedPieces,
     }
   })
+  const loosePieces = ctx.bodies
+    .filter((_, b) => fraction(b) < LOCKED_FRACTION)
+    .map((body) => ({
+      layerId: ctx.layers[body.band].layerId,
+      footprint: body.piece.footprint,
+    }))
 
   const interfaces = glueInterfaces(ctx.layers)
   const ids = new Set(interfaces.map((i) => i.layerId))
@@ -551,6 +581,7 @@ export function analyzeRig(inputs: RigInputs): RigAnalysis {
     pillars,
     suggestedPillars,
     locks,
+    loosePieces,
     interfaces,
     glueSpots,
     suggestedGlueSpots,

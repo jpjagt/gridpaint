@@ -38,7 +38,7 @@ describe("layerFootprint", () => {
       false,
     )
     expect(ls.map((l) => l.layerId)).toEqual([2, 1])
-    for (const { p, n } of ls[1].samples) {
+    for (const { p, n } of ls[1].pieces[0].samples) {
       expect(contains(ls[1].footprint, { x: p.x + n.x * 0.05, y: p.y + n.y * 0.05 })).toBe(false)
       expect(contains(ls[1].footprint, { x: p.x - n.x * 0.05, y: p.y - n.y * 0.05 })).toBe(true)
     }
