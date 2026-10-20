@@ -2,6 +2,7 @@ import { useStore } from "@nanostores/react"
 import { $exportRects } from "@/stores/drawingStores"
 import type { CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
+import { ThicknessPicker } from "@/components/ThicknessPicker"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
@@ -139,6 +140,11 @@ function QuantityInput({
             @{rect.customMmPerUnit}mm
           </span>
         )}
+        {rect.customThickness && rect.customThickness > 0 && (
+          <span className='text-[10px] text-muted-foreground/60 font-mono'>
+            ↕{rect.customThickness}mm
+          </span>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -192,6 +198,24 @@ function QuantityInput({
                 />
                 <span className='text-[10px] text-muted-foreground font-mono'>mm</span>
               </div>
+            </div>
+            <div className='px-2 py-1.5'>
+              <div className='text-[10px] text-muted-foreground font-mono mb-1'>
+                Thickness (mm)
+              </div>
+              <ThicknessPicker
+                value={rect.customThickness}
+                defaultLabel='default'
+                onChange={(t) =>
+                  $exportRects.set(
+                    $exportRects
+                      .get()
+                      .map((r) =>
+                        r.id === rect.id ? { ...r, customThickness: t } : r,
+                      ),
+                  )
+                }
+              />
             </div>
           </DropdownMenuContent>
         </DropdownMenu>

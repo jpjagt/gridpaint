@@ -40,8 +40,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
-import { LAYER_THICKNESS_OPTIONS, type LayerThickness } from "@/lib/threejs"
-import { CustomThicknessInput } from "@/components/CustomThicknessInput"
+import { resolveRectThickness } from "@/lib/export/rectSettings"
+import { ThicknessPicker } from "@/components/ThicknessPicker"
 
 // 3×3 grid layout: rows top→bottom, cols left→right
 const ANCHOR_GRID: { id: CutoutAnchor; label: string }[][] = [
@@ -286,7 +286,10 @@ function ExportOptions({
   const [model3dOpen, setModel3dOpen] = useState(false)
 
   // 3D export options
-  const [layerThickness, setLayerThickness] = useState<LayerThickness>(1)
+  // Thickness is the drawing-wide setting; rects may override it
+  const layerThickness = canvasView.layerThickness
+  const setLayerThickness = (t: number) =>
+    $canvasView.setKey("layerThickness", t)
   const [reverseLayers, setReverseLayers] = useState(false)
   const [includeCutouts, setIncludeCutouts] = useState(true)
 
@@ -323,7 +326,7 @@ function ExportOptions({
         layers: visibleLayers,
         exportRect: rect,
         canvasView,
-        layerThickness,
+        layerThickness: resolveRectThickness(rect, layerThickness),
         reverseLayers,
         includeCutouts,
         fileName,
@@ -369,6 +372,9 @@ function ExportOptions({
     if (rect.customMmPerUnit && rect.customMmPerUnit > 0) {
       parts.push(`@${rect.customMmPerUnit}mm`)
     }
+    if (rect.customThickness && rect.customThickness > 0) {
+      parts.push(`${rect.customThickness}mm thick`)
+    }
     return parts.join(" ")
   }
 
@@ -381,27 +387,10 @@ function ExportOptions({
             <span className='text-xs text-muted-foreground font-mono'>
               Thickness:
             </span>
-            <div className='flex gap-0.5'>
-              {LAYER_THICKNESS_OPTIONS.map((t) => (
-                <button
-                  key={t}
-                  type='button'
-                  onClick={() => setLayerThickness(t)}
-                  className={cn(
-                    "text-xs font-mono px-2 py-1 rounded transition-colors",
-                    layerThickness === t
-                      ? "bg-foreground text-background"
-                      : "bg-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t}mm
-                </button>
-              ))}
-              <CustomThicknessInput
-                thickness={layerThickness}
-                onThicknessChange={setLayerThickness}
-              />
-            </div>
+            <ThicknessPicker
+              value={layerThickness}
+              onChange={(t) => t && setLayerThickness(t)}
+            />
 
             <div className='w-px h-4 bg-border' />
 
@@ -597,8 +586,6 @@ function ExportOptions({
           layers={layers}
           canvasView={canvasView}
           drawingName={drawingName}
-          layerThickness={layerThickness}
-          onLayerThicknessChange={setLayerThickness}
           reverseLayers={reverseLayers}
           onReverseLayersChange={setReverseLayers}
           includeCutouts={includeCutouts}

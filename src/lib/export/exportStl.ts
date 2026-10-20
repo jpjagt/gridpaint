@@ -17,6 +17,7 @@ import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js"
 import { createLayeredModel, type LayerThickness } from "@/lib/threejs"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
+import { resolveRectMmPerUnit } from "@/lib/export/rectSettings"
 
 export interface ExportStlOptions {
   layers: Layer[]
@@ -62,10 +63,10 @@ export function exportStl(options: ExportStlOptions): boolean {
     customMmPerUnit: mmPerUnitForStl,
   }
 
-  const effectiveMmPerUnit =
-    exportRect.customMmPerUnit && exportRect.customMmPerUnit > 0
-      ? exportRect.customMmPerUnit
-      : canvasView.mmPerUnit
+  const effectiveMmPerUnit = resolveRectMmPerUnit(
+    exportRect,
+    canvasView.mmPerUnit,
+  )
 
   // The SVG content generated internally uses subgrid coordinates, which are
   // already in physical mm via mmPerUnit. We scale the geometry post-hoc so

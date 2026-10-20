@@ -183,6 +183,8 @@ export interface ExportRect {
   name?: string
   /** Optional override for mm per unit. Undefined/0 means use global canvasView.mmPerUnit */
   customMmPerUnit?: number
+  /** Optional override for layer thickness in mm. Undefined/0 means use global canvasView.layerThickness */
+  customThickness?: number
 }
 
 // === Validation ===

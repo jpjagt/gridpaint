@@ -17,7 +17,8 @@ import { CameraSyncGroup } from "@/lib/threejs"
 import { cn } from "@/lib/utils"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
-import type { LayerThickness } from "@/lib/threejs"
+import { setThicknessForRect } from "@/stores/drawingStores"
+import { resolveRectThickness } from "@/lib/export/rectSettings"
 
 const MAX_PREVIEW_RECTS = 3
 
@@ -29,9 +30,6 @@ interface ModelViewerModalProps {
   layers: Layer[]
   canvasView: CanvasViewState
   drawingName?: string
-  /** Controlled layer thickness. When provided, the in-modal thickness picker is hidden. */
-  layerThickness?: LayerThickness
-  onLayerThicknessChange?: (t: LayerThickness) => void
   /** Controlled mirror/reverse-layers. When provided, the in-modal checkbox is hidden. */
   reverseLayers?: boolean
   onReverseLayersChange?: (v: boolean) => void
@@ -49,27 +47,17 @@ export function ModelViewerModal({
   exportRects,
   layers,
   canvasView,
-  layerThickness: layerThicknessProp,
-  onLayerThicknessChange,
   reverseLayers: reverseLayersProp,
   onReverseLayersChange,
   includeCutouts = true,
 }: ModelViewerModalProps) {
-  const [layerThicknessInternal, setLayerThicknessInternal] =
-    useState<LayerThickness>(1)
   const [reverseLayersInternal, setReverseLayersInternal] = useState(false)
   const [syncCameras, setSyncCameras] = useState(false)
   const [cameraSyncGroup] = useState(() => new CameraSyncGroup())
 
-  const isControlled =
-    layerThicknessProp !== undefined || reverseLayersProp !== undefined
-  const layerThickness = layerThicknessProp ?? layerThicknessInternal
+  const isControlled = reverseLayersProp !== undefined
   const reverseLayers = reverseLayersProp ?? reverseLayersInternal
 
-  const setLayerThickness = (t: LayerThickness) => {
-    setLayerThicknessInternal(t)
-    onLayerThicknessChange?.(t)
-  }
   const setReverseLayers = (v: boolean) => {
     setReverseLayersInternal(v)
     onReverseLayersChange?.(v)
@@ -157,9 +145,14 @@ export function ModelViewerModal({
                     layers={visibleLayers}
                     exportRect={rect}
                     canvasView={canvasView}
-                    layerThickness={layerThickness}
+                    layerThickness={resolveRectThickness(
+                      rect,
+                      canvasView.layerThickness,
+                    )}
                     onThicknessChange={
-                      isControlled ? undefined : setLayerThickness
+                      isControlled
+                        ? undefined
+                        : (t) => setThicknessForRect(rect.id, t)
                     }
                     reverseLayers={reverseLayers}
                     onReverseLayersChange={

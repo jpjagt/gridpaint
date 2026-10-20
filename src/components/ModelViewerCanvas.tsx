@@ -20,6 +20,7 @@ import {
 import { CustomThicknessInput } from "@/components/CustomThicknessInput"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
+import { resolveRectMmPerUnit } from "@/lib/export/rectSettings"
 
 interface ModelViewerCanvasProps {
   layers: Layer[]
@@ -53,10 +54,10 @@ export function ModelViewerCanvas({
   const [setup, setSetup] = useState<SceneSetup | null>(null)
   const modelGroupRef = useRef<THREE.Group | null>(null)
 
-  const effectiveMmPerUnit =
-    exportRect.customMmPerUnit && exportRect.customMmPerUnit > 0
-      ? exportRect.customMmPerUnit
-      : canvasView.mmPerUnit
+  const effectiveMmPerUnit = resolveRectMmPerUnit(
+    exportRect,
+    canvasView.mmPerUnit,
+  )
   // Read by the model build without making thickness a rebuild trigger
   const thicknessRef = useRef(layerThickness)
   thicknessRef.current = layerThickness

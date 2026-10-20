@@ -27,11 +27,13 @@ import { TileMeshBuilder } from "./tileMesher"
 import type { Layer, CanvasViewState } from "@/stores/drawingStores"
 import type { ExportRect } from "@/types/gridpaint"
 import type { LayeredModelLayerInfo, LayerMeshPlan } from "@/types/threejs"
+import { resolveRectMmPerUnit } from "@/lib/export/rectSettings"
+import { LAYER_THICKNESS_PRESETS } from "@/lib/constants"
 
 /** Layer thickness in mm. Any positive value; presets below are shortcuts. */
 export type LayerThickness = number
 
-export const LAYER_THICKNESS_OPTIONS: LayerThickness[] = [0.5, 1, 1.5, 2.0]
+export const LAYER_THICKNESS_OPTIONS: LayerThickness[] = LAYER_THICKNESS_PRESETS
 
 export interface LayeredModelOptions {
   layers: Layer[]
@@ -65,10 +67,7 @@ export function createLayeredModel(
   } = options
   const { gridSize, borderWidth, mmPerUnit } = canvasView
 
-  const effectiveMmPerUnit =
-    exportRect.customMmPerUnit && exportRect.customMmPerUnit > 0
-      ? exportRect.customMmPerUnit
-      : mmPerUnit
+  const effectiveMmPerUnit = resolveRectMmPerUnit(exportRect, mmPerUnit)
 
   const visibleLayers = layers.filter((l) => l.isVisible)
 

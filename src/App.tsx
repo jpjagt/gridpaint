@@ -109,6 +109,8 @@ function EditorPage() {
         }}
         onHome={() => navigate("/")}
         mmPerUnit={canvasView.mmPerUnit}
+        layerThickness={canvasView.layerThickness}
+        onLayerThicknessChange={(t) => $canvasView.setKey("layerThickness", t)}
         showMeasuringBars={showMeasuringBars}
         onToggleMeasuringBars={() => setShowMeasuringBars((v) => !v)}
         onShowShortcuts={() => setShowShortcuts(true)}

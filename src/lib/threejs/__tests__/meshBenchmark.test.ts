@@ -56,6 +56,7 @@ const canvasView: CanvasViewState = {
   panOffset: { x: 0, y: 0 },
   zoom: 1,
   mmPerUnit: 1,
+  layerThickness: 1,
   layerRange: DEFAULT_LAYER_RANGE,
 }
 const exportRect = { id: "r", minX: 0, minY: 0, maxX: 99, maxY: 99, quantity: 1 }

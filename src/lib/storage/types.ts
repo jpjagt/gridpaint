@@ -76,6 +76,8 @@ export interface DrawingDocument extends DrawingMetadata {
   zoom: number
   /** How many millimeters each grid unit represents */
   mmPerUnit: number
+  /** Metal thickness per layer in mm. Absent ⇒ DEFAULT_LAYER_THICKNESS. */
+  layerThickness?: number
   /** Configurable inclusive range of selectable layer ids. Absent ⇒ default 1..6. */
   layerRange?: LayerRange
   /** All layers in this drawing */

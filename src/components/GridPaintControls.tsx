@@ -15,6 +15,7 @@ import {
   Settings,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ModeToggle"
+import { ThicknessPicker } from "@/components/ThicknessPicker"
 import { $syncStatus, $authState } from "@/stores/authStores"
 import { $history, undo, redo } from "@/stores/historyStore"
 
@@ -23,6 +24,9 @@ interface GridPaintControlsProps {
   onGridSizeChange: (operation: "+" | "-") => void
   onBorderWidthChange: (width: number) => void
   onMmPerUnitChange: (mmPerUnit: number) => void
+  /** Drawing-wide metal thickness (mm) */
+  layerThickness: number
+  onLayerThicknessChange: (thickness: number) => void
   /** Current drawing title */
   name: string
   /** Callback when title is edited */
@@ -46,6 +50,8 @@ export const GridPaintControls = ({
   onGridSizeChange,
   onBorderWidthChange,
   onMmPerUnitChange,
+  layerThickness,
+  onLayerThicknessChange,
   name,
   onNameChange,
   onHome,
@@ -188,6 +194,17 @@ export const GridPaintControls = ({
         >
           <Minus className='w-4 h-4' />
         </Button>
+
+        {/* Metal thickness */}
+        <div
+          className='bg-white/10 backdrop-blur-sm rounded-md px-1 py-0.5'
+          title='Metal thickness per layer (mm)'
+        >
+          <ThicknessPicker
+            value={layerThickness}
+            onChange={(t) => t && onLayerThicknessChange(t)}
+          />
+        </div>
 
         {/* Physical size control */}
         <div className='bg-white/10 backdrop-blur-sm rounded-md px-2 py-1 flex items-center gap-1'>

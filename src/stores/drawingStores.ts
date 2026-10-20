@@ -1,7 +1,7 @@
 import { atom, map } from "nanostores"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingDocument } from "@/lib/storage/types"
-import { DEFAULT_MM_PER_UNIT } from "@/lib/constants"
+import { DEFAULT_MM_PER_UNIT, DEFAULT_LAYER_THICKNESS } from "@/lib/constants"
 import type {
   InteractionGroup,
   PointModifications,
@@ -42,6 +42,7 @@ export interface CanvasViewState {
   panOffset: { x: number; y: number }
   zoom: number
   mmPerUnit: number // How many millimeters each grid unit represents
+  layerThickness: number // Metal sheet thickness in mm (3D preview, STL, rig)
   layerRange: LayerRange // Inclusive range of selectable layer ids
 }
 
@@ -74,6 +75,7 @@ export const $canvasView = map<CanvasViewState>({
   panOffset: { x: 0, y: 0 },
   zoom: 1,
   mmPerUnit: DEFAULT_MM_PER_UNIT,
+  layerThickness: DEFAULT_LAYER_THICKNESS,
   layerRange: DEFAULT_LAYER_RANGE,
 })
 
@@ -95,6 +97,24 @@ export const $exportFormat = atom<ExportFormat>("svg")
 
 /** IDs of selected export rects for export. Empty set = all rects selected. */
 export const $selectedExportRectIds = atom<Set<string>>(new Set())
+
+/**
+ * Set the thickness that applies to a rect: its own override when it has
+ * one, otherwise the drawing-wide thickness.
+ */
+export function setThicknessForRect(rectId: string, thickness: number): void {
+  if (!(thickness > 0)) return
+  const rect = $exportRects.get().find((r) => r.id === rectId)
+  if (rect?.customThickness && rect.customThickness > 0) {
+    $exportRects.set(
+      $exportRects
+        .get()
+        .map((r) => (r.id === rectId ? { ...r, customThickness: thickness } : r)),
+    )
+  } else {
+    $canvasView.setKey("layerThickness", thickness)
+  }
+}
 
 /** Toggle selection of a single export rect */
 export function toggleExportRectSelection(id: string): void {
@@ -175,6 +195,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         panOffset: stored.panOffset,
         zoom: stored.zoom,
         mmPerUnit: stored.mmPerUnit || DEFAULT_MM_PER_UNIT, // Default for legacy drawings
+        layerThickness: stored.layerThickness || DEFAULT_LAYER_THICKNESS,
         layerRange: stored.layerRange ?? DEFAULT_LAYER_RANGE,
       })
 
@@ -205,6 +226,7 @@ export async function initializeDrawingState(drawingId: string): Promise<void> {
         panOffset: { x: 0, y: 0 },
         zoom: 1,
         mmPerUnit: DEFAULT_MM_PER_UNIT,
+        layerThickness: DEFAULT_LAYER_THICKNESS,
         layerRange: DEFAULT_LAYER_RANGE,
       })
 
@@ -540,6 +562,7 @@ export function resetDrawing(): void {
     panOffset: { x: 0, y: 0 },
     zoom: 1,
     mmPerUnit: DEFAULT_MM_PER_UNIT,
+    layerThickness: DEFAULT_LAYER_THICKNESS,
     layerRange: DEFAULT_LAYER_RANGE,
   })
 }
