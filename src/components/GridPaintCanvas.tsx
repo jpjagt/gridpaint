@@ -135,8 +135,12 @@ export const GridPaintCanvas = forwardRef<
   // ref before it was attached and register null). Keeps canvasRef.current in
   // sync for the rest of the component, and registers the element so the save
   // path can capture gallery thumbnails.
+  // The element is also state, so listener effects re-attach whenever the
+  // canvas mounts (it only appears once the drawing has loaded)
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const setCanvasRef = useCallback((el: HTMLCanvasElement | null) => {
     canvasRef.current = el
+    setCanvasEl(el)
     registerThumbnailCanvas(el)
   }, [])
 
@@ -149,7 +153,10 @@ export const GridPaintCanvas = forwardRef<
   const [renderer, setRenderer] = useState<Canvas2DRenderer | null>(null)
 
   // Interaction state
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  // Last pointer position of a pan drag. A ref, not state: several mousemoves
+  // can arrive before a re-render, and a stale start re-applies old deltas
+  // (the drag would run ahead of the cursor)
+  const panLastRef = useRef({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [lastPaintCoords, setLastPaintCoords] = useState<{
     x: number
@@ -796,17 +803,16 @@ export const GridPaintCanvas = forwardRef<
       getLayerStyle,
     )
 
-    // Active group outline: 2px on screen, thinning once cells get small so a
-    // zoomed-out drawing isn't buried under its own outline
+    // Active group outline: 2 world units wide, so it scales with zoom (thin
+    // when zoomed out) like the original per-cell outline
     if (activeOutline && renderer.context) {
       const ctx = renderer.context
       const scale = canvasView.zoom * activeOutline.scale
-      const cellPx = canvasView.gridSize * scale
       ctx.save()
       ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
       ctx.scale(scale, scale)
       ctx.strokeStyle = getCanvasColor("--canvas-outline-active")
-      ctx.lineWidth = Math.min(2, cellPx * 0.06) / scale
+      ctx.lineWidth = 2 / activeOutline.scale
       ctx.lineCap = "round"
       ctx.lineJoin = "round"
       ctx.stroke(activeOutline.path)
@@ -1245,7 +1251,7 @@ export const GridPaintCanvas = forwardRef<
 
   // Mouse interaction handlers
   useEffect(() => {
-    const canvas = canvasRef.current
+    const canvas = canvasEl
     if (!canvas) return
 
     const handleContextMenu = (e: MouseEvent) => {
@@ -1257,7 +1263,7 @@ export const GridPaintCanvas = forwardRef<
       const isInvertHeld = e.altKey || e.button === 2
 
       if (currentTool === "pan") {
-        setPanStart({ x: e.clientX, y: e.clientY })
+        panLastRef.current = { x: e.clientX, y: e.clientY }
       } else if (currentTool === "select") {
         const grid = getGridCoordinates(e.clientX, e.clientY)
         const fp = $selectionState.get().floatingPaste
@@ -1388,15 +1394,15 @@ export const GridPaintCanvas = forwardRef<
         const isInvertHeld = e.altKey || !!(e.buttons & 2)
 
         if (currentTool === "pan") {
-          const deltaX = e.clientX - panStart.x
-          const deltaY = e.clientY - panStart.y
+          const deltaX = e.clientX - panLastRef.current.x
+          const deltaY = e.clientY - panLastRef.current.y
           const currentCanvasView = $canvasView.get()
 
           $canvasView.setKey("panOffset", {
             x: currentCanvasView.panOffset.x + deltaX,
             y: currentCanvasView.panOffset.y + deltaY,
           })
-          setPanStart({ x: e.clientX, y: e.clientY })
+          panLastRef.current = { x: e.clientX, y: e.clientY }
         } else if (currentTool === "select") {
           if (moveDragStartRef.current) {
             // Moving a floating paste via drag — compute delta from last grid cell
@@ -1557,8 +1563,8 @@ export const GridPaintCanvas = forwardRef<
     handleOverrideClick,
     currentTool,
     isDragging,
-    panStart,
     lastPaintCoords,
+    canvasEl,
     selection.startSelection,
     selection.updateSelection,
     selection.hasSelection,
@@ -1576,31 +1582,28 @@ export const GridPaintCanvas = forwardRef<
     exportRectsHook.isDrawing,
   ])
 
-  // Wheel event handler for zoom/pan (same as original)
+  // Wheel/trackpad: ctrl (pinch) zooms toward the cursor, otherwise pans.
+  // Reads the view from the store, not the render closure: several wheel
+  // events can arrive before React re-renders.
   useEffect(() => {
-    const canvas = canvasRef.current
+    const canvas = canvasEl
     if (!canvas) return
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
+      const view = $canvasView.get()
 
       if (e.ctrlKey) {
-        // Zoom gesture
         const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
-        const currentZoom = canvasView.zoom
-        const newZoom = Math.max(
-          0.005,
-          Math.min(15.0, currentZoom * zoomFactor),
-        )
+        const newZoom = Math.max(0.005, Math.min(15.0, view.zoom * zoomFactor))
 
-        // Zoom towards mouse position
         const rect = canvas.getBoundingClientRect()
         const mouseX = e.clientX - rect.left
         const mouseY = e.clientY - rect.top
 
-        // Calculate world position at mouse before zoom
-        const worldX = (mouseX - canvasView.panOffset.x) / currentZoom
-        const worldY = (mouseY - canvasView.panOffset.y) / currentZoom
+        // Keep the world point under the cursor fixed
+        const worldX = (mouseX - view.panOffset.x) / view.zoom
+        const worldY = (mouseY - view.panOffset.y) / view.zoom
 
         $canvasView.setKey("zoom", newZoom)
         $canvasView.setKey("panOffset", {
@@ -1608,21 +1611,16 @@ export const GridPaintCanvas = forwardRef<
           y: mouseY - worldY * newZoom,
         })
       } else {
-        // Pan gesture (two-finger scroll)
-        const currentCanvasView = $canvasView.get()
         $canvasView.setKey("panOffset", {
-          x: currentCanvasView.panOffset.x - e.deltaX,
-          y: currentCanvasView.panOffset.y - e.deltaY,
+          x: view.panOffset.x - e.deltaX,
+          y: view.panOffset.y - e.deltaY,
         })
       }
     }
 
     canvas.addEventListener("wheel", handleWheel, { passive: false })
-
-    return () => {
-      canvas.removeEventListener("wheel", handleWheel)
-    }
-  }, [canvasView])
+    return () => canvas.removeEventListener("wheel", handleWheel)
+  }, [canvasEl])
 
   // Clear transient shape-tool drag state when leaving the shape tool, so a
   // stale rubber-band or resize gesture never persists into another tool.

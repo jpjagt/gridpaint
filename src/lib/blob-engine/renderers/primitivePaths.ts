@@ -103,14 +103,14 @@ export function appendPrimitivePath(
         move(0, 0)
         line(s, 0)
         line(s, s)
-        quarter(s, s, 0, 0, 0, s)
+        quarter(s, s, 0, 0, s, 0)
       } else if (rel === 2) {
         move(s, s)
         line(0, s)
         quarter(0, s, s, 0, s, s)
       } else {
         move(0, 0)
-        quarter(0, 0, s, s, s, 0)
+        quarter(0, 0, s, s, 0, s)
         line(0, s)
       }
       sink.closePath()
@@ -125,7 +125,7 @@ export function appendPrimitivePath(
         quarter(0, s, s, 0, 0, 0)
       } else if (rel === 1) {
         move(0, 0)
-        quarter(0, 0, s, s, 0, s)
+        quarter(0, 0, s, s, s, 0)
         line(0, s)
       } else if (rel === 2) {
         move(0, 0)
@@ -133,7 +133,7 @@ export function appendPrimitivePath(
         quarter(s, 0, 0, s, s, s)
       } else {
         move(s, s)
-        quarter(s, s, 0, 0, s, 0)
+        quarter(s, s, 0, 0, 0, s)
         line(s, 0)
       }
       sink.closePath()

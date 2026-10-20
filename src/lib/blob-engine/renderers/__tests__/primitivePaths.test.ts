@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest"
 import type { BlobPrimitive, Quadrant } from "@/lib/blob-engine/types"
 import { appendPrimitivePath } from "@/lib/blob-engine/renderers/primitivePaths"
 import type { PathSink } from "@/lib/blob-engine/types"
+import { primitiveToEdges } from "@/lib/blob-engine/renderers/SvgPathRenderer"
 
 const GRID_SIZE = 50
 const S = GRID_SIZE / 2
@@ -374,3 +375,34 @@ describe("placement", () => {
 function polyKey(polygon: Pt[]): string {
   return polygon.map(([x, y]) => `${x.toFixed(6)},${y.toFixed(6)}`).join("|")
 }
+
+describe("agreement with the SVG export", () => {
+  it("every arc bulges the same way as the export's arc (same circle center)", () => {
+    // A quarter arc between two fixed endpoints with axis-aligned tangents has
+    // two possible centers (it can bulge either way); endpoint and tangent
+    // checks can't tell them apart, so compare centers with primitiveToEdges.
+    const world = (v2: number) => (v2 / 2 + 0.5) * GRID_SIZE
+    for (const type of ["roundedCorner", "diagonalBridge"] as const) {
+      for (const q of [0, 1, 2, 3] as Quadrant[]) {
+        for (const rq of [0, 1, 2, 3] as Quadrant[]) {
+          const primitive = makePrimitive(type, q, rq, { x: 2, y: -1 })
+          const centers: string[] = []
+          const sink: PathSink = {
+            moveTo() {},
+            lineTo() {},
+            bezierCurveTo() {},
+            closePath() {},
+            arc(cx, cy) {
+              centers.push(`${cx},${cy}`)
+            },
+          }
+          appendPrimitivePath(sink, primitive, GRID_SIZE)
+          const expected = primitiveToEdges(primitive)
+            .filter((e) => e.kind === "arc")
+            .map((e) => (e.kind === "arc" ? `${world(e.center.x2)},${world(e.center.y2)}` : ""))
+          expect(centers, `${type} q=${q} rq=${rq}`).toEqual(expected)
+        }
+      }
+    }
+  })
+})
