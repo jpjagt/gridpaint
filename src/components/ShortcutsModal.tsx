@@ -118,11 +118,22 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
           <Section title={`Cutout Tool (${TOOL_KEYS.cutout})`}>
             <KbdRow keys={["I", "O", "K", "L"]} description="Anchor: NW, NE, SW, SE corner (laid out like the corners)" />
+            <KbdRow keys={FULL_KEY} description="Anchor: center" />
             <KbdRow keys="click" description="Place circle, or set first / second pill center" />
             <KbdRow keys="Escape" description="Cancel unfinished pill" />
             <KbdRow keys={["shift", "click"]} description="Add cutout to all layers with point" />
             <KbdRow keys={["alt", "click"]} description="Remove hovered cutout from active layer" />
             <KbdRow keys={["alt", "shift", "click"]} description="Clear all cutouts at point from all layers" />
+          </Section>
+
+          <Section title={`Shape Tool (${TOOL_KEYS.shape})`}>
+            <KbdRow keys={TOOL_KEYS.shape} description="Again: switch rectangle / ellipse" />
+            <KbdRow keys={FULL_KEY} description="Switch fill / edge" />
+          </Section>
+
+          <Section title={`Export Tool (${TOOL_KEYS.export})`}>
+            <KbdRow keys="drag" description="Draw an export rect (a click alone does nothing)" />
+            <KbdRow keys="Escape" description="Cancel the rect being drawn" />
           </Section>
 
           <Section title={`Override Tool (${TOOL_KEYS.override})`}>

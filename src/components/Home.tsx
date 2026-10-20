@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { drawingStore } from "@/lib/storage/store"
 import type { DrawingMetadata } from "@/lib/storage/types"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Trash2, Download, User, Footprints } from "lucide-react"
 import { ImportDrawingDialog } from "@/components/ImportDrawingDialog"
@@ -291,29 +301,30 @@ export default function Home() {
       )}
 
       {/* Delete confirmation dialog */}
-      {deleteDialogId && (
-        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
-          <div className='bg-card text-card-foreground rounded-lg p-6 max-w-sm mx-4 border border-border'>
-            <h3 className='text-lg font-semibold mb-3'>delete grid</h3>
-            <p className='text-muted-foreground mb-4'>
+      <AlertDialog
+        open={deleteDialogId !== null}
+        onOpenChange={(open) => !open && setDeleteDialogId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>delete grid</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you sure you want to delete "
               {drawings.find((d) => d.id === deleteDialogId)?.name}"? This
               action cannot be undone.
-            </p>
-            <div className='flex gap-3 justify-end'>
-              <Button variant='outline' onClick={() => setDeleteDialogId(null)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => handleDelete(deleteDialogId)}
-                className='bg-red-600 hover:bg-red-700'
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDialogId && handleDelete(deleteDialogId)}
+              className={buttonVariants({ variant: "destructive" })}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Import drawing dialog */}
       <ImportDrawingDialog

@@ -66,14 +66,20 @@ export function overrideShapeForKey(e: KeyboardEvent): QuadrantState | null {
   return `${e.shiftKey ? "concave" : "convex"}-${corner}`
 }
 
-/** Cutout anchor for a keydown (corners only), or null */
+/**
+ * Cutout anchor for a keydown, or null: corners on I O K L, and F (the whole
+ * cell, as in the override tool) for the centre
+ */
 export function cutoutAnchorForKey(e: KeyboardEvent): CutoutAnchor | null {
   if (e.shiftKey) return null
-  return QUADRANT_KEYS[e.key.toUpperCase() as keyof typeof QUADRANT_KEYS] ?? null
+  const key = e.key.toUpperCase()
+  if (key === FULL_KEY) return "center"
+  return QUADRANT_KEYS[key as keyof typeof QUADRANT_KEYS] ?? null
 }
 
 /** Display label for a cutout anchor's key, if it has one */
 export function cutoutAnchorKeyLabel(anchor: CutoutAnchor): string | null {
+  if (anchor === "center") return FULL_KEY
   const entry = Object.entries(QUADRANT_KEYS).find(([, c]) => c === anchor)
   return entry ? entry[0] : null
 }

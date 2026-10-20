@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   $canvasView,
   $layersState,
@@ -145,7 +145,7 @@ export function DrawingSettingsModal({
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}
-                    className="bg-red-600 hover:bg-red-700"
+                    className={buttonVariants({ variant: "destructive" })}
                   >
                     Delete
                   </AlertDialogAction>

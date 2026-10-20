@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   $currentTool,
   $cutoutToolSettings,
@@ -27,6 +27,8 @@ import {
 import type { CutoutAnchor, CutoutToolSettings, ExportRect, QuadrantState } from "@/types/gridpaint"
 import { Button } from "@/components/ui/button"
 import {
+  FULL_KEY,
+  TOOL_KEYS,
   cutoutAnchorForKey,
   cutoutAnchorKeyLabel,
   isIgnorableKeyEvent,
@@ -430,7 +432,7 @@ function ExportOptions({
                 onClick={() => $exportFormat.set(f)}
                 disabled={isFormatDisabled}
                 className={cn(
-                  "text-xs font-mono px-2 py-1 transition-colors",
+                  "text-xs font-mono px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                   isFormatDisabled && "opacity-30 cursor-not-allowed",
                   !isFormatDisabled && format === f
                     ? "bg-foreground text-background"
@@ -475,7 +477,7 @@ function ExportOptions({
               type='button'
               onClick={() => $exportMode.set(m)}
               className={cn(
-                "text-xs font-mono px-2 py-1 transition-colors",
+                "text-xs font-mono px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 mode === m
                   ? "bg-foreground text-background"
                   : "bg-transparent text-muted-foreground hover:text-foreground",
@@ -660,7 +662,7 @@ function CutoutOptions({
               aria-pressed={settings.shape === shape}
               onClick={() => $cutoutToolSettings.setKey("shape", shape)}
               className={cn(
-                "text-xs font-mono px-2 min-h-10 transition-colors",
+                "text-xs font-mono px-2 min-h-10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 settings.shape === shape
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:text-foreground",
@@ -693,7 +695,7 @@ function CutoutOptions({
                 aria-label={label}
                 aria-pressed={settings.anchor === id}
                 className={cn(
-                  "w-6 h-6 border rounded-sm transition-colors text-[8px] font-mono leading-none",
+                  "w-6 h-6 border rounded-sm transition-colors text-[8px] font-mono leading-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                   settings.anchor === id
                     ? "bg-foreground border-foreground text-background"
                     : "bg-transparent border-border hover:border-foreground/50 text-muted-foreground",
@@ -709,7 +711,7 @@ function CutoutOptions({
           type='button'
           onClick={() => $cutoutToolSettings.setKey("anchor", "custom")}
           className={cn(
-            "text-xs font-mono px-1.5 py-0.5 border rounded-sm transition-colors text-left",
+            "text-xs font-mono px-1.5 py-0.5 border rounded-sm transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             settings.anchor === "custom"
               ? "bg-foreground text-background border-foreground"
               : "bg-transparent text-muted-foreground border-border hover:border-foreground/50",
@@ -761,7 +763,7 @@ function CutoutOptions({
               aria-pressed={settings.sizeUnit === unit}
               onClick={() => $cutoutToolSettings.setKey("sizeUnit", unit)}
               className={cn(
-                "text-xs font-mono px-2 min-h-10 transition-colors",
+                "text-xs font-mono px-2 min-h-10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 settings.sizeUnit === unit
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:text-foreground",
@@ -806,7 +808,7 @@ function CutoutOptions({
               type='button'
               onClick={() => $cutoutToolSettings.setKey("mode", m)}
               className={cn(
-                "text-xs font-mono px-2 py-1 transition-colors",
+                "text-xs font-mono px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 settings.mode === m
                   ? "bg-foreground text-background"
                   : "bg-transparent text-muted-foreground hover:text-foreground",
@@ -890,9 +892,30 @@ function ShapeOptions({ floatingPaste }: { floatingPaste: FloatingPaste | null }
     rebuild({ exponent: n })
   }
 
+  // R (the tool key) again cycles rect/ellipse; F toggles fill/edge.
+  // Capture phase: runs before the global tool handler, so the R press that
+  // switches *into* the shape tool doesn't also toggle the kind.
+  const keyState = useRef({ kind, style, setKind, setStyle })
+  keyState.current = { kind, style, setKind, setStyle }
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isIgnorableKeyEvent(e) || e.shiftKey) return
+      const key = e.key.toUpperCase()
+      const k = keyState.current
+      if (key === TOOL_KEYS.shape && $currentTool.get() === "shape") {
+        k.setKind(k.kind === "rectangle" ? "ellipse" : "rectangle")
+      } else if (key === FULL_KEY) {
+        e.preventDefault()
+        k.setStyle(k.style === "fill" ? "edge" : "fill")
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown, { capture: true })
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true })
+  }, [])
+
   const seg = (active: boolean) =>
     cn(
-      "text-xs font-mono px-2 py-1 transition-colors",
+      "text-xs font-mono px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       active ? "bg-foreground text-background" : "bg-transparent text-muted-foreground hover:text-foreground",
     )
 

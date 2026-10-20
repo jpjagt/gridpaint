@@ -6,7 +6,6 @@ export * from "./types"
 export { BlobEngine } from "./BlobEngine"
 export { NeighborhoodAnalyzer } from "./NeighborhoodAnalyzer"
 export { PrimitiveGenerator } from "./PrimitiveGenerator"
-export { GeometryCache } from "./GeometryCache"
 
 // Renderers
 export { Renderer, RenderUtils } from "./renderers/Renderer"

@@ -42,11 +42,14 @@ import { registerThumbnailCanvas } from "@/lib/storage/thumbnail"
 import { BlobEngine } from "@/lib/blob-engine/BlobEngine"
 import { Canvas2DRenderer } from "@/lib/blob-engine/renderers/Canvas2DRenderer"
 import { TiledLayerGeometry } from "@/lib/blob-engine/TiledLayerGeometry"
+import { quadrantStateToPrimitive } from "@/lib/blob-engine/GroupMerger"
+import { appendPrimitivePath } from "@/lib/blob-engine/renderers/primitivePaths"
 import { TiledOutline } from "@/lib/gridpaint/activeOutline"
 import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 import type {
   CompositeGeometry,
   LayerGeometry,
+  Quadrant,
 } from "@/lib/blob-engine/types"
 
 import { getLayerFillColor } from "@/lib/gridpaint/layerColors"
@@ -73,9 +76,8 @@ import {
   toggleLayerVisibility,
   toggleLayerRenderStyle,
   createOrActivateLayer,
-  updateGroupPoints,
+  applyGroupStroke,
   updatePointModifications,
-  clearPointModifications,
   resetDrawing,
 } from "@/stores/drawingStores"
 import type { Cutout, CutoutDraft, PointModifications, ShapeHandle } from "@/types/gridpaint"
@@ -172,6 +174,14 @@ export const GridPaintCanvas = forwardRef<
     pointKey: string
     index: number
     cutout: Cutout
+  } | null>(null)
+
+  /** Override tool: the quadrant under the cursor, previewed in render() */
+  const overrideHoverRef = useRef<{
+    gridX: number
+    gridY: number
+    quadrant: Quadrant
+    clearing: boolean
   } | null>(null)
 
   const [cutoutDraft, setCutoutDraft] = useState<CutoutDraft | null>(null)
@@ -594,14 +604,6 @@ export const GridPaintCanvas = forwardRef<
             hovered.pointKey,
             hasAnything ? newMods : undefined,
           )
-
-          const [hx, hy] = hovered.pointKey.split(",").map(Number)
-          blobEngine.invalidateLayer(layer.id, {
-            minX: hx - 1,
-            minY: hy - 1,
-            maxX: hx + 1,
-            maxY: hy + 1,
-          })
         })
         hoveredCutoutRef.current = null
         return
@@ -644,14 +646,6 @@ export const GridPaintCanvas = forwardRef<
         )
 
         hoveredCutoutRef.current = null
-
-        const [hx, hy] = hovered.pointKey.split(",").map(Number)
-        blobEngine.invalidateLayer(activeLayerId, {
-          minX: hx - 1,
-          minY: hy - 1,
-          maxX: hx + 1,
-          maxY: hy + 1,
-        })
         return
       }
 
@@ -698,7 +692,6 @@ export const GridPaintCanvas = forwardRef<
           ...existingMods,
           cutouts: [...(existingMods?.cutouts ?? []), newCutout],
         })
-        blobEngine.invalidateLayer(layerId)
       })
       setCutoutDraft(null)
     },
@@ -753,14 +746,6 @@ export const GridPaintCanvas = forwardRef<
         }
         updatePointModifications(activeLayerId, pointKey, newMods)
       }
-
-      // Invalidate cache
-      blobEngine.invalidateLayer(activeLayerId, {
-        minX: qCoords.gridX - 1,
-        minY: qCoords.gridY - 1,
-        maxX: qCoords.gridX + 1,
-        maxY: qCoords.gridY + 1,
-      })
     },
     [getQuadrantCoordinates, overrideSettings, blobEngine],
   )
@@ -811,15 +796,17 @@ export const GridPaintCanvas = forwardRef<
       getLayerStyle,
     )
 
-    // Active group outline: a constant 2px on screen at any zoom
+    // Active group outline: 2px on screen, thinning once cells get small so a
+    // zoomed-out drawing isn't buried under its own outline
     if (activeOutline && renderer.context) {
       const ctx = renderer.context
       const scale = canvasView.zoom * activeOutline.scale
+      const cellPx = canvasView.gridSize * scale
       ctx.save()
       ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
       ctx.scale(scale, scale)
       ctx.strokeStyle = getCanvasColor("--canvas-outline-active")
-      ctx.lineWidth = 2 / scale
+      ctx.lineWidth = Math.min(2, cellPx * 0.06) / scale
       ctx.lineCap = "round"
       ctx.lineJoin = "round"
       ctx.stroke(activeOutline.path)
@@ -974,6 +961,51 @@ export const GridPaintCanvas = forwardRef<
       ctx.restore()
     }
 
+    // Override tool: preview the selected shape in the hovered quadrant
+    // (just the quadrant box for "empty" or when alt-clearing)
+    if (currentTool === "override" && overrideHoverRef.current && renderer.context) {
+      const { gridX, gridY, quadrant, clearing } = overrideHoverRef.current
+      const ctx = renderer.context
+      const gs = canvasView.gridSize
+      const h = gs / 2
+      const cx = (gridX + 0.5) * gs
+      const cy = (gridY + 0.5) * gs
+      const qx = quadrant === 0 || quadrant === 3 ? cx : cx - h
+      const qy = quadrant === 0 || quadrant === 1 ? cy : cy - h
+      const color = getCanvasColor(clearing ? "--destructive" : "--highlighted")
+
+      ctx.save()
+      ctx.translate(canvasView.panOffset.x, canvasView.panOffset.y)
+      ctx.scale(canvasView.zoom, canvasView.zoom)
+      const converted = clearing ? null : quadrantStateToPrimitive(overrideSettings.shape)
+      if (converted) {
+        const path = new Path2D()
+        appendPrimitivePath(
+          path,
+          {
+            type: converted.type,
+            center: { x: gridX, y: gridY },
+            quadrant,
+            size: h,
+            layerId: 0,
+            curveType: converted.curveType,
+            renderQuadrant:
+              converted.type === "rectangle" ? undefined : converted.renderQuadrant,
+          },
+          gs,
+        )
+        ctx.globalAlpha = 0.4
+        ctx.fillStyle = color
+        ctx.fill(path)
+        ctx.globalAlpha = 1
+      }
+      ctx.strokeStyle = color
+      ctx.lineWidth = 1 / canvasView.zoom
+      ctx.setLineDash([3 / canvasView.zoom, 3 / canvasView.zoom])
+      ctx.strokeRect(qx, qy, h, h)
+      ctx.restore()
+    }
+
     // Render Center of Gravity (hold 'G')
     if (showCenterOfGravity && selectionState.bounds && renderer?.context) {
       const cog = computeCenterOfGravity(layersState.layers, selectionState.bounds)
@@ -1041,6 +1073,7 @@ export const GridPaintCanvas = forwardRef<
     exportRectsHook.draftBounds,
     showCenterOfGravity,
     selectionState.bounds,
+    overrideSettings.shape,
     rigAnalysis,
     rigToolSettings,
   ])
@@ -1149,6 +1182,7 @@ export const GridPaintCanvas = forwardRef<
       if (isOptionHeld && (currentTool === "draw" || currentTool === "erase")) {
         effectiveTool = currentTool === "draw" ? "erase" : "draw"
       }
+      if (effectiveTool !== "draw" && effectiveTool !== "erase") return coords
 
       const pointsToModify = new Set<string>()
       if (lastCoords) {
@@ -1162,7 +1196,7 @@ export const GridPaintCanvas = forwardRef<
         let x = lastCoords.x
         let y = lastCoords.y
 
-        while (true) {
+        for (;;) {
           pointsToModify.add(`${x},${y}`)
           if (x === coords.x && y === coords.y) break
           const e2 = 2 * err
@@ -1183,46 +1217,30 @@ export const GridPaintCanvas = forwardRef<
       const groupIdx = Math.min(activeGroupIndex, activeLayer.groups.length - 1)
       const activeGroup = activeLayer.groups[Math.max(0, groupIdx)]
       if (!activeGroup) return
+      // Moving within a cell changes nothing: skip the store update (and the
+      // geometry diff it would trigger)
+      const changed = [...pointsToModify].filter((key) =>
+        effectiveTool === "draw"
+          ? !activeGroup.points.has(key)
+          : activeGroup.points.has(key) || activeLayer.pointModifications?.has(key),
+      )
+      if (changed.length === 0) return coords
+
       const newPoints = new Set(activeGroup.points)
-      pointsToModify.forEach((key) => {
-        if (effectiveTool === "draw") {
-          newPoints.add(key)
-        } else if (effectiveTool === "erase") {
-          newPoints.delete(key)
-          // Also clear point modifications when erasing (each clear is a
-          // store update, so skip points that have none)
-          if (activeLayer.pointModifications?.has(key)) {
-            clearPointModifications(activeLayerId, key)
-          }
-        }
-      })
-
-      // Apply update to the active group
-      updateGroupPoints(activeLayerId, newPoints, activeGroup.id)
-
-      // Targeted cache invalidation for the edited region (+1-cell padding for neighbors)
-      if (pointsToModify.size > 0) {
-        let minX = Infinity,
-          minY = Infinity,
-          maxX = -Infinity,
-          maxY = -Infinity
-        for (const key of pointsToModify) {
-          const [x, y] = key.split(",").map(Number)
-          if (x < minX) minX = x
-          if (y < minY) minY = y
-          if (x > maxX) maxX = x
-          if (y > maxY) maxY = y
-        }
-        blobEngine.invalidateLayer(activeLayerId, {
-          minX: minX - 1,
-          minY: minY - 1,
-          maxX: maxX + 1,
-          maxY: maxY + 1,
-        })
+      for (const key of changed) {
+        if (effectiveTool === "draw") newPoints.add(key)
+        else newPoints.delete(key)
       }
+      // Erasing also clears the cells' overrides and cutouts; one store update
+      applyGroupStroke(
+        activeLayerId,
+        activeGroup.id,
+        newPoints,
+        effectiveTool === "erase" ? changed : [],
+      )
       return coords
     },
-    [getGridCoordinates, currentTool, activeGroupIndex, blobEngine.invalidateLayer],
+    [getGridCoordinates, currentTool, activeGroupIndex],
   )
 
   // Mouse interaction handlers
@@ -1335,6 +1353,23 @@ export const GridPaintCanvas = forwardRef<
         cutoutRemovingRef.current = e.altKey || !!(e.buttons & 2)
         hoveredCutoutRef.current = getHoveredCutout(e.clientX, e.clientY)
         render()
+      }
+
+      if (currentTool === "override") {
+        const q = getQuadrantCoordinates(e.clientX, e.clientY)
+        const clearing = e.altKey || !!(e.buttons & 2)
+        const prev = overrideHoverRef.current
+        if (
+          !q ||
+          !prev ||
+          prev.gridX !== q.gridX ||
+          prev.gridY !== q.gridY ||
+          prev.quadrant !== q.quadrant ||
+          prev.clearing !== clearing
+        ) {
+          overrideHoverRef.current = q ? { ...q, clearing } : null
+          render()
+        }
       }
 
       // Shape-handle hover: only when not mid-gesture (resize sets it on down).
@@ -1492,6 +1527,10 @@ export const GridPaintCanvas = forwardRef<
 
     const handleMouseLeave = () => {
       handleMouseUp()
+      if (overrideHoverRef.current) {
+        overrideHoverRef.current = null
+        render()
+      }
       if (currentTool === "cutout") {
         cutoutPointerRef.current = null
         hoveredCutoutRef.current = null
@@ -1587,6 +1626,11 @@ export const GridPaintCanvas = forwardRef<
 
   // Clear transient shape-tool drag state when leaving the shape tool, so a
   // stale rubber-band or resize gesture never persists into another tool.
+  // Drop the override hover preview when leaving the override tool
+  useEffect(() => {
+    if (currentTool !== "override") overrideHoverRef.current = null
+  }, [currentTool])
+
   useEffect(() => {
     if (currentTool !== "shape") {
       shapeDragStartRef.current = null
@@ -1686,6 +1730,12 @@ export const GridPaintCanvas = forwardRef<
         setCutoutDraft(null)
       }
 
+      // ── Escape: cancel an export rect drag ───────────────────────────────
+      if (e.key === "Escape" && currentTool === "export" && exportRectsHook.isDrawing) {
+        e.preventDefault()
+        exportRectsHook.cancelDraw()
+      }
+
       // ── Escape: clear selection ──────────────────────────────────────────
       if (e.key === "Escape") {
         if (currentTool === "select" && selection.hasSelection) {
@@ -1717,13 +1767,14 @@ export const GridPaintCanvas = forwardRef<
     selection.cancelFloatingPaste,
     getGridCoordinates,
     centerCanvasToContent,
+    exportRectsHook.isDrawing,
+    exportRectsHook.cancelDraw,
   ])
 
   // Imperative handle (same interface as original)
   useImperativeHandle(ref, () => ({
     reset: () => {
       resetDrawing()
-      blobEngine.clearCaches()
       render()
     },
 
@@ -1735,7 +1786,6 @@ export const GridPaintCanvas = forwardRef<
           : Math.max(25, canvasView.gridSize - step)
 
       $canvasView.setKey("gridSize", newSize)
-      blobEngine.clearCaches()
       initializeCanvas()
       render()
     },
@@ -1743,7 +1793,6 @@ export const GridPaintCanvas = forwardRef<
     setBorderWidth: (width: number) => {
       const clampedWidth = Math.max(0, Math.min(10, width))
       $canvasView.setKey("borderWidth", clampedWidth)
-      blobEngine.clearCaches()
       render()
     },
 
@@ -1826,7 +1875,6 @@ export const GridPaintCanvas = forwardRef<
 
     toggleLayerVisibility: (layerId: number) => {
       toggleLayerVisibility(layerId)
-      blobEngine.invalidateLayer(layerId)
       render()
     },
 
@@ -1847,13 +1895,11 @@ export const GridPaintCanvas = forwardRef<
         setActiveLayer(layers.length > 0 ? layers[0].id : null)
       }
 
-      blobEngine.invalidateLayer(layerId)
       render()
     },
 
     toggleLayerRenderStyle: (layerId: number) => {
       toggleLayerRenderStyle(layerId)
-      blobEngine.invalidateLayer(layerId)
       render()
     },
 
@@ -1928,12 +1974,6 @@ export const GridPaintCanvas = forwardRef<
     if (import.meta.hot) {
       const handleHotUpdate = () => {
         console.log("Hot reload detected - forcing canvas redraw")
-        blobEngine.clearCaches()
-
-        // Force invalidation of all layers
-        layersState.layers.forEach((layer) => {
-          blobEngine.invalidateLayer(layer.id)
-        })
 
         // Reinitialize canvas and force a complete re-render
         setTimeout(() => {
@@ -1954,8 +1994,8 @@ export const GridPaintCanvas = forwardRef<
   // Don't render until state is ready
   if (!isReady) {
     return (
-      <div className='w-full h-full bg-gray-100 flex items-center justify-center'>
-        <div className='text-gray-500'>Loading...</div>
+      <div className='w-full h-full bg-background flex items-center justify-center'>
+        <div className='text-muted-foreground'>Loading...</div>
       </div>
     )
   }

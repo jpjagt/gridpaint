@@ -42,7 +42,7 @@ const PRIMITIVE_PRIORITY: Record<PrimitiveType, number> = {
  * The renderQuadrant determines the visual orientation (rotation) of the shape,
  * which may differ from the physical quadrant it's placed in.
  */
-function quadrantStateToPrimitive(
+export function quadrantStateToPrimitive(
   state: QuadrantState,
 ): { type: PrimitiveType; curveType: CurveType; renderQuadrant: Quadrant } | null {
   switch (state) {

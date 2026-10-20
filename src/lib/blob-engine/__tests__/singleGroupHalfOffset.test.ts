@@ -28,7 +28,7 @@ describe("single-group half-offset through engine dispatch", () => {
       groups: [{ id: "default", points: new Set(["3,3"]), offsetPhaseX: "half", offsetPhaseY: "half" }],
     }
     const engine = new BlobEngine({ enableCaching: true })
-    const geo = engine.generateLayerGeometry(layer, 10, 0, { minX: -10, minY: -10, maxX: 10, maxY: 10 })
+    const geo = engine.generateLayerGeometry(layer, 10, 0)
     expect(geo.primitives.length).toBeGreaterThan(0)
     const allShifted = geo.primitives.every(
       (p) => p.center.x % 1 !== 0 && p.center.y % 1 !== 0,

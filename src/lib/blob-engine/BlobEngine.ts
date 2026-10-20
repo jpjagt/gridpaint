@@ -21,12 +21,13 @@ import { getGridLayerPoints } from "./types"
 import { NeighborhoodAnalyzer } from "./NeighborhoodAnalyzer"
 import { PrimitiveGenerator } from "./PrimitiveGenerator"
 import { GroupMerger } from "./GroupMerger"
-import { GeometryCache } from "./GeometryCache"
 import { BlobEngineError } from "./types"
 import { scaleToFactor } from "@/lib/blob-engine/utils/scale"
 
 export interface BlobEngineOptions {
+  /** @deprecated No-op: geometry caching now lives in TiledLayerGeometry */
   enableCaching?: boolean
+  /** @deprecated No-op */
   maxCacheSize?: number
   debugMode?: boolean
 }
@@ -75,7 +76,6 @@ export class BlobEngine {
   private analyzer = new NeighborhoodAnalyzer()
   private generator = new PrimitiveGenerator()
   private groupMerger = new GroupMerger()
-  private cache = new GeometryCache()
 
   private options: BlobEngineOptions
 
@@ -96,7 +96,6 @@ export class BlobEngine {
     layers: GridLayer[],
     gridSize: number,
     borderWidth: number = 0,
-    viewport?: SpatialRegion,
   ): CompositeGeometry {
     try {
       const startTime = this.options.debugMode ? performance.now() : 0
@@ -121,7 +120,6 @@ export class BlobEngine {
           layer,
           gridSize,
           borderWidth,
-          viewport,
         )
 
         layerGeometries.push({
@@ -195,7 +193,6 @@ export class BlobEngine {
     layer: GridLayer,
     gridSize: number,
     borderWidth: number = 0,
-    viewport?: SpatialRegion,
     options: {
       /**
        * Take the group-merge path even if this layer alone wouldn't need it.
@@ -221,73 +218,7 @@ export class BlobEngine {
       return this.createGeometryFromPrimitives(primitives, gridSize, borderWidth)
     }
 
-    // Fast path: single group, no overrides (original algorithm)
-    // If caching and viewport provided, do region-based fetch/compute
-    if (this.options.enableCaching && viewport) {
-      const { geometry: hitPrimitives, hitRegions, missRegions } =
-        this.cache.getCachedGeometry(viewport, [layer], gridSize, borderWidth)
-
-      const resultPrimitives: BlobPrimitive[] = [...hitPrimitives]
-
-      // Precompute candidate points within the overall viewport once
-      const viewportPoints = this.getViewportPoints(layer, viewport)
-
-      // Update layer version snapshot once for this round
-      this.cache.snapshotLayerVersions([layer])
-
-      // Compute primitives for each missed region and cache them
-      for (const regionKey of missRegions) {
-        const regionBounds = this.cache.getRegionBounds(regionKey)
-        const pointsToProcess = this.filterPointsInRegion(viewportPoints, regionBounds)
-
-        if (pointsToProcess.size === 0) {
-          // Cache empty to avoid rework later
-          this.cache.cacheRegionGeometry(regionKey, [], [layer])
-          continue
-        }
-
-        const regionPrimitives: BlobPrimitive[] = []
-        for (const pointKey of pointsToProcess) {
-          const [x, y] = pointKey.split(",").map(Number)
-          const point: GridPoint = { x, y }
-
-          const neighborhood = this.analyzer.getNeighborhoodMap(
-            point,
-            allLayerPoints,
-          )
-          const analysis = this.analyzer.analyzeNeighborhood(
-            neighborhood,
-            allLayerPoints,
-            point,
-          )
-          const isActivePoint = allLayerPoints.has(pointKey)
-
-          const pointPrimitives = this.generatePointPrimitives(
-            point,
-            neighborhood,
-            isActivePoint,
-            gridSize,
-            borderWidth,
-            layer.id,
-            analysis,
-          )
-
-          regionPrimitives.push(...pointPrimitives)
-        }
-
-        // Cache region results and add to final list
-        this.cache.cacheRegionGeometry(regionKey, regionPrimitives, [layer])
-        resultPrimitives.push(...regionPrimitives)
-      }
-
-      return this.createGeometryFromPrimitives(
-        resultPrimitives,
-        gridSize,
-        borderWidth,
-      )
-    }
-
-    // Fallback: no viewport or caching disabled → compute full set
+    // Fast path: single group, no overrides
     const pointsToProcess = this.getAllLayerPoints(layer)
     if (pointsToProcess.size === 0) {
       return this.createEmptyLayerGeometry(gridSize, borderWidth)
@@ -468,37 +399,11 @@ export class BlobEngine {
     }
   }
 
-  /**
-   * Invalidate cached geometry for a layer
-   */
-  invalidateLayer(layerId: number, affectedRegion?: SpatialRegion): void {
-    if (this.options.enableCaching) {
-      this.cache.invalidateLayer(layerId, affectedRegion)
-    }
+  /** @deprecated No-op: kept for callers from before TiledLayerGeometry */
+  invalidateLayer(): void {}
 
-    // Also clear analyzer caches since layer data changed
-    this.analyzer.clearCache()
-    this.groupMerger.clearCache()
-  }
-
-  /**
-   * Clear all caches
-   */
-  clearCaches(): void {
-    this.cache.clear()
-    this.analyzer.clearCache()
-    this.groupMerger.clearCache()
-  }
-
-  /**
-   * Get performance statistics
-   */
-  getStats() {
-    return {
-      cache: this.cache.getStats(),
-      options: this.options,
-    }
-  }
+  /** @deprecated No-op: kept for callers from before TiledLayerGeometry */
+  clearCaches(): void {}
 
   /**
    * Update engine options

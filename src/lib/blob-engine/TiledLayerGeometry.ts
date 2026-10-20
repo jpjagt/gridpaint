@@ -137,7 +137,6 @@ export class TiledLayerGeometry {
       windowLayer,
       gridSize,
       borderWidth,
-      undefined,
       { forceGroupMerge },
     )
 

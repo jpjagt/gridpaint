@@ -404,6 +404,38 @@ export function updateGroupPoints(
 }
 
 /**
+ * One paint/erase step as a single store update: replace a group's points and
+ * drop the point modifications of erased cells.
+ */
+export function applyGroupStroke(
+  layerId: number,
+  groupId: string,
+  points: Set<string>,
+  clearModsAt: Iterable<string> = [],
+): void {
+  const current = $layersState.get()
+  const layers = current.layers.map((layer) => {
+    if (layer.id !== layerId) return layer
+    const groups = layer.groups.map((g) => (g.id === groupId ? { ...g, points } : g))
+    let pointModifications = layer.pointModifications
+    for (const key of clearModsAt) {
+      if (!pointModifications?.has(key)) continue
+      if (pointModifications === layer.pointModifications) {
+        pointModifications = new Map(pointModifications)
+      }
+      pointModifications.delete(key)
+    }
+    return {
+      ...layer,
+      groups,
+      pointModifications:
+        pointModifications && pointModifications.size > 0 ? pointModifications : undefined,
+    }
+  })
+  $layersState.setKey("layers", layers)
+}
+
+/**
  * Convenience: update points for the first/default group of a layer.
  * Most drawing operations use this.
  */

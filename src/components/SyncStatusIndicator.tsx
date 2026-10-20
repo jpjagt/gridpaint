@@ -20,7 +20,7 @@ export function SyncStatusIndicator() {
   return (
     <div className="fixed bottom-4 right-4 z-40">
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-card border border-border"
         title={
           syncStatus.error
             ? `Sync error: ${syncStatus.error}`
@@ -33,20 +33,20 @@ export function SyncStatusIndicator() {
       >
         {syncStatus.error ? (
           <>
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            <span className="text-xs text-red-500">Sync error</span>
+            <AlertCircle className="w-4 h-4 text-destructive" />
+            <span className="text-xs text-destructive">Sync error</span>
           </>
         ) : syncStatus.isSyncing ? (
           <>
             <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-            <span className="text-xs text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-muted-foreground">
               Syncing...
             </span>
           </>
         ) : (
           <>
             <Cloud className="w-4 h-4 text-green-500" />
-            <span className="text-xs text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-muted-foreground">
               Synced
             </span>
           </>
