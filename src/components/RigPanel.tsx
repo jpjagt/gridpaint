@@ -377,6 +377,7 @@ const SETUP_FIELDS: { key: keyof PrintSetup; label: string; step: number }[] = [
   { key: "stencilThickness", label: "Stencil", step: 0.1 },
   { key: "glueDiameter", label: "Glue spot ⌀", step: 0.1 },
   { key: "glueMargin", label: "Glue margin", step: 0.1 },
+  { key: "outlineDepth", label: "Outline depth", step: 0.1 },
 ]
 
 function PrintSetupFields({ setup }: { setup: PrintSetup }) {

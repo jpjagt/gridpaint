@@ -35,6 +35,7 @@ export const DEFAULT_PRINT_SETUP: PrintSetup = {
   glueMargin: 0.5,
   glueMarkers: true,
   plateOutlines: true,
+  outlineDepth: 0.2,
 }
 
 function loadPrintSetup(): PrintSetup {

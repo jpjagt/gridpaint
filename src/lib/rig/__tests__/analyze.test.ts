@@ -29,6 +29,7 @@ const setup: PrintSetup = {
   glueMargin: 0.5,
   glueMarkers: true,
   plateOutlines: true,
+  outlineDepth: 0.2,
 }
 
 // Layer 2 (in first): 5x5 block. Layer 1 on top: a plus shape.

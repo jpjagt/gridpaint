@@ -59,6 +59,8 @@ export interface PrintSetup {
   glueMarkers: boolean
   /** Engrave every layer's outline into the top of the base plate */
   plateOutlines: boolean
+  /** Depth of those outline grooves (mm); one print layer is enough */
+  outlineDepth: number
 }
 
 export type RigToolMode = "pillars" | "glue"
