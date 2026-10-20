@@ -22,12 +22,10 @@ import {
   isEmpty,
   offset,
   pieces,
-  rect as rectRegion,
   union,
 } from "@/lib/rig/clip"
+import { basePlate } from "@/lib/rig/plate"
 
-/** Plate margin around everything it carries (mm) */
-const PLATE_MARGIN = 2
 /** Glue markers point at spots at most this many cells away */
 const MARKER_REACH = 4
 /** Marker triangle size (circumradius, mm) */
@@ -80,23 +78,8 @@ export function buildRigParts(
     ...layers.map((l) => l.footprint),
     ...pillars.map((p) => p.sections[0] ?? []),
   )
-  if (!isEmpty(everything)) {
-    const bb = bounds(everything)
-    const r = Math.min(4, m)
-    const plate = offset(
-      offset(
-        rectRegion(
-          bb.minX - PLATE_MARGIN,
-          bb.minY - PLATE_MARGIN,
-          bb.maxX + PLATE_MARGIN,
-          bb.maxY + PLATE_MARGIN,
-        ),
-        -r,
-      ),
-      r,
-    )
-    slabs.push({ z0: 0, z1: b, region: plate })
-  }
+  const plate = basePlate(everything)
+  if (plate.length > 0) slabs.push({ z0: 0, z1: b, region: plate })
 
   const parts: RigPart[] = []
   const transform = (p: Vec2) => ({ x: reverse ? -p.x : p.x, y: -p.y })
